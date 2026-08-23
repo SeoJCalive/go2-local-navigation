@@ -1,0 +1,201 @@
+schema_version: 1
+record_kind: tf_frame_contract
+source_markdown: ../README.md
+record_id: "go2-local-navigation-frame-contract-20260822"
+title: "공식 Go2 URDF 및 TF frame 계약"
+status: "verified-onboard_static_tf_bringup_odom_adapter_project_mapping"
+recorded_at: "2026-08-23"
+provenance:
+  kind: "official_reference_observed_onboard_project_accepted_mapping"
+  derived_from:
+    - "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    - "/home/tjwocjf0915/research/Go2/records/migrations/go2_agx_software_stability_20260821.yaml"
+  physical_execution: "not_run"
+  direct_onboard_verification: "static_tf_bringup_verified"
+  latest_odometry_adapter_runtime: "odom_adapter_verified_teardown_completed"
+  physical_sensor_interpretation: "user_reported_alignment_with_installed_go2_sensors"
+  latest_runtime_probe: "static_tf_bringup_verified_teardown_completed"
+  official_reference:
+    geometry_source: "urdf/go2_description.urdf::radar_joint"
+    root_frame: "base"
+    fixed_edges: ["base_to_imu", "base_to_radar"]
+  observed_onboard_runtime:
+    topic: "/utlidar/cloud"
+    frame_id: "utlidar_lidar"
+    status: "verified_by_direct_discovery"
+  project_accepted_mapping:
+    decision: "installed sensor physical alignment permits direct base_to_utlidar_lidar mapping from official radar_joint geometry"
+    calibration_interpretation: "project_integration_decision_not_independent_onboard_calibration"
+  runtime_instantiation:
+    owner: "bringup/tf2_ros/static_transform_publisher"
+    status: "verified_onboard_static_tf_bringup"
+source_refs:
+  - source_id: "CURRENT-GO2-AGX-20260822"
+    path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    role: "현재 AGX 환경 요약"
+  - source_id: "GO2-AGX-TF-PROBE-20260823"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_agx_tf_frame_probe_20260823.yaml"
+    role: "이번 AGX read-only TF frame probe"
+  - source_id: "GO2-AGX-TF-PROBE-FOLLOWUP-20260823"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_agx_tf_frame_probe_followup_20260823.yaml"
+    role: "wrapper·direct discovery 기반 TF frame probe 후속 결과"
+  - source_id: "NAV2-TF-REQUIREMENTS"
+    path: "https://docs.nav2.org/setup_guides/transformation/setup_transforms.html"
+    role: "내비게이션 TF 요구사항 참고 자료"
+  - source_id: "UNITREE-GO2-FULL-URDF-DAADF41"
+    path: "https://github.com/unitreerobotics/unitree_ros/blob/daadf41ee9afce8f90fdc09a98506012691fa122/robots/go2_description/urdf/go2_description.urdf"
+    role: "Go2 전체 URDF와 native sensor 기준"
+  - source_id: "INRIA-UNITREE-DESCRIPTION-5635136"
+    path: "https://github.com/inria-paris-robotics-lab/unitree_description"
+    role: "제3자 Go2 본체 description 비교 자료"
+  - source_id: "EPPL-AMIGO-96E830"
+    path: "https://github.com/eppl-erau-db/amigo_ros2"
+    role: "AGX·센서 프로젝트의 Go2 description 비교 자료"
+
+  - source_id: "GO2-LOCAL-NAVIGATION-ODOM-FRAME-MAPPING-20260823"
+    path: "/home/tjwocjf0915/research/Go2/records/decisions/go2_local_navigation_odom_frame_mapping_20260823.yaml"
+    role: "base_link to base project mapping과 odom owner 결정"
+
+frames:
+  map:
+    role: "전역 내비게이션 frame"
+    status: "planned"
+  odom:
+    role: "지역적으로 연속적인 odom frame"
+    status: "runtime_available_project_adapter_verified"
+  base:
+    role: "공식·프로젝트 Go2 root frame"
+    status: "official_canonical_root_project_root_runtime_static_tf_verified"
+  imu:
+    role: "차체 내장 IMU의 공식 native link"
+    runtime_source_topic: "/lf/lowstate"
+    runtime_source_field: "imu_state"
+    status: "official_reference_physical_alignment_observed_runtime_source_verified_runtime_static_tf_verified"
+  radar:
+    role: "기본 Unitree LiDAR의 공식 native link"
+    runtime_topic: "/utlidar/cloud"
+    runtime_frame_id: "utlidar_lidar"
+    status: "official_reference_runtime_frame_observed_project_mapping_accepted_runtime_static_tf_verified"
+  front_camera:
+    role: "LiDAR 위쪽 기본 내장 카메라의 공식 native link"
+    runtime_topic: "/frontvideostream"
+    runtime_type: "unitree_go/msg/Go2FrontVideoData"
+    status: "official_reference_physical_alignment_observed_runtime_topic_verified_current_project_deferred"
+  utlidar_lidar:
+    role: "원시 LiDAR cloud의 관찰 frame"
+    source_topic: "/utlidar/cloud"
+    relation_to_official: "project_accepted_direct_base_mapping_from_radar_joint_geometry"
+    status: "observed_frame_id_verified_project_accepted_mapping_runtime_static_tf_verified"
+  utlidar_imu:
+    role: "LiDAR 내부 IMU의 별도 관찰 frame"
+    source_topic: "/utlidar/imu"
+    status: "observed_frame_id_verified_not_used_in_initial_project"
+
+urdf_model:
+  path: "urdf/go2_description.urdf"
+  default_mode: "official_full_model"
+  optional_mode: "none"
+  enable_argument: null
+  default_enable_value: null
+  publisher: "bringup/go2_static_tf.launch.py"
+  root_frame: "base"
+  includes:
+    - "full_native_body"
+    - "rotor_calflower_foot_links"
+    - "visual_collision_inertial"
+    - "native_imu_radar_front_camera"
+  note: "공식 전체 URDF를 canonical source로 사용한다. 추가 장비와 runtime 연결은 실제 값 확인 후 별도 overlay로 정의한다."
+
+body_model:
+  source_urdf: "urdf/go2_description.urdf"
+  projection: "config/body_model.yaml"
+  official_root_frame: "base"
+  project_root_frame: "base"
+  status: "official_reference_unverified_onboard"
+  provenance:
+    kind: "official_source_projection"
+    official_commit: "daadf41ee9afce8f90fdc09a98506012691fa122"
+    third_party_values_imported: false
+    projection_scope: "key_joint_origins_limits_only"
+  included:
+    - "key_joint_origins_axes_limits"
+  excluded:
+    - "full_urdf_visual_collision_inertial"
+    - "rotor_calflower_links"
+    - "native_sensor_transforms"
+    - "external_lidar"
+    - "map"
+    - "odom"
+    - "base_footprint"
+  note: "YAML은 검색용 projection이며 canonical geometry source가 아니다. canonical root는 base이며 dynamic leg joint TF는 이 단계에서 검증하지 않았다."
+
+transforms:
+  map_to_odom:
+    parent: "map"
+    child: "odom"
+    owner: "SLAM 또는 위치 추정 구성요소"
+    status: "required_later"
+  odom_to_base:
+    parent: "odom"
+    child: "base"
+    owner: "go2_state_estimation/odometry_adapter_node"
+    topic: "/odom"
+    mapping: "project-accepted base_link to base"
+    source: "/utlidar/robot_odom"
+    runtime_record: "records/experiments/go2_local_navigation_odom_adapter_20260823.yaml"
+    status: "verified_onboard_runtime_project_accepted"
+  base_to_imu:
+    parent: "base"
+    child: "imu"
+    owner: "robot_state_publisher"
+    source: "urdf/go2_description.urdf"
+    geometry: "defined_in_canonical_urdf"
+    runtime_source: "/lf/lowstate.imu_state"
+    note: "공식 fixed edge이며 robot_state_publisher가 소유한다. AGX static TF runtime 발행을 확인했다."
+    status: "official_fixed_geometry_robot_state_publisher_runtime_static_tf_verified"
+  base_to_radar:
+    parent: "base"
+    child: "radar"
+    owner: "robot_state_publisher"
+    source: "urdf/go2_description.urdf"
+    geometry: "defined_in_canonical_urdf"
+    note: "공식 fixed edge이며 robot_state_publisher가 소유한다. AGX static TF runtime 발행을 확인했다."
+    status: "official_fixed_geometry_robot_state_publisher_runtime_static_tf_verified"
+  base_to_front_camera:
+    parent: "base"
+    child: "front_camera"
+    owner: "공식 URDF fixed joint / 향후 robot_state_publisher"
+    source: "urdf/go2_description.urdf"
+    geometry: "defined_in_canonical_urdf"
+    status: "official_geometry_runtime_tf_publisher_unverified_current_project_deferred"
+  base_to_utlidar_lidar:
+    parent: "base"
+    child: "utlidar_lidar"
+    owner: "tf2_ros/static_transform_publisher via bringup"
+    relation_to_official: "project_accepted_direct_mapping_from_official_radar_joint"
+    source_geometry: "urdf/go2_description.urdf::base_to_radar"
+    note: "사용자가 설치 센서의 물리 정렬을 확인하여 official radar_joint geometry를 direct runtime edge로 수용했다. 이는 독립 온보드 calibration이 아닌 프로젝트 통합 결정이며, AGX static TF runtime edge를 확인했다."
+    geometry:
+      translation_m: [0.28945, 0.0, -0.046825]
+      rotation_rpy_rad: [0.0, 2.8782, 0.0]
+      status: "official_geometry_project_accepted_runtime_static_tf_verified"
+    instantiated: true
+    status: "verified_onboard_static_tf_bringup_project_accepted_geometry"
+
+validation_boundary:
+  allowed:
+    - "공식 URDF XML 문법과 robot root 확인"
+    - "공식 Go2 전체 link·joint tree와 native sensor link 확인"
+    - "body_model.yaml projection의 key joint 값이 공식 URDF와 일치하는지 확인"
+    - "공식 radar와 runtime utlidar_lidar의 frame_id·TF publisher를 별도 비교"
+    - "wrapper와 ros2 --no-daemon을 사용한 직접 discovery 결과를 daemon graph와 구분"
+  not_allowed:
+    - "측정하지 않은 runtime transform 수치의 기본값 지정"
+    - "이 파일만으로 robot_state_publisher 또는 /tf_static 실행"
+    - "map->odom 또는 odom->base를 URDF fixed joint로 추가"
+    - "물리 장착·주행 상태가 확정됐다고 판정"
+
+safety:
+  guessed_zero_extrinsics_allowed: false
+  tf_publishers_enabled: true
+  physical_execution: "not_run"

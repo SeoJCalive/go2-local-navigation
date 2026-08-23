@@ -1,0 +1,25 @@
+# ROS 2 and Python build products
+/build/
+/install/
+/log/
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
+
+# Runtime data and large recordings
+/data/*
+!/data/README.md
+*.bag
+*.db3
+*.mcap
+*.sqlite3
+
+# Local environment and editor files
+.env
+.env.*
+.venv/
+.idea/
+.vscode/
+
+# Internal research/mount manifest; it contains environment-specific paths
+/project.yaml

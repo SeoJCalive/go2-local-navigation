@@ -1,0 +1,267 @@
+schema_version: 1
+record_kind: robot_body_kinematics
+record_id: "go2-body-kinematics-20260823"
+title: "Go2 본체 주요 관절 검색용 projection"
+source_markdown: "../README.md"
+status: "unverified"
+recorded_at: "2026-08-23"
+provenance:
+  kind: "official_source_projection"
+  official_commit: "daadf41ee9afce8f90fdc09a98506012691fa122"
+  third_party_values_imported: false
+  onboard_joint_tf_verification: "not_run"
+  source_scope: "key_joint_origins_limits_only"
+source_refs:
+  - source_id: "UNITREE-GO2-FULL-URDF-DAADF41"
+    path: "https://github.com/unitreerobotics/unitree_ros/blob/daadf41ee9afce8f90fdc09a98506012691fa122/robots/go2_description/urdf/go2_description.urdf"
+    role: "수치 기준"
+  - source_id: "INRIA-UNITREE-DESCRIPTION-5635136"
+    path: "https://github.com/inria-paris-robotics-lab/unitree_description"
+    role: "본체 구조 비교"
+  - source_id: "EPPL-AMIGO-96E830"
+    path: "https://github.com/eppl-erau-db/amigo_ros2"
+    role: "본체 구조·AGX 프로젝트 비교"
+root_frame:
+  official: "base"
+  project: "base"
+  mapping_status: "canonical_root_is_project_root"
+
+joints:
+  - id: "go2_joint_head_upper"
+    name: "Head_upper_joint"
+    parent: "base"
+    child: "Head_upper"
+    type: "fixed"
+    origin_xyz_m: [0.285, 0.0, 0.01]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_head_lower"
+    name: "Head_lower_joint"
+    parent: "Head_upper"
+    child: "Head_lower"
+    type: "fixed"
+    origin_xyz_m: [0.008, 0.0, -0.07]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"
+
+  - id: "go2_joint_fl_hip"
+    name: "FL_hip_joint"
+    parent: "base"
+    child: "FL_hip"
+    type: "revolute"
+    origin_xyz_m: [0.1934, 0.0465, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limit:
+      lower_rad: -1.0472
+      upper_rad: 1.0472
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fl_thigh"
+    name: "FL_thigh_joint"
+    parent: "FL_hip"
+    child: "FL_thigh"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0955, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -1.5708
+      upper_rad: 3.4907
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fl_calf"
+    name: "FL_calf_joint"
+    parent: "FL_thigh"
+    child: "FL_calf"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -2.7227
+      upper_rad: -0.83776
+      effort: 45.43
+      velocity_rad_s: 15.7
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fl_foot"
+    name: "FL_foot_joint"
+    parent: "FL_calf"
+    child: "FL_foot"
+    type: "fixed"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"
+
+  - id: "go2_joint_fr_hip"
+    name: "FR_hip_joint"
+    parent: "base"
+    child: "FR_hip"
+    type: "revolute"
+    origin_xyz_m: [0.1934, -0.0465, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limit:
+      lower_rad: -1.0472
+      upper_rad: 1.0472
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fr_thigh"
+    name: "FR_thigh_joint"
+    parent: "FR_hip"
+    child: "FR_thigh"
+    type: "revolute"
+    origin_xyz_m: [0.0, -0.0955, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -1.5708
+      upper_rad: 3.4907
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fr_calf"
+    name: "FR_calf_joint"
+    parent: "FR_thigh"
+    child: "FR_calf"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -2.7227
+      upper_rad: -0.83776
+      effort: 45.43
+      velocity_rad_s: 15.7
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_fr_foot"
+    name: "FR_foot_joint"
+    parent: "FR_calf"
+    child: "FR_foot"
+    type: "fixed"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"
+
+  - id: "go2_joint_rl_hip"
+    name: "RL_hip_joint"
+    parent: "base"
+    child: "RL_hip"
+    type: "revolute"
+    origin_xyz_m: [-0.1934, 0.0465, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limit:
+      lower_rad: -1.0472
+      upper_rad: 1.0472
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rl_thigh"
+    name: "RL_thigh_joint"
+    parent: "RL_hip"
+    child: "RL_thigh"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0955, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -0.5236
+      upper_rad: 4.5379
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rl_calf"
+    name: "RL_calf_joint"
+    parent: "RL_thigh"
+    child: "RL_calf"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -2.7227
+      upper_rad: -0.83776
+      effort: 45.43
+      velocity_rad_s: 15.7
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rl_foot"
+    name: "RL_foot_joint"
+    parent: "RL_calf"
+    child: "RL_foot"
+    type: "fixed"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"
+
+  - id: "go2_joint_rr_hip"
+    name: "RR_hip_joint"
+    parent: "base"
+    child: "RR_hip"
+    type: "revolute"
+    origin_xyz_m: [-0.1934, -0.0465, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [1.0, 0.0, 0.0]
+    limit:
+      lower_rad: -1.0472
+      upper_rad: 1.0472
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rr_thigh"
+    name: "RR_thigh_joint"
+    parent: "RR_hip"
+    child: "RR_thigh"
+    type: "revolute"
+    origin_xyz_m: [0.0, -0.0955, 0.0]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -0.5236
+      upper_rad: 4.5379
+      effort: 23.7
+      velocity_rad_s: 30.1
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rr_calf"
+    name: "RR_calf_joint"
+    parent: "RR_thigh"
+    child: "RR_calf"
+    type: "revolute"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    axis: [0.0, 1.0, 0.0]
+    limit:
+      lower_rad: -2.7227
+      upper_rad: -0.83776
+      effort: 45.43
+      velocity_rad_s: 15.7
+    evidence: "official"
+    status: "unverified"
+  - id: "go2_joint_rr_foot"
+    name: "RR_foot_joint"
+    parent: "RR_calf"
+    child: "RR_foot"
+    type: "fixed"
+    origin_xyz_m: [0.0, 0.0, -0.213]
+    origin_rpy_rad: [0.0, 0.0, 0.0]
+    evidence: "official"
+    status: "unverified"

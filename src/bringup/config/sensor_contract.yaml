@@ -1,0 +1,112 @@
+schema_version: 1
+record_kind: project_sensor_contract
+source_markdown: ../README.md
+record_id: "go2-local-navigation-sensor-contract-20260822"
+title: "AGX 센서·odometry adapter 계약"
+status: "verified-onboard_lidar_and_odometry_adapter_project_accepted"
+recorded_at: "2026-08-23"
+provenance:
+  kind: "onboard_readonly_topic_probe"
+  derived_from:
+    - "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    - "/home/tjwocjf0915/research/Go2/records/migrations/go2_agx_software_stability_20260821.yaml"
+  physical_execution: "no_motion"
+  direct_onboard_verification: "lidar_and_odometry_probe_verified"
+source_refs:
+  - source_id: "CURRENT-GO2-AGX-20260822"
+    path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    role: "현재 AGX 환경 요약"
+  - source_id: "OBS-GO2-AGX-SOFTWARE-STABILITY-20260821"
+    path: "/home/tjwocjf0915/research/Go2/records/migrations/go2_agx_software_stability_20260821.yaml"
+    role: "읽기 전용 topic 주기 관찰"
+  - source_id: "GO2-LOCAL-NAVIGATION-SENSOR-ODOMETRY-PROBE-20260823"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_sensor_odometry_probe_20260823.yaml"
+    role: "LiDAR acceptance와 odometry source probe runtime 결과"
+  - source_id: "GO2-LOCAL-NAVIGATION-ODOM-ADAPTER-20260823"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_odom_adapter_20260823.yaml"
+    role: "odometry adapter output·dynamic TF·teardown runtime 결과"
+
+topics:
+  lidar_cloud:
+    topic: "/utlidar/cloud"
+    message_type: "sensor_msgs/msg/PointCloud2"
+    frame_id: "utlidar_lidar"
+    frame_status: "verified_onboard_frame_id_extrinsic_not_calibrated"
+    rate_hz:
+      observed_range: [15.39, 15.423]
+      latest_short_window_range: [15.404, 15.423]
+      status: "observed_stable_short_window"
+    point_fields:
+      required: ["x", "y", "z"]
+      names: ["x", "y", "z", "intensity", "ring", "time"]
+      layout:
+        height: 1
+        point_step: 32
+        is_dense: true
+        width_examples: [658, 679]
+        width_status: "variable_per_sample_observed"
+      status: "verified_onboard_short_window"
+    qos:
+      reliability: "reliable"
+      history: "keep_last"
+      depth: 1
+      durability: "volatile"
+      status: "verified_onboard_publisher_qos"
+    acceptance:
+      valid_samples: 395
+      invalid_samples: 0
+      status: "verified_onboard_readonly_acceptance"
+  odometry_source:
+    topic: "/utlidar/robot_odom"
+    message_type: "nav_msgs/msg/Odometry"
+    header_frame_id: "odom"
+    child_frame_id: "base_link"
+    pose_covariance: "all_zero_observed"
+    twist_covariance: "all_zero_observed"
+    source_status: "verified_onboard_observed_candidate"
+    adapter_status: "verified_onboard_runtime_project_accepted"
+    output_topic: "/odom"
+    tf_owner: "go2_state_estimation/odometry_adapter_node"
+    probe:
+      received_samples: 3851
+      invalid_samples: 0
+      warning_codes: ["pose_covariance_all_zero", "twist_covariance_all_zero"]
+      warning_log_policy: "each_code_once_per_process"
+    runtime_verification:
+      record_id: "go2-local-navigation-odom-adapter-20260823"
+      received_samples: 10634
+      published_samples: 10633
+      rejected_samples: 0
+      dynamic_tf_edge: "odom_to_base"
+      status: "verified_onboard_runtime"
+    qos:
+      reliability: "reliable"
+      history: "keep_last"
+      depth: 1
+      durability: "volatile"
+      status: "verified_onboard_publisher_qos"
+  lidar_imu:
+    topic: "/utlidar/imu"
+    message_type: "sensor_msgs/msg/Imu"
+    frame_id: "utlidar_imu"
+    frame_status: "verified_onboard_frame_id_extrinsic_not_used"
+    rate_hz:
+      observed_range: [240.26, 253.00]
+      status: "observed_stable_short_window"
+    qos:
+      status: "unverified_on_current_runtime"
+  low_state:
+    topic: "/lf/lowstate"
+    message_type: "unitree_go/msg/LowState"
+    role: "향후 선택적 상태 소비자"
+    rate_hz:
+      observed_range: [19.99, 20.01]
+      status: "observed_stable_short_window"
+    command_dependency: "초기 골격에서는 없음"
+
+safety:
+  motion_publishers_enabled: false
+  command_topics: []
+  service_calls_enabled: false
+  physical_execution: "not_run"
+  note: "이 계약은 입력만 기록하며 Go2 motion을 승인하지 않는다."
