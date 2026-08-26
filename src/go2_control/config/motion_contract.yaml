@@ -1,0 +1,77 @@
+schema_version: 1
+record_kind: "motion_control_contract"
+record_id: "go2-local-navigation-motion-control-contract-20260826"
+source_markdown: "../README.md"
+status: "candidate_non_actuating"
+recorded_at: "2026-08-26"
+latest_verified_at: "2026-08-27"
+provenance:
+  kind: "official_repository_plus_onboard_readonly_observation_plus_engineering_candidate"
+  target: "go2_agx"
+  physical_execution: false
+  command_publication: false
+source_refs:
+  - source_id: "GO2-LOCAL-NAVIGATION-MOTION-INTERFACE-PROBE-20260826"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_motion_interface_probe_20260826.yaml"
+    role: "현재 AGX topic·message·QoS read-only 관찰"
+  - source_id: "UNITREE-ROS2-PINNED-668D1EC5"
+    path: "https://github.com/unitreerobotics/unitree_ros2/tree/668d1ec5a05d1c38d3306bdca7d59f2ba3581a88"
+    role: "Move·StopMove API ID와 Request parameter schema 공식 저장소 근거"
+  - source_id: "UNITREE-SUPPORT-MOTION-V2"
+    path: "/home/tjwocjf0915/research/Go2/sources/official/sdk/raw_snapshots/2026-08-03/motion_services_interface_v2__6_814_en.md"
+    role: "Move 공식 범위·robot coordinate·1초 유지·filter 및 stop 권고"
+  - source_id: "GO2-LOCAL-NAVIGATION-MOTION-DRY-RUN-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_motion_adapter_dry_run_20260827.yaml"
+    role: "닫힌 이중 gate, clamp, watchdog와 preview 비동작 실행 근거"
+  - source_id: "GO2-LOCAL-NAVIGATION-INTEGRATED-PREFLIGHT-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml"
+    role: "전체 stack에서 닫힌 gate와 command publisher 부재를 확인한 근거"
+input:
+  topic: "/go2_control/cmd_vel_candidate"
+  message_type: "geometry_msgs/msg/Twist"
+  frame_semantics: "project_assumed_robot_relative_base_planar_command"
+  frame_status: "candidate_pending_nav2_and_physical_axis_verification"
+output:
+  preview_topic: "/go2_control/sport_request_preview"
+  preview_message_type: "unitree_api/msg/Request"
+  control_topic: "/api/sport/request"
+  control_message_type: "unitree_api/msg/Request"
+  control_topic_status: "verified-onboard_readonly_graph"
+  publisher_creation_gate:
+    required_true_parameters: ["output_enabled", "physical_validation_approved"]
+    default: "closed"
+unitree_request:
+  move:
+    api_id: 1008
+    parameter_fields: ["x", "y", "z"]
+    field_mapping:
+      x: "velocity_x_m_s"
+      y: "velocity_y_m_s"
+      z: "yaw_rate_rad_s"
+    status: "official_repository_confirmed_current_runtime_not_actuated"
+  stop_move:
+    api_id: 1003
+    parameter: ""
+    status: "official_repository_confirmed_current_runtime_not_actuated"
+limits:
+  official_hard_envelope:
+    velocity_x_m_s: [-2.5, 3.8]
+    velocity_y_m_s: [-1.0, 1.0]
+    yaw_rate_rad_s: [-4.0, 4.0]
+    status: "official"
+  project_candidate:
+    forward_m_s: 0.30
+    reverse_m_s: 0.20
+    lateral_m_s: 0.15
+    yaw_rad_s: 0.40
+    linear_acceleration_m_s2: 0.50
+    yaw_acceleration_rad_s2: 1.00
+    command_timeout_ms: 250
+    status: "engineering_candidate_for_non_actuating_validation"
+    physical_suitability: "unverified"
+safety:
+  lowcmd_used: false
+  sport_request_published: false
+  stand_walk_motion_executed: false
+  activation_requires_new_user_approval: true
+  current_stage: "non_actuating_dry_run_and_integrated_preflight_verified"
