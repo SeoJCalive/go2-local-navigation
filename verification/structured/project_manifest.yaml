@@ -1,0 +1,69 @@
+schema_version: 1
+record_kind: project_manifest
+source_markdown: "../../README.md"
+record_id: "go2-local-navigation-project-20260822"
+title: "Go2 로컬 내비게이션 프로젝트 기초 골격"
+project_name: go2_local_navigation
+status: "candidate"
+recorded_at: "2026-08-22"
+latest_verified_at: "2026-08-27"
+provenance:
+  kind: "design_from_current_agx_record"
+  derived_from:
+    - "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    - "/home/tjwocjf0915/research/Go2/project_catalog/README.md"
+  physical_execution: "powered_stationary_no_motion"
+  direct_onboard_verification: "static_tf_odometry_adapter_bag_replay_obstacle_candidates_motion_dry_run_nav2_preview_and_integrated_preflight_verified"
+remote_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation"
+workspace_path: "remote_agx_home/go2_projects/projects/go2_local_navigation"
+purpose: "AGX에서 Go2 센서 계약을 읽기 전용으로 검증하고 이후 자율주행 단계를 준비하는 프로젝트"
+scope:
+  - read_only_sensor_acceptance
+  - lidar_obstacle_candidate_reporting
+  - staged_mapping_and_nav2_preparation
+  - staged_motion_adapter_non_actuating
+  - nav2_local_costmap_and_controller_non_actuating_preview
+  - central_acceptance_matrix
+  - integrated_non_actuating_preflight
+verified_outputs:
+  - "/odom"
+  - "odom_to_base_dynamic_tf"
+  - "/perception/obstacle_candidates"
+  - "/local_costmap/costmap"
+  - "/go2_control/cmd_vel_candidate"
+  - "/go2_control/sport_request_preview"
+completed_stages:
+  - "stationary_bag_replay_acceptance"
+  - "stationary_obstacle_candidate_perception"
+  - "motion_interface_readonly_probe"
+  - "motion_adapter_candidate_build_and_tests"
+  - "motion_adapter_non_actuating_dry_run"
+  - "nav2_costmap_non_actuating_runtime"
+  - "nav2_controller_non_actuating_preview"
+  - "verification_acceptance_matrix_index"
+  - "integrated_non_actuating_preflight"
+next_stage: "stationary_smoke_and_soak"
+candidate_outputs:
+  - "/go2_control/sport_request_preview"
+  - "/go2_nav2/costmap_only_cmd_vel_unused"
+verification:
+  entrypoint: "verification/README.md"
+  structured_matrix: "verification/structured/acceptance_matrix.yaml"
+  latest_record_id: "go2-local-navigation-integrated-preflight-20260827"
+  status: "stage_9_complete"
+non_goals:
+  - physical_motion_control
+  - go2_control_topic_publication
+  - sport_api_calls
+  - low_level_motor_commands
+  - physical_navigation_execution
+source_refs:
+  - source_id: "CURRENT-GO2-AGX-20260822"
+    path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    role: "현재 AGX 환경 요약"
+  - source_id: "UNITREE-ROS2-PINNED-668D1EC5"
+    path: "https://github.com/unitreerobotics/unitree_ros2/tree/668d1ec5a05d1c38d3306bdca7d59f2ba3581a88"
+    role: "공식 ROS 2 참고 자료"
+  - source_id: "INTEGRATED-PREFLIGHT-RUN-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml"
+    role: "9단계 30초 전체 비동작 stack 검증 근거"

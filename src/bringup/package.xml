@@ -3,7 +3,7 @@
 <package format="3">
   <name>bringup</name>
   <version>0.1.0</version>
-  <description>읽기 전용 센서 계약과 canonical URDF 기반 static TF launch 구성</description>
+  <description>센서 계약과 canonical URDF 기반 static TF·perception·offline RViz launch 구성</description>
   <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
   <license>Apache-2.0</license>
 
@@ -11,10 +11,18 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>description</exec_depend>
+  <exec_depend>go2_perception</exec_depend>
   <exec_depend>go2_sensor</exec_depend>
   <exec_depend>go2_state_estimation</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>unitree_go</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

@@ -1,0 +1,81 @@
+schema_version: 1
+record_kind: "navigation_non_actuating_contract"
+record_id: "go2-local-navigation-nav2-non-actuating-contract-20260827"
+source_markdown: "../README.md"
+package_name: "go2_nav2"
+status: "candidate_non_actuating"
+recorded_at: "2026-08-27"
+provenance:
+  kind: "official_nav2_plus_agx_installed_runtime_plus_engineering_candidate"
+  target: "go2_agx"
+  physical_execution: false
+  command_publication: false
+source_refs:
+  - source_id: "NAV2-HUMBLE-OFFICIAL-PARAMS"
+    path: "https://github.com/ros-navigation/navigation2/blob/humble/nav2_bringup/params/nav2_params.yaml"
+    role: "controller server·DWB·local costmap parameter 구조"
+  - source_id: "GO2-LOCAL-NAVIGATION-MOTION-CONTRACT-20260826"
+    path: "../../go2_control/config/motion_contract.yaml"
+    role: "adapter input topic·candidate 제한·이중 gate"
+  - source_id: "GO2-LOCAL-NAVIGATION-PERCEPTION-CONTRACT-20260826"
+    path: "../../go2_perception/config/perception_contract.yaml"
+    role: "PointCloud2 obstacle candidate 입력"
+installed_runtime:
+  ros_distribution: "humble"
+  nav2_version: "1.1.20"
+  packages:
+    - "nav2_controller"
+    - "nav2_costmap_2d"
+    - "nav2_dwb_controller"
+    - "nav2_lifecycle_manager"
+  status: "verified_on_agx_package_install_and_runtime"
+frames:
+  global: "odom"
+  robot: "base"
+  map_to_odom_required: false
+inputs:
+  odometry: "/odom"
+  obstacle_candidates: "/perception/obstacle_candidates"
+outputs:
+  costmap: "/local_costmap/costmap"
+  velocity_candidate: "/go2_control/cmd_vel_candidate"
+  sport_preview: "/go2_control/sport_request_preview"
+runtime_verification:
+  recorded_at: "2026-08-27"
+  costmap_only:
+    local_costmap_owner: "controller_server"
+    lifecycle_state: "active"
+    costmap_rate_hz: 1.667
+    motion_adapter_started: false
+    action_goal_sent: false
+    clean_teardown: true
+  controller_preview:
+    lifecycle_state: "active"
+    path_distance_m: 0.30
+    stationary_result: "aborted_expected_progress_checker"
+    project_control_publisher_created: false
+    clean_teardown: true
+  standalone_costmap:
+    status: "rejected_onboard_due_teardown"
+    observed_exit_codes: [-6, -11]
+safety:
+  output_enabled: false
+  physical_validation_approved: false
+  control_topic_publisher_created: false
+  obstacle_clearing: false
+  planner_started: false
+  slam_started: false
+  localization_started: false
+candidate_values:
+  robot_radius_m: 0.30
+  max_forward_m_s: 0.30
+  max_reverse_m_s: 0.20
+  max_lateral_m_s: 0.15
+  max_yaw_rad_s: 0.40
+  status: "engineering_candidate_physical_suitability_unverified"
+open_items:
+  - "physical_robot_footprint_after_agx_mount"
+  - "actual_go2_axis_response"
+  - "actual_obstacle_avoidance"
+  - "map_to_odom_localization"
+  - "physical_stop_response"
