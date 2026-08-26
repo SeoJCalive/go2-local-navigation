@@ -8,6 +8,7 @@ node publishes ``/odom`` and ``odom -> base`` TF; it does not command Go2.
 from typing import Final
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -151,12 +152,24 @@ def main(args: list[str] | None = None) -> None:
     node = OdometryAdapterNode()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        if rclpy.ok():
+            node.get_logger().info(
+                "odometry adapter stopped by keyboard interrupt"
+            )
+    except RuntimeError:
+        if rclpy.ok():
+            raise
+    except ExternalShutdownException:
+        return
     finally:
-        node.get_logger().info(
-            f"odometry adapter summary: received={node._received_sample_count} "
-            f"published={node.published_sample_count} "
-            f"rejected={node.rejected_sample_count} "
-            f"warnings={tuple(sorted(node._seen_warning_codes))}"
-        )
+        if rclpy.ok():
+            node.get_logger().info(
+                f"odometry adapter summary: received={node._received_sample_count} "
+                f"published={node.published_sample_count} "
+                f"rejected={node.rejected_sample_count} "
+                f"warnings={tuple(sorted(node._seen_warning_codes))}"
+            )
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()

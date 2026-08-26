@@ -19,6 +19,7 @@ go2_state_estimation/
 │   ├── odometry_adapter_node.py        # source를 /odom과 odom → base로 전달
 │   └── odometry_probe_node.py          # Odometry subscription과 logger 보고
 ├── resource/go2_state_estimation       # ament package resource marker
+├── test/test_odometry_adapter_shutdown.py # ROS shutdown 경계 회귀 테스트
 ├── test/test_odometry_contract.py      # 순수 계약 unit test
 ├── package.xml                          # ament_python·ROS runtime 의존성
 └── setup.py                             # 설치 metadata와 probe·adapter console entry point
@@ -33,6 +34,9 @@ go2_state_estimation/
   같은 pose·timestamp로 dynamic `odom → base` TF를 publish한다.
 - adapter는 `/cmd_vel` publish, service call, motion을 수행하지 않으며, 잘못된
   source frame·timestamp·수치 sample은 출력하지 않는다.
+- executor의 message 변환 `RuntimeError`는 ROS context가 이미 inactive인 종료
+  경계에서만 정상 종료로 처리한다. active context의 같은 오류는 숨기지 않고 다시
+  발생시킨다.
 
 이 README와 `config/odometry_contract.yaml`은 source 관찰과 project adapter의
 실행 계약을 설명한다. `odom → base` owner는 `odometry_adapter_node` 하나로
@@ -43,6 +47,9 @@ go2_state_estimation/
 reject했다. `/odom` publisher와 dynamic `odom → base` TF를 확인한 뒤 두 launch를
 teardown했으며, command topic baseline은 변하지 않았다. all-zero covariance는
 source 값을 그대로 전달했고 수치 보정하지 않았다.
+
+2026-08-27 Nav2 preview 종료 재검증에서 executor shutdown 경계 회귀 테스트를
+추가했고, 실제 launch 종료 때 adapter가 clean exit하는 것을 확인했다.
 
 상세 결과는
 `records/experiments/go2_local_navigation_odom_adapter_20260823.md`와 같은 stem의

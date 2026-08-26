@@ -3,13 +3,17 @@
 <package format="3">
   <name>go2_perception</name>
   <version>0.1.0</version>
-  <description>읽기 전용 장애물·가용 공간 보고 경계</description>
+  <description>읽기 전용 LiDAR obstacle candidate 보고 경계</description>
   <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
   <license>Apache-2.0</license>
 
   <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>sensor_msgs_py</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
 
   <test_depend>ament_copyright</test_depend>

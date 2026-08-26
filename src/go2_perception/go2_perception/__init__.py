@@ -1,5 +1,6 @@
 """Go2 로컬 내비게이션의 읽기 전용 perception 패키지.
 
-초기 골격에는 node 구현을 넣지 않았다. 실행 동작을 추가하기 전에 관찰된
-센서 계약을 먼저 검증해야 한다.
+`obstacle_candidate_node`는 기존 static TF lookup 결과로 `/utlidar/cloud`를
+`/perception/obstacle_candidates`에 publish한다. 결과는 obstacle candidate일 뿐
+최종 장애물 분류나 free-space 증명이 아니다.
 """

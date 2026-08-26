@@ -1,0 +1,71 @@
+schema_version: 1
+record_kind: stationary_perception_contract
+record_id: "go2-local-navigation-stationary-perception-contract-20260826"
+title: "정지 상태 LiDAR obstacle candidate 계약"
+status: "verified-onboard_stationary-bag-replay"
+recorded_at: "2026-08-26"
+source_markdown: "../README.md"
+source_refs:
+  - source_id: "GO2-LOCAL-NAVIGATION-SENSOR-CONTRACT"
+    path: "../../bringup/config/sensor_contract.yaml"
+    role: "verified onboard LiDAR input topic, frame, fields, and QoS"
+  - source_id: "GO2-LOCAL-NAVIGATION-FRAME-CONTRACT"
+    path: "../../description/config/frame_contract.yaml"
+    role: "project canonical base frame and existing static TF owner"
+  - source_id: "GO2-LOCAL-NAVIGATION-STATIONARY-BAG-PERCEPTION-20260826"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_stationary_bag_perception_20260826.yaml"
+    role: "raw bag, isolated replay, candidate output, and teardown evidence"
+provenance:
+  input_observation:
+    kind: "project_observed"
+    source: "../../bringup/config/sensor_contract.yaml"
+    status: "verified_onboard_short_window"
+  target_frame:
+    kind: "project_canonical"
+    value: "base"
+  transform:
+    kind: "project_static_tf_existing"
+    owner: "../../bringup/launch/go2_static_tf.launch.py"
+    official_calibration_status: "not_claimed"
+    runtime_candidate_status: "verified_onboard_stationary_bag_replay"
+contract:
+  input:
+    topic: "/utlidar/cloud"
+    message_type: "sensor_msgs/msg/PointCloud2"
+    frame_id: "utlidar_lidar"
+    qos:
+      reliability: "reliable"
+      history: "keep_last"
+      depth: 1
+      durability: "volatile"
+  transform:
+    mechanism: "tf2_ros_lookup_at_message_timestamp"
+    source_frame: "utlidar_lidar"
+    target_frame: "base"
+  candidate_filter:
+    planar_range_m: [0.25, 5.0]
+    base_frame_z_m: [-0.25, 1.0]
+    finite_transformed_xyz_required: true
+  output:
+    topic: "/perception/obstacle_candidates"
+    message_type: "sensor_msgs/msg/PointCloud2"
+    frame_id: "base"
+    timestamp: "preserved_from_input_header"
+    meaning: "obstacle_candidates_not_final_classification_or_free_space_proof"
+runtime_verification:
+  raw_input_messages: 300
+  output_messages: 300
+  timestamp_set_exact_match: true
+  output_width_range: [445, 772]
+  output_points_total: 181083
+  observed_planar_range_m: [0.366098, 4.572631]
+  observed_base_frame_z_m: [-0.249999, 0.573519]
+  all_points_finite: true
+  contract_bounds_passed: true
+  clean_teardown: true
+safety:
+  command_topics: []
+  services: []
+  motion_apis: []
+  realsense_access: false
+  physical_execution: "powered_stationary_no_motion"
