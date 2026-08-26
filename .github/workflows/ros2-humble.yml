@@ -24,6 +24,18 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out pinned Unitree ROS 2 message packages
+        uses: actions/checkout@v4
+        with:
+          repository: unitreerobotics/unitree_ros2
+          ref: 668d1ec5a05d1c38d3306bdca7d59f2ba3581a88
+          path: src/unitree_ros2
+          sparse-checkout: |
+            cyclonedds_ws/src/unitree/unitree_api
+            cyclonedds_ws/src/unitree/unitree_go
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - name: Install ROS build tools and dependencies
         run: |
           apt-get update
@@ -39,13 +51,18 @@ jobs:
             --rosdistro humble \
             --as-root apt:false \
             --reinstall \
-            -r \
             -y
 
       - name: Build workspace
         run: |
           source /opt/ros/humble/setup.bash
           colcon build --symlink-install --event-handlers console_direct+
+
+      - name: Verify Unitree message imports
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          python3 -c "from unitree_api.msg import Request; from unitree_go.msg import LowState"
 
       - name: Run tests
         run: |
