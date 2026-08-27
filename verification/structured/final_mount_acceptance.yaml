@@ -1,0 +1,107 @@
+schema_version: 1
+record_kind: "final_mount_integration_acceptance_plan"
+record_id: "go2-local-navigation-final-mount-acceptance-20260827"
+source_markdown: "../final_mount_integration.md"
+status: "prepared_execution_deferred"
+recorded_at: "2026-08-27"
+preparation_status: "completed"
+execution_status: "deferred"
+provenance:
+  kind: "preparation_plan_without_physical_execution"
+  target: "go2_agx"
+  physical_execution: "not_performed"
+  command_publication: false
+  interpretation_rule: "미수행 물리 사실과 임계값은 deferred 또는 unverified로 유지"
+source_refs:
+  - source_id: "CURRENT-GO2-AGX-20260827"
+    path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    role: "현재 AGX 임시 통합 상태와 미확인 물리 조건"
+  - source_id: "STAGE9-INTEGRATED-PREFLIGHT"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml"
+    role: "최종 장착 전 46 PASS 비작동 preflight 근거"
+  - source_id: "STAGE10-STATIONARY-SOAK"
+    record_id: "go2-local-navigation-stationary-soak-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_stationary_soak_20260827.yaml"
+    role: "최종 장착 전 30분 기준과 yaw drift 경고 근거"
+  - source_id: "MOTION-CONTRACT"
+    path: "../../src/go2_control/config/motion_contract.yaml"
+    role: "닫힌 output gate와 candidate limit 상태"
+scope:
+  included:
+    - "mount_rigidity"
+    - "connector_strain_relief"
+    - "ethernet_and_power_routing"
+    - "mobile_power_without_external_tether"
+    - "airflow"
+    - "lidar_and_default_front_camera_occlusion"
+    - "measured_footprint_and_polygon"
+    - "stage9_and_stage10_post_mount_reruns"
+  excluded:
+    - "physical_motion"
+    - "actual_control_publication"
+    - "realsense_imu"
+observed:
+  final_mount_completed: false
+  pre_mount_stage10_status: "completed_with_warning"
+  pre_mount_stage10_record_id: "go2-local-navigation-stationary-soak-20260827"
+  measured_footprint: null
+  footprint_polygon: null
+  stage9_post_mount_run: null
+  stage10_post_mount_run: null
+  final_mobile_power_configuration: null
+unverified:
+  mount_rigidity_threshold: null
+  connector_strain_relief_criteria: null
+  ethernet_power_clearance_criteria: null
+  airflow_temperature_threshold: null
+  lidar_occlusion_criteria: null
+  front_camera_occlusion_criteria: null
+  footprint_dimensions: null
+  mobile_power_voltage_current_and_protection: null
+acceptance_checks:
+  - check_id: "final-mount-rigidity"
+    status: "deferred"
+    measurement: "체결 위치, 유격 관찰, 사진"
+    artifact_required: "장착 사진과 관찰 record"
+  - check_id: "connector-strain-relief"
+    status: "deferred"
+    measurement: "connector 잠금, 케이블 당김 방향, strain relief 사진"
+    artifact_required: "배선 사진과 관찰 record"
+  - check_id: "ethernet-power-routing"
+    status: "deferred"
+    measurement: "관절·열원·모서리·센서 시야와의 경로 관계"
+    artifact_required: "routing 사진과 관찰 record"
+  - check_id: "mobile-power-without-external-tether"
+    status: "deferred"
+    measurement: "이동 중 외부 tether 없이 사용하는 전원 source, 보호 회로와 connector"
+    artifact_required: "최종 전원 구성과 근거 record"
+  - check_id: "agx-airflow"
+    status: "deferred"
+    measurement: "흡기·배기·방열 경로 가림 여부"
+    artifact_required: "방열 경로 사진과 온도 관찰 record"
+  - check_id: "default-lidar-occlusion"
+    status: "deferred"
+    measurement: "AGX, bracket, connector, cable의 기본 LiDAR 시야 차폐"
+    artifact_required: "정면·측면 사진"
+  - check_id: "default-front-camera-occlusion"
+    status: "deferred"
+    measurement: "AGX, bracket, connector, cable의 기본 front camera 시야 차폐"
+    artifact_required: "정면·측면 사진"
+  - check_id: "measured-footprint-polygon"
+    status: "deferred"
+    measurement: "AGX, bracket, connector, cable sweep 포함 실측 외곽"
+    artifact_required: "측정 원본과 polygon artifact"
+  - check_id: "stage9-post-mount-rerun"
+    status: "deferred"
+    measurement: "닫힌 gate에서 integrated non-actuating preflight 재실행"
+    artifact_required: "새 result artifact와 execution record"
+  - check_id: "stage10-post-mount-rerun"
+    status: "deferred"
+    measurement: "canonical stationary smoke·soak 절차 재실행"
+    artifact_required: "새 result artifact와 execution record"
+revalidation_gates:
+  - "final_mount_physical_artifacts_recorded"
+  - "stage9_post_mount_artifact_recorded"
+  - "stage10_post_mount_artifact_recorded"
+  - "control_gates_remain_closed_for_stage_11"
+  - "mobile_power_without_external_tether_verified_before_stage_12"

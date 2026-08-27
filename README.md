@@ -17,7 +17,9 @@ owner를 수용했다. adapter runtime에서 `/odom`과 `odom → base` dynamic 
 비동작 dry-run과 Nav2 local costmap·controller preview를 검증했으며, 실제 Sport
 control publisher는 생성하지 않았다. 같은 날 30초 통합 비동작 preflight에서 필수
 TF·sensor·odom·obstacle candidate·local costmap, 안전 gate, AGX 자원과 clean
-teardown을 함께 확인했고 46개 check가 모두 PASS였다.
+teardown을 함께 확인했고 46개 check가 모두 PASS였다. 이어서 30초 smoke는 47개
+check가 모두 PASS했고 30분 soak는 46 PASS·1 WARN이었다. 유일한 경고는 정지 yaw
+누적 drift `0.248012 rad`이며, 최종 장착 전 해결된 사실로 승격하지 않는다.
 
 ## 작업 위치와 규칙
 
@@ -62,16 +64,18 @@ ros2 run go2_nav2 integrated_preflight \
   --ros-args -p duration_sec:=30 -p run_label:=stage9
 ```
 
-최신 성공 run은 `data/runs/preflight/20260827_020502_stage9/result.json`이며,
-상세 근거는 로컬
-`records/experiments/go2_local_navigation_integrated_preflight_20260827.md`와 같은
-stem의 YAML projection에 보존한다. runtime JSON과 로그는 Git 대상이 아니다.
+9단계 성공 run은 `data/runs/preflight/20260827_020502_stage9/result.json`이다.
+10단계는 `20260827_150959_stage10_smoke`와
+`20260827_151053_stage10_soak`이며, 실행은 완료됐지만 soak의 yaw drift 경고를
+보존한다. 정확한 수치와 checksum은 로컬
+`records/experiments/go2_local_navigation_stationary_soak_20260827.md`와 같은
+stem의 YAML projection을 따른다. runtime JSON과 로그는 Git 대상이 아니다.
 
 `go2_control`은 현재 AGX graph와 공식 Unitree Request schema를 근거로 구현됐고
-AGX runtime dry-run과 14개 자동 테스트를 통과했다. 기본 이중 gate는 닫혀 있으며
-실제 command 전송은 수행하지 않았다. Nav2 controller preview는 내부 candidate와
-Sport preview까지만 연결됐고, 정지 상태에서 local costmap `1.667 Hz`와 clean
-teardown을 확인했다.
+motion adapter와 read-only trial recorder를 포함한 22개 package 테스트를 통과했다.
+recorder는 실제 `/odom` 5947개를 기록하고 control publisher 없이 clean exit했다.
+기본 이중 gate는 닫혀 있으며 실제 command 전송은 수행하지 않았다. 전체 7개
+패키지는 62 tests, 0 failures, 0 errors, 2 skipped로 검증됐다.
 
 ## 로봇 전원 없이 RViz2로 URDF·TF 보기
 
@@ -164,10 +168,11 @@ joint로 추가하지 않는다.
 
 ## 다음 확인 단계
 
-1. 두 motion gate를 닫은 채 10단계 정지 smoke·soak를 수행한다.
-2. AGX를 최종 고정한 뒤 footprint, 케이블, 열, 센서 위치를 다시 확인한다.
-3. 동적 활동이 가능한 조건에서 mapping과 `map → odom`을 검증한다.
-4. 실제 output은 별도 승인 후 축 방향·제동·StopMove부터 제한적으로 검증한다.
+1. 10단계 정지 smoke·soak는 실행 완료 상태로 유지하되 yaw drift 경고를 후속 시험에 연결한다.
+2. 11단계 준비 절차에 따라 AGX를 최종 고정하고 footprint, 케이블, 전원, 열과 센서 시야를 기록한다.
+3. 최종 고정 뒤 9·10단계 비동작 시험을 새 artifact로 다시 실행한다.
+4. 12단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
+5. 그 뒤 동적 mapping, `map → odom`과 실제 목적지 도달을 순차 검증한다.
 
 센서·odometry source probe 결과는
 `records/experiments/go2_local_navigation_sensor_odometry_probe_20260823.md`와
@@ -190,3 +195,8 @@ motion adapter dry-run과 Nav2 preview 결과는 각각
 통합 비동작 preflight 결과는
 `records/experiments/go2_local_navigation_integrated_preflight_20260827.md`와 같은
 stem의 YAML projection에 보존한다.
+
+정지 smoke·soak와 trial recorder QA 결과는 각각
+`records/experiments/go2_local_navigation_stationary_soak_20260827.md`,
+`records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.md`와
+같은 stem의 YAML projection에 보존한다.

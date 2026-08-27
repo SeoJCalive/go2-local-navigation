@@ -13,7 +13,7 @@ provenance:
     - "/home/tjwocjf0915/research/Go2/CURRENT.md"
     - "/home/tjwocjf0915/research/Go2/project_catalog/README.md"
   physical_execution: "powered_stationary_no_motion"
-  direct_onboard_verification: "static_tf_odometry_adapter_bag_replay_obstacle_candidates_motion_dry_run_nav2_preview_and_integrated_preflight_verified"
+  direct_onboard_verification: "static_tf_odometry_adapter_bag_replay_obstacle_candidates_motion_dry_run_nav2_preview_integrated_preflight_stationary_soak_and_trial_recorder_readonly_qa"
 remote_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation"
 workspace_path: "remote_agx_home/go2_projects/projects/go2_local_navigation"
 purpose: "AGX에서 Go2 센서 계약을 읽기 전용으로 검증하고 이후 자율주행 단계를 준비하는 프로젝트"
@@ -25,6 +25,10 @@ scope:
   - nav2_local_costmap_and_controller_non_actuating_preview
   - central_acceptance_matrix
   - integrated_non_actuating_preflight
+  - stationary_smoke_and_soak
+  - final_mount_integration_preparation
+  - limited_physical_motion_validation_preparation
+  - limited_motion_trial_readonly_recorder
 verified_outputs:
   - "/odom"
   - "odom_to_base_dynamic_tf"
@@ -42,15 +46,25 @@ completed_stages:
   - "nav2_controller_non_actuating_preview"
   - "verification_acceptance_matrix_index"
   - "integrated_non_actuating_preflight"
-next_stage: "stationary_smoke_and_soak"
+  - "stationary_smoke_and_soak_execution_completed_with_warning"
+  - "final_mount_integration_preparation"
+  - "limited_physical_motion_validation_preparation"
+prepared_stages:
+  - stage: "final_mount_integration"
+    preparation_status: "completed"
+    execution_status: "deferred"
+  - stage: "limited_physical_motion_validation"
+    preparation_status: "completed"
+    execution_status: "deferred"
+next_stage: "final_mount_integration"
 candidate_outputs:
   - "/go2_control/sport_request_preview"
   - "/go2_nav2/costmap_only_cmd_vel_unused"
 verification:
   entrypoint: "verification/README.md"
   structured_matrix: "verification/structured/acceptance_matrix.yaml"
-  latest_record_id: "go2-local-navigation-integrated-preflight-20260827"
-  status: "stage_9_complete"
+  latest_record_id: "go2-local-navigation-stationary-soak-20260827"
+  status: "stage_10_completed_with_warning_stages_11_12_prepared_execution_deferred"
 non_goals:
   - physical_motion_control
   - go2_control_topic_publication
@@ -67,3 +81,19 @@ source_refs:
   - source_id: "INTEGRATED-PREFLIGHT-RUN-20260827"
     path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml"
     role: "9단계 30초 전체 비동작 stack 검증 근거"
+  - source_id: "STATIONARY-SOAK-RUN-20260827"
+    record_id: "go2-local-navigation-stationary-soak-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_stationary_soak_20260827.yaml"
+    role: "10단계 smoke·30분 soak와 yaw drift 경고 근거"
+  - source_id: "TRIAL-RECORDER-READONLY-QA-20260827"
+    record_id: "go2-local-navigation-trial-recorder-readonly-qa-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml"
+    role: "12단계 read-only recorder 구현·종료·실제 odometry QA 근거"
+  - source_id: "FINAL-MOUNT-ACCEPTANCE-PLAN"
+    record_id: "go2-local-navigation-final-mount-acceptance-20260827"
+    path: "final_mount_acceptance.yaml"
+    role: "11단계 준비 완료와 실제 실행 보류 조건"
+  - source_id: "LIMITED-PHYSICAL-MOTION-ACCEPTANCE-PLAN"
+    record_id: "go2-local-navigation-limited-physical-motion-acceptance-20260827"
+    path: "limited_physical_motion_acceptance.yaml"
+    role: "12단계 준비 완료와 실제 trial 보류 조건"

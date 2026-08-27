@@ -117,6 +117,11 @@ PASS였다. 필수 node 7개와 TF 5개, 실제 센서·odom·obstacle candidate
 닫힌 두 gate, 최대 온도 `42.718°C`와 잔류 process 0개를 확인했다. 이 결과는 30분
 soak나 물리 navigation 검증이 아니다.
 
+이어진 Stage 10에서 30초 smoke는 47 PASS였고 30분 soak는 46 PASS·1 WARN이었다.
+모든 필수 topic과 host·teardown 항목은 통과했지만 정지 yaw 누적 drift
+`0.248012 rad`가 현재 `0.10 rad` 경고 기준을 넘었다. 따라서 runner의 30분
+생존·연속성은 확인됐지만 odometry 장시간 yaw 안정성은 통과로 승격하지 않는다.
+
 ## 현재 candidate 경계
 
 - Nav2 기준 frame: `odom`, robot frame: `base`

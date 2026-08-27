@@ -123,6 +123,22 @@ source_refs:
     record_id: "go2-local-navigation-integrated-preflight-20260827"
     path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml"
     role: "30초 전체 비동작 stack, 안전 gate, 자원과 clean teardown 근거"
+  - source_id: "STATIONARY-SOAK-RUN"
+    record_id: "go2-local-navigation-stationary-soak-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_stationary_soak_20260827.yaml"
+    role: "10단계 smoke·30분 soak와 yaw drift 경고 근거"
+  - source_id: "TRIAL-RECORDER-READONLY-QA"
+    record_id: "go2-local-navigation-trial-recorder-readonly-qa-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml"
+    role: "12단계 recorder 실제 odometry read-only QA와 종료 근거"
+  - source_id: "FINAL-MOUNT-PLAN"
+    record_id: "go2-local-navigation-final-mount-acceptance-20260827"
+    path: "final_mount_acceptance.yaml"
+    role: "11단계 준비 상태와 실제 장착 보류 조건"
+  - source_id: "LIMITED-PHYSICAL-MOTION-PLAN"
+    record_id: "go2-local-navigation-limited-physical-motion-acceptance-20260827"
+    path: "limited_physical_motion_acceptance.yaml"
+    role: "12단계 준비 상태와 실제 물리 trial 보류 조건"
 
 modules:
   - module_id: "agx_runtime_dds"
@@ -134,10 +150,10 @@ modules:
     current_claim:
       status: "verified"
       highest_evidence_level: "stationary-onboard-verified"
-      claim: "Humble, CycloneDDS, domain 0, eno1 조건에서 재부팅 복구와 30초 전체 비동작 preflight 확인"
+      claim: "Humble, CycloneDDS, domain 0, eno1 조건에서 재부팅 복구와 30분 전체 비동작 runtime 확인"
       limitations: ["최종 장착 전원·네트워크 미확인"]
     attained_evidence_levels: ["implemented", "stationary-onboard-verified"]
-    evidence_refs: ["AGX-REBOOT-PERSISTENCE", "AGX-SOFTWARE-STABILITY", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["AGX-REBOOT-PERSISTENCE", "AGX-SOFTWARE-STABILITY", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "runtime-wrapper-recovery"
         status: "passed"
@@ -160,16 +176,16 @@ modules:
     current_claim:
       status: "partial"
       highest_evidence_level: "stationary-onboard-verified"
-      claim: "LiDAR layout, frame, timestamp와 30초 통합 수신을 실제 AGX에서 확인"
-      limitations: ["30분 이상 dropout·jitter 미검증", "LiDAR IMU는 navigation input으로 사용하지 않음"]
+      claim: "LiDAR layout, frame, timestamp와 30분 통합 수신을 실제 AGX에서 확인"
+      limitations: ["최종 장착 시야·cable 차폐 미검증", "LiDAR IMU는 navigation input으로 사용하지 않음"]
     attained_evidence_levels: ["implemented", "automated-tested", "stationary-onboard-verified"]
-    evidence_refs: ["SENSOR-CONTRACT", "SENSOR-ODOMETRY-PROBE", "AGX-SOFTWARE-STABILITY", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["SENSOR-CONTRACT", "SENSOR-ODOMETRY-PROBE", "AGX-SOFTWARE-STABILITY", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "lidar-readonly-contract"
         status: "passed"
         condition: "PointCloud2 type, utlidar_lidar frame, x/y/z field와 timestamp"
       - check_id: "stationary-long-window-input"
-        status: "unverified"
+        status: "passed"
         condition: "30분 이상 정지 상태 수신률, gap, frame과 timestamp 추세"
       - check_id: "final-mount-occlusion"
         status: "deferred"
@@ -212,16 +228,16 @@ modules:
     current_claim:
       status: "partial"
       highest_evidence_level: "stationary-onboard-verified"
-      claim: "source validation, base_link to base project mapping, 30초 정지 drift와 clean shutdown 확인"
-      limitations: ["실제 거리·yaw 정확도 미검증", "source covariance all-zero 관찰"]
+      claim: "source validation, base_link to base project mapping, 30분 정지 pose와 clean shutdown 확인"
+      limitations: ["30분 정지 yaw drift 경고", "실제 거리·yaw 정확도 미검증", "source covariance all-zero 관찰"]
     attained_evidence_levels: ["implemented", "automated-tested", "replay-verified", "stationary-onboard-verified"]
-    evidence_refs: ["ODOMETRY-CONTRACT", "ODOMETRY-FRAME-DECISION", "ODOMETRY-ADAPTER-RUN", "STATIONARY-PERCEPTION-RUN", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["ODOMETRY-CONTRACT", "ODOMETRY-FRAME-DECISION", "ODOMETRY-ADAPTER-RUN", "STATIONARY-PERCEPTION-RUN", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "stationary-adapter-runtime"
         status: "passed"
         condition: "유효 source를 /odom과 odom to base로 전달"
       - check_id: "stationary-drift-window"
-        status: "unverified"
+        status: "warning"
         condition: "30분 정지 pose와 yaw drift 기록"
       - check_id: "dynamic-distance-yaw"
         status: "deferred"
@@ -238,10 +254,10 @@ modules:
     current_claim:
       status: "partial"
       highest_evidence_level: "stationary-onboard-verified"
-      claim: "정지 onboard source와 bag replay에서 timestamp를 보존한 base-frame 후보 출력을 확인"
+      claim: "정지 onboard source와 bag replay, 30분 soak에서 timestamp를 보존한 base-frame 후보 출력을 확인"
       limitations: ["최종 장애물 분류가 아님", "free-space 증명 아님", "동적 장애물 미검증"]
     attained_evidence_levels: ["implemented", "automated-tested", "replay-verified", "stationary-onboard-verified"]
-    evidence_refs: ["PERCEPTION-CONTRACT", "STATIONARY-PERCEPTION-RUN", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["PERCEPTION-CONTRACT", "STATIONARY-PERCEPTION-RUN", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "stationary-replay-transform-filter"
         status: "passed"
@@ -267,7 +283,7 @@ modules:
       claim: "clamp, acceleration, NaN 거부, watchdog StopMove preview와 닫힌 이중 gate 확인"
       limitations: ["실제 Sport request publish 미실행", "축 방향·StopMove 물리 반응·제동거리 미검증"]
     attained_evidence_levels: ["implemented", "automated-tested", "stationary-onboard-verified"]
-    evidence_refs: ["MOTION-CONTRACT", "MOTION-INTERFACE-PROBE", "MOTION-DRY-RUN", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["MOTION-CONTRACT", "MOTION-INTERFACE-PROBE", "MOTION-DRY-RUN", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN", "TRIAL-RECORDER-READONLY-QA"]
     acceptance_checks:
       - check_id: "non-actuating-contract"
         status: "passed"
@@ -275,6 +291,9 @@ modules:
       - check_id: "unexpected-control-publisher"
         status: "passed"
         condition: "프로젝트 node의 /api/sport/request publisher 부재"
+      - check_id: "trial-recorder-readonly-runtime"
+        status: "passed"
+        condition: "candidate·preview·odom subscriber만 가진 recorder의 실제 odometry 수신과 clean shutdown"
       - check_id: "physical-axis-stop"
         status: "deferred"
         condition: "최종 고정, 안전 전원, 시험 공간과 최신 사용자 승인"
@@ -293,7 +312,7 @@ modules:
       claim: "controller-owned local costmap, 격리 candidate와 정지 progress abort를 확인"
       limitations: ["robot radius는 engineering candidate", "clearing과 free-space 미사용", "실제 obstacle avoidance 미검증"]
     attained_evidence_levels: ["implemented", "automated-tested", "stationary-onboard-verified"]
-    evidence_refs: ["NAVIGATION-CONTRACT", "NAV2-PREVIEW-RUN", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["NAVIGATION-CONTRACT", "NAV2-PREVIEW-RUN", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "local-costmap-runtime"
         status: "passed"
@@ -371,10 +390,10 @@ modules:
     current_claim:
       status: "partial"
       highest_evidence_level: "stationary-onboard-verified"
-      claim: "30초 전체 비동작 stack의 연속 입력, 자원과 clean teardown 확인"
-      limitations: ["전체 stack 30분 이상 soak 미실행", "최종 mount thermal 조건 아님"]
+      claim: "30분 전체 비동작 stack의 연속 입력, 자원과 clean teardown 확인"
+      limitations: ["정지 yaw drift 경고", "최종 mount thermal 조건 아님"]
     attained_evidence_levels: ["implemented", "automated-tested", "stationary-onboard-verified"]
-    evidence_refs: ["AGX-SOFTWARE-STABILITY", "ODOMETRY-ADAPTER-RUN", "STATIONARY-PERCEPTION-RUN", "MOTION-DRY-RUN", "NAV2-PREVIEW-RUN", "INTEGRATED-PREFLIGHT-RUN"]
+    evidence_refs: ["AGX-SOFTWARE-STABILITY", "ODOMETRY-ADAPTER-RUN", "STATIONARY-PERCEPTION-RUN", "MOTION-DRY-RUN", "NAV2-PREVIEW-RUN", "INTEGRATED-PREFLIGHT-RUN", "STATIONARY-SOAK-RUN"]
     acceptance_checks:
       - check_id: "short-window-and-clean-teardown"
         status: "passed"
@@ -383,7 +402,7 @@ modules:
         status: "passed"
         condition: "필수 TF·topic·gate·자원과 teardown을 전체 stack에서 함께 판정"
       - check_id: "thirty-minute-soak"
-        status: "unverified"
+        status: "warning"
         condition: "비동작 전체 stack 30분 실행과 gap, drift, resource 추세"
       - check_id: "final-mount-thermal"
         status: "deferred"
@@ -403,7 +422,7 @@ modules:
       claim: "AGX는 임시 배치이며 최종 고정·영구 전원·케이블·열 조건이 확정되지 않음"
       limitations: ["현재 robot radius 0.30 m는 candidate", "외부 전원 tether 상태에서는 이동 승인 불가"]
     attained_evidence_levels: []
-    evidence_refs: ["PROJECT-MANIFEST", "AGX-SOFTWARE-STABILITY", "NAVIGATION-CONTRACT"]
+    evidence_refs: ["PROJECT-MANIFEST", "AGX-SOFTWARE-STABILITY", "NAVIGATION-CONTRACT", "STATIONARY-SOAK-RUN", "FINAL-MOUNT-PLAN"]
     acceptance_checks:
       - check_id: "mount-and-strain-relief"
         status: "deferred"
@@ -420,12 +439,41 @@ modules:
     failure_checks: ["mount 유격", "케이블 인장", "통풍 차단", "sensor 시야 차폐", "이동 중 외부 전원 tether 위험"]
     revalidation_triggers: ["mount 위치 변경", "AGX enclosure 변경", "전원 방식 변경", "케이블 routing 변경", "추가 장비 장착"]
 
+  - module_id: "limited_physical_motion_validation"
+    owner: "go2_control_and_physical_operator"
+    role: "최종 장착 후 단일 command owner, 축별 외부 측정과 StopMove를 제한적으로 검증"
+    interfaces:
+      inputs: ["approved axis command", "/odom", "external measurement", "latest approval"]
+      outputs: ["read-only trial record", "axis and stop observations"]
+    current_claim:
+      status: "deferred"
+      highest_evidence_level: "stationary-onboard-verified"
+      claim: "protocol·recorder·자동 테스트와 실제 odometry read-only QA만 완료"
+      limitations: ["최종 장착 미완료", "이동용 전원 미확인", "실제 command·축·StopMove·제동 미실행", "합격 임계값 미확정"]
+    attained_evidence_levels: ["implemented", "automated-tested", "stationary-onboard-verified"]
+    evidence_refs: ["MOTION-CONTRACT", "FINAL-MOUNT-PLAN", "LIMITED-PHYSICAL-MOTION-PLAN", "TRIAL-RECORDER-READONLY-QA"]
+    acceptance_checks:
+      - check_id: "read-only-trial-recorder"
+        status: "passed"
+        condition: "실제 /odom 수신, control publisher·client 부재와 clean shutdown"
+      - check_id: "stage11-prerequisites"
+        status: "deferred"
+        condition: "최종 고정, 이동용 전원, footprint와 통풍 acceptance"
+      - check_id: "single-command-owner-and-current-approval"
+        status: "deferred"
+        condition: "trial 직전 owner와 최신 승인 범위 기록"
+      - check_id: "axis-and-stopmove-trials"
+        status: "deferred"
+        condition: "x, y, yaw 단일 축과 StopMove를 외부 측정과 함께 기록"
+    failure_checks: ["복수 command owner", "승인 범위 이탈", "gate closure 실패", "watchdog 뒤 정지 미확인", "외부 측정 artifact 누락"]
+    revalidation_triggers: ["recorder schema 변경", "motion gate 변경", "candidate limit 변경", "최종 mount 완료", "새 물리 승인"]
+
 next_stage:
-  stage_id: 10
-  name: "stationary_smoke_and_soak"
-  status: "ready_to_run"
+  stage_id: 11
+  name: "final_mount_integration"
+  status: "preparation_completed_execution_deferred"
   prerequisites:
-    - "9단계 integrated_non_actuating_preflight PASS"
-    - "motion gate false 유지"
-    - "실제 command publication 없음"
-    - "Go2와 AGX를 움직이지 않는 안전한 정지 상태 유지"
+    - "최종 장착 작업 시점과 담당자 확보"
+    - "이동 가능한 전원 구조와 보호 기준 확인"
+    - "mount, cable, airflow, sensor occlusion과 footprint artifact 기록"
+    - "최종 장착 뒤 9·10단계 비동작 재실행"

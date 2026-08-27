@@ -10,16 +10,24 @@
 ```text
 verification/
 ├── README.md
+├── final_mount_integration.md
+├── limited_physical_motion_validation.md
 └── structured/
     ├── project_manifest.yaml
-    └── acceptance_matrix.yaml
+    ├── acceptance_matrix.yaml
+    ├── final_mount_acceptance.yaml
+    └── limited_physical_motion_acceptance.yaml
 ```
 
 | 파일 | 역할 |
 | --- | --- |
 | `README.md` | 검증 수준, 판정 상태, 읽는 순서와 갱신 기준을 설명한다. |
+| `final_mount_integration.md` | 11단계 최종 장착·배선·전원·열·footprint 확인 절차를 설명한다. |
+| `limited_physical_motion_validation.md` | 12단계 축별 물리 시험, 승인·StopMove·측정 record 절차를 설명한다. |
 | `structured/project_manifest.yaml` | 프로젝트 범위, 현재 완료 단계, 안전 비목표와 근거 위치를 구조화한다. |
 | `structured/acceptance_matrix.yaml` | 모듈 ID, 입출력, 현재 검증 수준, 근거 ID, 합격 조건, 보류 시험과 재검증 조건을 구조화한다. |
+| `structured/final_mount_acceptance.yaml` | 11단계 준비 완료와 실제 장착 보류 항목을 구조화한다. |
+| `structured/limited_physical_motion_acceptance.yaml` | 12단계 준비·recorder 상태와 실제 trial 보류 항목을 구조화한다. |
 
 ## 읽는 순서
 
@@ -82,12 +90,17 @@ verification/
 ## 현재 단계
 
 - 9단계 `integrated_non_actuating_preflight`: `completed`
-- 최신 근거: `go2-local-navigation-integrated-preflight-20260827`
-- 최종 실행: `20260827_020502_stage9`, 46 checks PASS
-- 10단계 `stationary_smoke_and_soak`: `ready_to_run`
+- 10단계 `stationary_smoke_and_soak`: `completed_with_warning`
+- 10단계 근거: `go2-local-navigation-stationary-soak-20260827`
+- smoke: `20260827_150959_stage10_smoke`, 47 PASS
+- soak: `20260827_151053_stage10_soak`, 46 PASS·1 WARN
+- 11단계 `final_mount_integration`: `preparation_completed_execution_deferred`
+- 12단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
+- recorder 근거: `go2-local-navigation-trial-recorder-readonly-qa-20260827`
 
-9단계 완료는 30초 정지 조건의 전체 stack 기동·관찰·종료를 의미한다. 30분 이상
-soak, 최종 고정 상태와 물리 동작 검증은 포함하지 않는다.
+10단계 경고는 30분 정지 yaw 누적 drift이며 중앙 매트릭스에서 warning으로 유지한다.
+11·12단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
+의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.
 
 ## 안전 경계
 

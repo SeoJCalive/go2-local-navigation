@@ -62,6 +62,11 @@ interface는 생성되지 않았으며 최종 teardown 뒤 project process와 to
 `records/experiments/go2_local_navigation_integrated_preflight_20260827.md`에
 기록했다.
 
+같은 날 30초 smoke는 47 PASS였고 30분 soak는 46 PASS·1 WARN이었다. 필수 topic,
+자원, kernel, 닫힌 gate와 teardown은 통과했지만 정지 yaw 누적 drift
+`0.248012 rad`가 경고로 남았다. 상세 결과는
+`records/experiments/go2_local_navigation_stationary_soak_20260827.md`에 기록했다.
+
 ## 폴더 및 파일 구조
 
 ```text
@@ -134,7 +139,7 @@ bringup/
 | `bringup/preflight_metrics.py` | topic 연속성·schema·timing·정지 drift와 전체 상태를 판정한다. |
 | `bringup/preflight_observer_node.py` | ROS graph·TF·topic·gate를 시간 제한으로 관찰해 `observer.json`을 만든다. |
 | `bringup/preflight_report.py` | observer 관찰값의 불변 구조와 JSON provenance를 정의한다. |
-| `bringup/preflight_resources.py` | `tegrastats`와 kernel event를 memory·thermal·OOM check로 변환한다. |
+| `bringup/preflight_resources.py` | `tegrastats`와 kernel event를 시작·종료 RAM/온도 추세, maximum memory·thermal과 OOM check로 변환한다. |
 | `bringup/preflight_result.py` | observer JSON 경계를 검증하고 runner의 최종 result 저장을 지원한다. |
 | `bringup/preflight_ros_samples.py` | ROS message를 고정 크기의 type·frame·timestamp·pose 표본으로 변환한다. |
 | `bringup/preflight_subscriptions.py` | 필수 ROS topic type, QoS와 표본 변환기를 observer에 연결한다. |

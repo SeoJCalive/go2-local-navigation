@@ -38,3 +38,20 @@
 
 최종 판정, 수치와 checksum은
 `records/experiments/go2_local_navigation_integrated_preflight_20260827.yaml`을 따른다.
+
+같은 날 10단계 정지 안정성 산출물은 다음 경로에 있다.
+
+- `runs/preflight/20260827_150959_stage10_smoke`: 30초 smoke, 47 PASS
+- `runs/preflight/20260827_151053_stage10_soak`: 30분 soak, 46 PASS·yaw drift 1 WARN
+
+수신률·gap·drift·자원과 파일별 checksum은
+`records/experiments/go2_local_navigation_stationary_soak_20260827.yaml`을 따른다.
+
+12단계 준비용 read-only recorder QA 산출물은 다음 경로에 있다.
+
+- `runs/trial_recorder/20260827_stage12_readonly_qa.json`: 종료 경계 실패를 보존한 첫 실행
+- `runs/trial_recorder/20260827_stage12_readonly_qa_fixed.json`: 수정 후 exit 0 실행
+
+두 artifact의 상태와 checksum은
+`records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml`을
+따른다. 두 JSON의 `unverified` 상태는 실제 물리 trial이 수행되지 않았음을 뜻한다.

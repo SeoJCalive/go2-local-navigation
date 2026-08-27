@@ -1,0 +1,125 @@
+schema_version: 1
+record_kind: "limited_physical_motion_validation_plan"
+record_id: "go2-local-navigation-limited-physical-motion-acceptance-20260827"
+source_markdown: "../limited_physical_motion_validation.md"
+status: "prepared_execution_deferred"
+recorded_at: "2026-08-27"
+preparation_status: "completed"
+execution_status: "deferred"
+provenance:
+  kind: "preparation_plan_without_physical_execution"
+  target: "go2_agx"
+  physical_execution: "not_performed"
+  command_publication: false
+  interpretation_rule: "승인, 실제 측정, 임계값 확정 전에는 observed와 unverified를 분리"
+source_refs:
+  - source_id: "CURRENT-GO2-AGX-20260827"
+    path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
+    role: "현재 제어 경계와 미확인 축·제동 조건"
+  - source_id: "MOTION-CONTRACT"
+    path: "../../src/go2_control/config/motion_contract.yaml"
+    role: "candidate limit, watchdog, StopMove preview, 이중 gate 계약"
+  - source_id: "TRIAL-RECORDER"
+    path: "../../src/go2_control/go2_control/trial_recorder_node.py"
+    role: "candidate, preview, odom read-only future trial record 도구"
+  - source_id: "TRIAL-RECORDER-READONLY-QA"
+    record_id: "go2-local-navigation-trial-recorder-readonly-qa-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml"
+    role: "실제 odometry 수신, control publisher 부재와 clean shutdown 근거"
+  - source_id: "FINAL-MOUNT-PLAN"
+    record_id: "go2-local-navigation-final-mount-acceptance-20260827"
+    path: "final_mount_acceptance.yaml"
+    role: "최종 장착과 이동용 전원 선행조건"
+scope:
+  required:
+    - "single_command_owner"
+    - "latest_approval"
+    - "axis_by_axis_x_y_yaw"
+    - "StopMove"
+    - "watchdog"
+    - "stopping_latency_and_distance"
+    - "external_measurement_vs_odometry"
+    - "between_trial_gate_closure"
+    - "mobile_power_without_external_tether"
+    - "operator_established_stable_posture"
+  excluded:
+    - "realsense_imu"
+    - "lowcmd"
+    - "stand_walk_posture_transition"
+    - "autonomous_navigation"
+observed:
+  physical_trials_completed: false
+  command_owner: null
+  latest_approval: null
+  x_axis_trials: []
+  y_axis_trials: []
+  yaw_axis_trials: []
+  stopmove_observations: []
+  watchdog_observations: []
+unverified:
+  candidate_limits_physical_suitability: null
+  trial_command_magnitudes: null
+  stopping_latency_threshold: null
+  stopping_distance_threshold: null
+  yaw_overshoot_threshold: null
+  distance_vs_odometry_error_threshold: null
+  yaw_vs_odometry_error_threshold: null
+  safe_trial_space_criteria: null
+acceptance_checks:
+  - check_id: "single-command-owner"
+    status: "deferred"
+    measurement: "trial 시작 직전 process, output path, publisher owner"
+    artifact_required: "command owner audit"
+  - check_id: "latest-approval"
+    status: "deferred"
+    measurement: "승인자, 시각, 범위, 철회 조건"
+    artifact_required: "current approval record"
+  - check_id: "axis-x"
+    status: "deferred"
+    measurement: "외부 실측 거리와 odometry x/y 변화"
+    artifact_required: "axis trial record"
+  - check_id: "axis-y"
+    status: "deferred"
+    measurement: "외부 실측 거리와 odometry x/y 변화"
+    artifact_required: "axis trial record"
+  - check_id: "axis-yaw"
+    status: "deferred"
+    measurement: "외부 실측 yaw와 odometry yaw 변화"
+    artifact_required: "axis trial record"
+  - check_id: "StopMove"
+    status: "deferred"
+    measurement: "StopMove request 시각, 정지 관찰 시각, 정지 거리와 yaw"
+    artifact_required: "StopMove event record"
+  - check_id: "watchdog"
+    status: "deferred"
+    measurement: "watchdog event와 StopMove/정지 관찰"
+    artifact_required: "watchdog event record"
+  - check_id: "between-trial-gate-closure"
+    status: "deferred"
+    measurement: "trial 종료 뒤 gate, owner, publisher, 정지 상태"
+    artifact_required: "closure audit per trial"
+future_trial_record:
+  status: "implemented_automated-tested_stationary-onboard-readonly-verified"
+  verification_evidence_ref: "TRIAL-RECORDER-READONLY-QA"
+  recorder_entry_point: "limited_motion_trial_recorder"
+  observes:
+    - "/go2_control/cmd_vel_candidate"
+    - "/go2_control/sport_request_preview"
+    - "/odom"
+  bounded_fields:
+    - "latest_candidate_and_received_time"
+    - "latest_move_preview_and_received_time"
+    - "latest_stop_preview_and_received_time"
+    - "first_and_last_odometry_with_received_time"
+  write_policy: "exclusive_create_no_overwrite"
+  prohibited_publication:
+    - "geometry_msgs/msg/Twist"
+    - "/api/sport/request"
+    - "/lowcmd"
+revalidation_gates:
+  - "stage_11_final_mount_artifacts_recorded"
+  - "latest_explicit_physical_approval_recorded"
+  - "single_command_owner_audited"
+  - "trial_space_and_stop_procedure_recorded"
+  - "mobile_power_without_external_tether_verified"
+  - "thresholds_remain_open_until_measured_and_approved"
