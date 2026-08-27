@@ -20,3 +20,6 @@
 .venv/
 .idea/
 .vscode/
+
+# Agent-local verification evidence
+/.omo/
