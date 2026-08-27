@@ -3,11 +3,12 @@
 <package format="3">
   <name>go2_control</name>
   <version>0.1.0</version>
-  <description>Nav2 속도 후보를 Unitree Sport request로 제한·변환하는 비동작 기본 adapter</description>
+  <description>Nav2 속도 후보 adapter와 제한 시험용 읽기 전용 recorder</description>
   <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
   <license>Apache-2.0</license>
 
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>unitree_api</exec_depend>
 

@@ -1,5 +1,5 @@
 """
-go2_control 패키지와 motion 계약을 설치한다.
+go2_control 패키지, motion 계약과 읽기 전용 trial recorder를 설치한다.
 
 설치 자체는 node를 실행하거나 Unitree Sport request를 publish하지 않는다.
 """
@@ -27,12 +27,13 @@ setup(
     zip_safe=True,
     maintainer="Go2 project maintainers",
     maintainer_email="bi-agx1@invalid.example",
-    description="Nav2 속도 후보를 Unitree Sport request로 제한·변환하는 adapter",
+    description="Nav2 속도 후보 adapter와 제한 시험용 읽기 전용 recorder",
     license="Apache-2.0",
     extras_require={"test": ["pytest"]},
     entry_points={
         "console_scripts": [
             "motion_adapter = go2_control.motion_adapter_node:main",
+            "limited_motion_trial_recorder = go2_control.trial_recorder_node:main",
         ],
     },
 )
