@@ -20,9 +20,15 @@ class ResourceSummary:
     """한 실행의 고정 크기 Jetson 자원 통계다."""
 
     sample_count: int
+    first_ram_used_mb: int
+    last_ram_used_mb: int
+    ram_delta_mb: int
     maximum_ram_used_mb: int
     total_ram_mb: int
     maximum_cpu_percent: float
+    first_temperature_c: float
+    last_temperature_c: float
+    temperature_delta_c: float
     maximum_temperature_c: float
 
 
@@ -35,20 +41,34 @@ class KernelObservation:
 
 
 def parse_tegrastats(lines: tuple[str, ...]) -> ResourceSummary:
-    """`tegrastats` 원문에서 최대 RAM·CPU·온도만 추출한다."""
+    """`tegrastats` 원문에서 시작·종료 변화와 최대 자원값을 추출한다."""
     sample_count = 0
+    first_ram_used_mb = 0
+    last_ram_used_mb = 0
     maximum_ram_used_mb = 0
     total_ram_mb = 0
     maximum_cpu_percent = 0.0
+    first_temperature_c = 0.0
+    last_temperature_c = 0.0
     maximum_temperature_c = 0.0
     for line in lines:
         ram_match = RAM_PATTERN.search(line)
         if ram_match is None:
             continue
+        ram_used_mb = int(ram_match.group(1))
+        temperatures = tuple(
+            float(value) for _, value in TEMPERATURE_PATTERN.findall(line)
+        )
+        current_temperature_c = max(temperatures) if temperatures else 0.0
+        if sample_count == 0:
+            first_ram_used_mb = ram_used_mb
+            first_temperature_c = current_temperature_c
         sample_count += 1
+        last_ram_used_mb = ram_used_mb
+        last_temperature_c = current_temperature_c
         maximum_ram_used_mb = max(
             maximum_ram_used_mb,
-            int(ram_match.group(1)),
+            ram_used_mb,
         )
         total_ram_mb = max(total_ram_mb, int(ram_match.group(2)))
         cpu_match = CPU_BLOCK_PATTERN.search(line)
@@ -62,19 +82,22 @@ def parse_tegrastats(lines: tuple[str, ...]) -> ResourceSummary:
                     maximum_cpu_percent,
                     max(cpu_values),
                 )
-        temperatures = tuple(
-            float(value) for _, value in TEMPERATURE_PATTERN.findall(line)
-        )
         if temperatures:
             maximum_temperature_c = max(
                 maximum_temperature_c,
-                max(temperatures),
+                current_temperature_c,
             )
     return ResourceSummary(
         sample_count=sample_count,
+        first_ram_used_mb=first_ram_used_mb,
+        last_ram_used_mb=last_ram_used_mb,
+        ram_delta_mb=last_ram_used_mb - first_ram_used_mb,
         maximum_ram_used_mb=maximum_ram_used_mb,
         total_ram_mb=total_ram_mb,
         maximum_cpu_percent=maximum_cpu_percent,
+        first_temperature_c=first_temperature_c,
+        last_temperature_c=last_temperature_c,
+        temperature_delta_c=last_temperature_c - first_temperature_c,
         maximum_temperature_c=maximum_temperature_c,
     )
 
@@ -112,6 +135,22 @@ def assess_resources(
             check_id="resources.telemetry",
             status=telemetry_status,
             detail=f"tegrastats_samples={summary.sample_count}",
+        ),
+        CheckResult(
+            check_id="resources.trend",
+            status=(
+                CheckStatus.PASS
+                if summary.sample_count >= 2
+                else CheckStatus.FAIL
+            ),
+            detail=(
+                f"first_ram_used_mb={summary.first_ram_used_mb}; "
+                f"last_ram_used_mb={summary.last_ram_used_mb}; "
+                f"ram_delta_mb={summary.ram_delta_mb}; "
+                f"first_temperature_c={summary.first_temperature_c:.3f}; "
+                f"last_temperature_c={summary.last_temperature_c:.3f}; "
+                f"temperature_delta_c={summary.temperature_delta_c:.3f}"
+            ),
         ),
         CheckResult(
             check_id="resources.memory",

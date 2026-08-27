@@ -1,5 +1,7 @@
 """AGX `tegrastats`와 kernel event의 정지 soak 판정 계약을 검증한다."""
 
+import pytest
+
 from bringup.preflight_resources import (
     CheckStatus,
     KernelObservation,
@@ -20,12 +22,41 @@ def test_tegrastats_parser_summarizes_memory_cpu_and_temperature() -> None:
     # When: resource summary를 계산한다.
     summary = parse_tegrastats(lines)
 
-    # Then: 최대 사용량·CPU·온도가 구조화된다.
+    # Then: 최대값과 시작·종료 변화량이 함께 구조화된다.
     assert summary.sample_count == 2
+    assert summary.first_ram_used_mb == 3116
+    assert summary.last_ram_used_mb == 3200
+    assert summary.ram_delta_mb == 84
     assert summary.maximum_ram_used_mb == 3200
     assert summary.total_ram_mb == 62828
     assert summary.maximum_cpu_percent == 11.0
+    assert summary.first_temperature_c == 41.781
+    assert summary.last_temperature_c == 45.5
+    assert summary.temperature_delta_c == pytest.approx(3.719)
     assert summary.maximum_temperature_c == 45.5
+
+
+def test_resource_assessment_reports_observable_trend() -> None:
+    # Given: 시작과 종료 자원값이 모두 있는 두 시점의 telemetry
+    summary = parse_tegrastats(
+        (
+            "RAM 3000/62828MB CPU [5%@729] cpu@40.000C tj@41.000C",
+            "RAM 3040/62828MB CPU [7%@729] cpu@42.000C tj@43.000C",
+        )
+    )
+
+    # When: 장시간 자원 판정과 동일한 함수를 실행한다.
+    checks = assess_resources(
+        summary,
+        passive_trip_c=70.0,
+        kernel=KernelObservation(available=True, forced_failure_events=()),
+    )
+
+    # Then: 시작·종료 변화가 독립 check로 남는다.
+    trend = next(check for check in checks if check.check_id == "resources.trend")
+    assert trend.status is CheckStatus.PASS
+    assert "ram_delta_mb=40" in trend.detail
+    assert "temperature_delta_c=2.000" in trend.detail
 
 
 def test_resource_assessment_fails_when_passive_trip_or_oom_is_observed() -> None:
