@@ -1,10 +1,10 @@
 """
 비동작 preflight launch·Jetson telemetry·clean teardown을 한 번에 실행한다.
 
-`ros2 run go2_nav2 integrated_preflight`의 entry point다. 관찰 중 motion 관련
+`ros2 run go2_validation integrated_preflight`의 entry point다. 관찰 중 motion 관련
 publish를 수행하지 않으며, 자동 산출물은 project `data/runs/preflight`에 저장한다.
-"""
 
+"""
 from dataclasses import asdict
 from datetime import datetime
 import json
@@ -33,7 +33,7 @@ from bringup.preflight_result import (
 )
 from bringup.preflight_resources import assess_resources, parse_tegrastats
 from bringup.preflight_types import CheckResult, CheckStatus
-from go2_nav2.preflight_runner_configuration import (
+from go2_validation.preflight_runner_configuration import (
     ConfigurationError,
     RunConfiguration,
     parse_configuration,
@@ -55,7 +55,7 @@ def _execute(node: Node, configuration: RunConfiguration) -> int:
     launch_command = [
         "ros2",
         "launch",
-        "go2_nav2",
+        "go2_validation",
         "go2_integrated_preflight.launch.py",
         f"duration_sec:={configuration.duration_seconds}",
         f"run_id:={run_id}",

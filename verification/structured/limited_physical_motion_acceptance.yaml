@@ -4,6 +4,7 @@ record_id: "go2-local-navigation-limited-physical-motion-acceptance-20260827"
 source_markdown: "../limited_physical_motion_validation.md"
 status: "prepared_execution_deferred"
 recorded_at: "2026-08-27"
+stage_id: 15
 preparation_status: "completed"
 execution_status: "deferred"
 provenance:
@@ -117,7 +118,7 @@ future_trial_record:
     - "/api/sport/request"
     - "/lowcmd"
 revalidation_gates:
-  - "stage_11_final_mount_artifacts_recorded"
+  - "stage_14_final_mount_artifacts_recorded"
   - "latest_explicit_physical_approval_recorded"
   - "single_command_owner_audited"
   - "trial_space_and_stop_procedure_recorded"

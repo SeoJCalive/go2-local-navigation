@@ -1,0 +1,46 @@
+schema_version: 1
+sources:
+  - source_id: dimos_go2_indoor
+    provenance: external_dynamic
+    repository_url: https://github.com/dimensionalOS/dimos
+    commit: b4cd9789cc68876adf87ff40a404677f127d69bf
+    lfs_pointer_url: https://github.com/dimensionalOS/dimos/blob/b4cd9789cc68876adf87ff40a404677f127d69bf/data/.lfs/go2_china_office_indoor.mcap.tar.gz
+    download_url: https://media.githubusercontent.com/media/dimensionalOS/dimos/b4cd9789cc68876adf87ff40a404677f127d69bf/data/.lfs/go2_china_office_indoor.mcap.tar.gz
+    lfs_oid: sha256:569b8401f15745ef68663dc3ac5fba0dcbdc7ed4ac9f599b3a9db895f63bf2a4
+    archive_filename: go2_china_office_indoor.mcap.tar.gz
+    archive_sha256: 569b8401f15745ef68663dc3ac5fba0dcbdc7ed4ac9f599b3a9db895f63bf2a4
+    archive_size_bytes: 1670777651
+    extracted_filename: go2_china_office_indoor.mcap
+    extracted_size_bytes: 1932198753
+    minimum_free_bytes: 8541115734
+    connect_timeout_seconds: 30
+    total_timeout_seconds: 3600
+    max_attempts: 3
+    repository_license: Apache-2.0
+    dataset_license_status: dataset_license_unverified
+    custody: local-only
+    redistribution: false
+    physical_execution: false
+    ground_truth: false
+    sensor_tf_profile: dimos_replay
+    sensor_tf_profile_registry: package://bringup/config/static_tf_profiles.yaml
+    selected_channels:
+      - source_topic: rt/utlidar/cloud
+        source_schema: sensor_msgs::msg::dds_::PointCloud2_
+        canonical_topic: /utlidar/cloud
+        canonical_type: sensor_msgs/msg/PointCloud2
+        expected_count: 17776
+      - source_topic: rt/utlidar/robot_odom
+        source_schema: nav_msgs::msg::dds_::Odometry_
+        canonical_topic: /utlidar/robot_odom
+        canonical_type: nav_msgs/msg/Odometry
+        expected_count: 173616
+    short_duration_seconds: 120
+    short_minimum_cloud_count: 1474
+    short_minimum_odometry_count: 14400
+    full_output_cap_bytes: 3864397506
+    output_qos:
+      reliability: reliable
+      history: keep_last
+      depth: 1
+      durability: volatile

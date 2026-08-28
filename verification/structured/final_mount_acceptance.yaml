@@ -4,6 +4,7 @@ record_id: "go2-local-navigation-final-mount-acceptance-20260827"
 source_markdown: "../final_mount_integration.md"
 status: "prepared_execution_deferred"
 recorded_at: "2026-08-27"
+stage_id: 14
 preparation_status: "completed"
 execution_status: "deferred"
 provenance:
@@ -103,5 +104,5 @@ revalidation_gates:
   - "final_mount_physical_artifacts_recorded"
   - "stage9_post_mount_artifact_recorded"
   - "stage10_post_mount_artifact_recorded"
-  - "control_gates_remain_closed_for_stage_11"
-  - "mobile_power_without_external_tether_verified_before_stage_12"
+  - "control_gates_remain_closed_for_stage_14"
+  - "mobile_power_without_external_tether_verified_before_stage_15"

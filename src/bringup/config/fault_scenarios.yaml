@@ -1,0 +1,73 @@
+schema_version: 1
+engineering_candidate: true
+scenarios:
+  - id: malformed-layout
+    fault_kind: malformed_layout
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: MALFORMED_LAYOUT
+    recovery_trigger: valid_cloud
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: empty-cloud
+    fault_kind: empty_cloud
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: EMPTY_CLOUD
+    recovery_trigger: valid_cloud
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: nan-cloud
+    fault_kind: nan_cloud
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: NAN_CLOUD
+    recovery_trigger: valid_cloud
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: stale-cloud
+    fault_kind: stale_cloud
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: STALE_CLOUD
+    recovery_trigger: valid_cloud
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: tf-loss
+    fault_kind: tf_loss
+    suppressed_outputs: [/scan]
+    reason_code: TF_UNAVAILABLE
+    recovery_trigger: tf_available
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: odom-regression
+    fault_kind: odom_regression
+    suppressed_outputs: [/odom]
+    reason_code: TIMESTAMP_REGRESSION
+    recovery_trigger: valid_odometry
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: odom-jump
+    fault_kind: odom_jump
+    suppressed_outputs: [/odom]
+    reason_code: ODOMETRY_JUMP
+    recovery_trigger: continuous_odometry
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: odom-loss
+    fault_kind: odom_loss
+    suppressed_outputs: [/odom]
+    reason_code: STALE_ODOMETRY
+    recovery_trigger: continuous_odometry
+    recovery_deadline_seconds: 1
+    terminal_status: recovered
+  - id: process-exit
+    fault_kind: process_exit
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: PROCESS_EXIT
+    recovery_trigger: process_restart
+    recovery_deadline_seconds: 10
+    terminal_status: recovered
+  - id: launch-failure
+    fault_kind: launch_failure
+    suppressed_outputs: [/go2_mapping/cloud_validated, /scan]
+    reason_code: LAUNCH_FAILURE
+    recovery_trigger: corrected_launch
+    recovery_deadline_seconds: 10
+    terminal_status: suppressed

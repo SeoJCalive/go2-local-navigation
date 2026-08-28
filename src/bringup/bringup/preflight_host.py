@@ -16,14 +16,18 @@ KERNEL_FAILURE_PATTERN: Final = re.compile(
     re.IGNORECASE,
 )
 PROCESS_MARKERS: Final = (
+    "async_slam_toolbox_node",
     "base_to_utlidar_lidar_static_tf",
     "controller_server",
     "go2_integrated_preflight_observer",
+    "go2_fault_fixture",
+    "go2_mapping_cloud_gate",
     "go2_motion_adapter",
     "go2_obstacle_candidates",
     "go2_odometry_adapter",
     "lifecycle_manager_controller",
     "robot_state_publisher",
+    "pointcloud_to_laserscan_node",
     "static_transform_publisher",
 )
 

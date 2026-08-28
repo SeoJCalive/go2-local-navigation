@@ -8,7 +8,7 @@ from xml.etree import ElementTree
 PROJECT_ROOT: Final = Path(__file__).parents[3]
 BRINGUP_MANIFEST: Final = PROJECT_ROOT / "src" / "bringup" / "package.xml"
 GO2_NAV2_MANIFEST: Final = (
-    PROJECT_ROOT / "src" / "go2_nav2" / "package.xml"
+    PROJECT_ROOT / "src" / "go2_validation" / "package.xml"
 )
 
 
@@ -21,14 +21,14 @@ def _execution_dependencies(manifest_path: Path) -> set[str]:
     }
 
 
-def test_preflight_composition_dependency_is_owned_by_go2_nav2() -> None:
+def test_preflight_composition_dependency_is_owned_by_go2_validation() -> None:
     # Given: bringup과 상위 조합 패키지의 ROS manifest
     bringup_dependencies = _execution_dependencies(BRINGUP_MANIFEST)
     navigation_dependencies = _execution_dependencies(GO2_NAV2_MANIFEST)
 
     # When: 통합 preflight의 의존 방향을 확인한다.
     dependency_direction = (
-        "go2_nav2" in bringup_dependencies,
+        "go2_validation" in bringup_dependencies,
         "bringup" in navigation_dependencies,
     )
 

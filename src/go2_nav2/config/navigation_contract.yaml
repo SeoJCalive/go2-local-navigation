@@ -5,6 +5,10 @@ source_markdown: "../README.md"
 package_name: "go2_nav2"
 status: "candidate_non_actuating"
 recorded_at: "2026-08-27"
+component_status:
+  local_costmap_controller_preview: "candidate_non_actuating"
+  slam_mapping_runtime: "experimental"
+  synthetic_navigation_assets: "experimental"
 provenance:
   kind: "official_nav2_plus_agx_installed_runtime_plus_engineering_candidate"
   target: "go2_agx"
