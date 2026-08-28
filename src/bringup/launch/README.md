@@ -20,9 +20,15 @@
 다음 구성요소만 시작한다.
 
 - `robot_state_publisher` 1개: canonical URDF의 모델 TF를 publish한다.
-- `tf2_ros static_transform_publisher` 1개: parent `base`, child
-  `utlidar_lidar`, x=`0.28945`, y=`0.0`, z=`-0.046825`, roll=`0.0`,
-  pitch=`2.8782`, yaw=`0.0`의 직접 static TF를 publish한다.
+- `tf2_ros static_transform_publisher` 1개: `sensor_tf_profile`에서 선택한 parent,
+  child, translation과 quaternion의 직접 static TF를 publish한다.
+
+기본 argument는 `sensor_tf_profile:=project_default`이며 기존 parent `base`, child
+`utlidar_lidar`, xyz `[0.28945, 0.0, -0.046825]`와 quaternion xyzw
+`[0.0, 0.9913405653, 0.0, 0.1313159683]`를 유지한다. `dimos_replay`는 DimOS
+external bag 전용이며 xyz `[0.28216, 0.0, -0.02467]`, quaternion
+`[-0.86682728, 0.48933769, -0.09113504, 0.02921455]`를 사용한다. 등록되지 않았거나
+비정규화 quaternion을 가진 profile은 launch 전에 거부한다.
 
 `radar → utlidar_lidar` edge는 만들지 않는다. joint state publisher, sensor driver,
 RealSense·camera node, command·motion node, service, `/cmd_vel`, `/lowcmd`,
@@ -34,10 +40,21 @@ Sport API, `map`·`odom`도 포함하지 않는다.
 ros2 launch bringup go2_static_tf.launch.py
 ```
 
+외부 DimOS replay에서만 다음처럼 명시한다.
+
+```bash
+ros2 launch bringup go2_static_tf.launch.py sensor_tf_profile:=dimos_replay
+```
+
 2026-08-23 AGX에서 이 launch의 runtime 검증과 teardown을 수행했다. `/tf_static`
 두 publisher와 세 핵심 edge를 확인했으며, `/tf` message와 `/joint_states`
 publisher는 관찰되지 않았다. 이 결과는 독립 물리 calibration이나 동적 joint
 상태 검증을 의미하지 않는다.
+
+2026-08-28 동일 120초 DimOS bag A/B에서 `dimos_replay`는 최대 translation·yaw
+jump를 줄였지만 두 profile 모두 연속성 기준을 초과했다. 따라서 이 profile은
+source-aligned replay 입력으로만 유지하며 실물 기본값이나 물리 calibration으로
+사용하지 않는다.
 
 ## `go2_odometry_adapter.launch.py`
 

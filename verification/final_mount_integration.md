@@ -1,4 +1,4 @@
-# 11단계: 최종 장착 통합 준비 절차
+# 14단계: 최종 장착 통합 준비 절차
 
 이 문서는 AGX를 Go2에 최종 고정한 뒤 수행할 비작동 통합 확인의 절차와 기록
 체크리스트다. 절차와 기록 구조의 준비는 완료됐지만 실제 장착 검증은 보류 상태다. 이
@@ -6,7 +6,7 @@
 
 ## 범위와 전제
 
-- 단계 ID: `stage_11_final_mount_integration`
+- 단계 ID: `stage_14_final_mount_integration`
 - 준비 상태: `completed`
 - 실제 장착 검증 상태: `deferred`
 - 현재 장착 상태: AGX 최종 장착 `unverified`
@@ -19,7 +19,7 @@
 - 최종 장착 작업을 수행할 담당자와 작업 시점을 기록한다.
 - 로봇의 전원·정지 상태와 작업 공간 안전 조건을 현장에서 확인해 기록한다.
 - AGX bracket, 체결 부품, connector, 전원선, Ethernet의 실제 구성과 변경 전 사진을 기록한다.
-- 이동 시험에 사용할 최종 전원 source·보호 회로·connector 구성을 기록한다. 현재처럼 외부 전원 tether를 사용하는 상태는 정지 검증에만 사용하고 12단계 진입 조건으로 승격하지 않는다.
+- 이동 시험에 사용할 최종 전원 source·보호 회로·connector 구성을 기록한다. 현재처럼 외부 전원 tether를 사용하는 상태는 정지 검증에만 사용하고 15단계 진입 조건으로 승격하지 않는다.
 - 이 문서와 `structured/final_mount_acceptance.yaml`의 미수행 항목이 `deferred` 또는 `unverified`인지 확인한다.
 
 ## 장착·배선 체크리스트
@@ -43,6 +43,6 @@
 ## 완료 판단과 기록
 
 - 모든 장착·배선·시야·footprint 측정이 실제 artifact와 함께 기록되기 전에는 `final-mount-verified`로 승격하지 않는다.
-- 최종 이동용 전원 구성이 확인되지 않으면 11단계를 완료하거나 12단계로 진입하지 않는다.
+- 최종 이동용 전원 구성이 확인되지 않으면 14단계를 완료하거나 15단계로 진입하지 않는다.
 - 9단계 및 10단계 재실행이 별도 실행 record와 artifact를 갖기 전에는 통합 재검증을 `passed`로 표시하지 않는다.
-- 이 단계가 완료돼도 실제 제어 approval, 축 방향, StopMove 반응, 제동 거리와 navigation motion은 12단계 이후 별도 최신 승인 대상으로 남는다.
+- 이 단계가 완료돼도 실제 제어 approval, 축 방향, StopMove 반응, 제동 거리와 navigation motion은 15단계의 별도 최신 승인 대상으로 남는다.

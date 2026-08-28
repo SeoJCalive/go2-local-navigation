@@ -22,12 +22,12 @@ verification/
 | 파일 | 역할 |
 | --- | --- |
 | `README.md` | 검증 수준, 판정 상태, 읽는 순서와 갱신 기준을 설명한다. |
-| `final_mount_integration.md` | 11단계 최종 장착·배선·전원·열·footprint 확인 절차를 설명한다. |
-| `limited_physical_motion_validation.md` | 12단계 축별 물리 시험, 승인·StopMove·측정 record 절차를 설명한다. |
+| `final_mount_integration.md` | 14단계 최종 장착·배선·전원·열·footprint 확인 절차를 설명한다. |
+| `limited_physical_motion_validation.md` | 15단계 축별 물리 시험, 승인·StopMove·측정 record 절차를 설명한다. |
 | `structured/project_manifest.yaml` | 프로젝트 범위, 현재 완료 단계, 안전 비목표와 근거 위치를 구조화한다. |
 | `structured/acceptance_matrix.yaml` | 모듈 ID, 입출력, 현재 검증 수준, 근거 ID, 합격 조건, 보류 시험과 재검증 조건을 구조화한다. |
-| `structured/final_mount_acceptance.yaml` | 11단계 준비 완료와 실제 장착 보류 항목을 구조화한다. |
-| `structured/limited_physical_motion_acceptance.yaml` | 12단계 준비·recorder 상태와 실제 trial 보류 항목을 구조화한다. |
+| `structured/final_mount_acceptance.yaml` | 14단계 준비 완료와 실제 장착 보류 항목을 구조화한다. |
+| `structured/limited_physical_motion_acceptance.yaml` | 15단계 준비·recorder 상태와 실제 trial 보류 항목을 구조화한다. |
 
 ## 읽는 순서
 
@@ -50,6 +50,7 @@ verification/
 | `implemented` | 코드·설정·launch가 존재한다. |
 | `automated-tested` | 순수 계약 또는 구성 자동 테스트를 통과했다. |
 | `replay-verified` | rosbag 또는 격리 입력으로 실행 경계를 확인했다. |
+| `synthetic-verified` | 결정론적 합성 입력에서 ROS graph·action 계약을 확인했다. |
 | `stationary-onboard-verified` | 실제 AGX와 Go2가 연결된 정지 상태에서 확인했다. |
 | `final-mount-verified` | AGX를 최종 고정한 물리 구성에서 다시 확인했다. |
 | `dynamic-verified` | 실제 이동 중 방향·거리·정지·센서 반응을 확인했다. |
@@ -94,12 +95,59 @@ verification/
 - 10단계 근거: `go2-local-navigation-stationary-soak-20260827`
 - smoke: `20260827_150959_stage10_smoke`, 47 PASS
 - soak: `20260827_151053_stage10_soak`, 46 PASS·1 WARN
-- 11단계 `final_mount_integration`: `preparation_completed_execution_deferred`
-- 12단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
+- 11단계 `software_fault_recovery`: `completed`
+- 11단계 근거: `data/runs/fault_acceptance/stage11.json`, fault 10개 모두 PASS
+- 12단계 `mapping_localization_and_nav2_shadow`: `software_replay_continuity_resolved_for_exact_canonical_bag_profile_localization_and_nav2_pending`
+- 12단계 입력 근거: `data/runs/mapping_input/stage12-ingress.json`, 정지·external short 모두 PASS
+- 12단계 mapping 근거: `data/runs/mapping/stage12.json`, 정지·external full 모두 PASS
+- 12단계 mapping record: `go2-local-navigation-slam-mapping-replay-20260827`
+- 역사적 TF continuity failed/open: `go2-local-navigation-dimos-tf-profile-ab-20260828`, 같은 120초 bag의
+  `project_default`·`dimos_replay` 모두 translation·yaw step 기준 실패
+- 후속 runtime: `data/runs/mapping_tf_ab/20260828_dimos_tf_ab_retry1/summary.json`,
+  `toggle_confirmed=false`
+- 역사적 scan projection failed/open 근거:
+  `go2-local-navigation-dimos-scan-projection-ab-20260828`, 유효 beam 중앙값
+  `36 → 251`과 translation·yaw 초과 횟수 감소
+- scan projection runtime:
+  `data/runs/mapping_scan_ab/20260828_dimos_scan_ab_round3/summary.json`, 최대
+  translation·yaw step 기준 실패, `toggle_confirmed=false`
+- canonical resolution: `go2-local-navigation-dimos-slam-continuity-resolution-20260828`,
+  `dimos_odom_accumulated_emit3` final A/B와 two repeats 모두 passed
+- canonical runtime: `data/runs/mapping_slam_fix/20260828_stable_emit3_loop_on_final_ab/summary.json`,
+  candidate `0.41047936583987504 m` / `0.1800169168112875 rad`, exceedance/unaligned/regressive `0/0/0`
+- canonical profile: `frame_limit=3`, `emit_every=3`, input/retry queue `64/64`,
+  `min_height=-0.10`, converter queue `64`; response expansion `false`와 loop closing
+  `true`는 A/B 공통 통제값, candidate-only coarse는 `0.1745`, baseline coarse는
+  `0.349`이며 global launch default `0.349`/`true`/`true`는 유지
+- final baseline: `raw_single`은 `0.5535118551684397 m` / `0.3678837777692796 rad`로 failed;
+  candidate는 cloud `1843/1842/614`, intrinsic drop `1`, overflow/pending/regression `0/0/0`,
+  command/control `0`, clean teardown, map·pose graph save/reload와 repeat 1·2를 통과
+- RViz/build: Global/Map `Ok`, candidate 새 TF warning 없음, captured 25초에서 whole-view
+  trembling 또는 large teleport 없음(지도 정확도 근거 아님); 해당 replay 당시
+  7 packages build, 267 tests, 0 failures/errors, 3 skipped
+- 현재 package 경계 clean gate: `go2_validation` 분리 후 AGX 실제 workspace
+  `install/`에 8 packages build, 287 tests, 0 failures/errors, 3 skipped;
+  executable `go2_validation=10`, `go2_nav2=0`; 원시 로그·JUnit·직접 QA는
+  `.omo/evidence/validation-package-refactor-closeout-20260828/README.md`; software-only
+  구조 검증이며 replay·live 근거 수준을 승격하지 않음
+- 외부 replay 변환 근거: `data/external/dimos_go2_indoor/runs/conversion.json`
+- 13단계 `software_only_freeze`: `deferred_until_stages_11_12_complete`
+- 14단계 `final_mount_integration`: `preparation_completed_execution_deferred`
+- 15단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
 - recorder 근거: `go2-local-navigation-trial-recorder-readonly-qa-20260827`
 
 10단계 경고는 30분 정지 yaw 누적 drift이며 중앙 매트릭스에서 warning으로 유지한다.
-11·12단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
+12단계에서는 PointCloud2→LaserScan 입력, replay provenance, 합성 map·BT·scenario
+자산과 Domain 63 SLAM map 생성·저장·pose graph 재로딩까지 완료했다. 후속 canonical
+resolution은 emit3 delivery와 profile-scoped coarse `0.1745`에서 map-correction
+continuity를 통과했다. candidate cloud accounting은 `1843/1842/614`, intrinsic drop
+`1`, overflow/pending/regression `0/0/0`이고 artifact 저장·재로딩과 clean teardown,
+repeat도 통과했다. 이 해결은 Go2 OFF·physical execution false·command publication
+false인 exact bag/profile의 replay 범위다. 앞선 TF/10-frame A/B failed/open 관찰은
+조건부 superseded된 역사적 근거로 보존한다. live hardware와 physical mount, map
+ground truth, saved-map localization, 전체 Nav2·NavigateToPose는 미검증이므로 다음
+software 단계도 이 항목들을 별도로 판정한다.
+14·15단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
 의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.
 
 ## 안전 경계

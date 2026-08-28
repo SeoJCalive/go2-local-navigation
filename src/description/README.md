@@ -82,14 +82,14 @@ description/
 | 파일 | 역할 |
 | --- | --- |
 | `README.md` | 공식 reference, 관찰 runtime frame, 프로젝트 수용 mapping, runtime 검증 결과를 구분해 설명한다. |
-| `config/frame_contract.yaml` | `base` root, `robot_state_publisher`의 공식 fixed edge, bringup `static_transform_publisher`의 direct LiDAR edge와 각 상태·소유자·출처를 구조화한다. |
-| `urdf/go2_description.urdf` | Unitree 공식 고정 커밋의 전체 Go2 URDF를 보존하는 canonical model이다. |
-| `urdf/go2_description_coordinate_check.png` | 공식 URDF에서 계산한 native sensor·주요 관절 원점의 좌표 투영을 확인하는 이미지다. 실행 asset이나 TF publisher가 아니다. |
-| `config/body_model.yaml` | 공식 URDF에서 반복 검색하기 좋은 주요 관절값만 뽑은 YAML projection이다. 실행 geometry source로 직접 사용하지 않는다. |
 | `package.xml` | ROS 2 metadata와 향후 description 사용에 필요한 의존성을 선언한다. |
 | `setup.py` | 공식 URDF·문서·YAML asset의 설치 경로를 정의한다. TF publisher는 등록하지 않는다. |
 | `setup.cfg` | 개발·설치 시 script 경로를 지정한다. |
 | `resource/description` | ament index가 패키지를 찾기 위한 빈 marker 파일이다. |
+| `config/body_model.yaml` | 공식 URDF에서 반복 검색하기 좋은 주요 관절값만 뽑은 YAML projection이다. 실행 geometry source로 직접 사용하지 않는다. |
+| `config/frame_contract.yaml` | `base` root, `robot_state_publisher`의 공식 fixed edge, bringup `static_transform_publisher`의 direct LiDAR edge와 각 상태·소유자·출처를 구조화한다. |
+| `urdf/go2_description.urdf` | Unitree 공식 고정 커밋의 전체 Go2 URDF를 보존하는 canonical model이다. |
+| `urdf/go2_description_coordinate_check.png` | 공식 URDF에서 계산한 native sensor·주요 관절 원점의 좌표 투영을 확인하는 이미지다. 실행 asset이나 TF publisher가 아니다. |
 | `description/__init__.py` | Python 패키지 경계와 TF 모델의 미확정 상태를 설명한다. |
 
 이 패키지는 공식 URDF asset과 계약만 제공한다. 추가 장비의 외부 파라미터를
