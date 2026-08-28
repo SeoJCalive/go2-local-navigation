@@ -20,6 +20,8 @@ class CloudLayout:
     height: int
     width: int
     point_step: int
+    row_step: int
+    data_length: int
     field_names: tuple[str, ...]
 
 
@@ -49,6 +51,26 @@ def validate_cloud_sample(
         return ValidationResult(is_valid=False, reason="unexpected frame_id")
     if not REQUIRED_FIELD_NAMES.issubset(sample.layout.field_names):
         return ValidationResult(is_valid=False, reason="missing required point fields")
+    if (
+        sample.layout.height <= 0
+        or sample.layout.width <= 0
+        or sample.layout.point_step <= 0
+        or sample.layout.row_step <= 0
+    ):
+        return ValidationResult(
+            is_valid=False,
+            reason="cloud layout must be nonzero",
+        )
+    minimum_row_step = sample.layout.width * sample.layout.point_step
+    expected_data_length = sample.layout.height * sample.layout.row_step
+    if (
+        sample.layout.row_step < minimum_row_step
+        or sample.layout.data_length != expected_data_length
+    ):
+        return ValidationResult(
+            is_valid=False,
+            reason="cloud data length mismatch",
+        )
     if sample.stamp_nanoseconds <= 0:
         return ValidationResult(is_valid=False, reason="timestamp must be positive")
     if (
