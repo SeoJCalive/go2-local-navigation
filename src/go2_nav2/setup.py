@@ -18,7 +18,14 @@ setup(
         (f"share/{PACKAGE_NAME}", ["package.xml"]),
         (f"share/{PACKAGE_NAME}/config", glob("config/*.yaml")),
         (f"share/{PACKAGE_NAME}/launch", glob("launch/*.py")),
-        (f"share/{PACKAGE_NAME}/maps", glob("maps/*")),
+        (
+            f"share/{PACKAGE_NAME}/maps",
+            [
+                *glob("maps/*.pgm"),
+                *glob("maps/*.png"),
+                *glob("maps/*.yaml"),
+            ],
+        ),
         (
             f"share/{PACKAGE_NAME}/behavior_trees",
             glob("behavior_trees/*.xml"),

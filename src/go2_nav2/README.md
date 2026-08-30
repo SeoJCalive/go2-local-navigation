@@ -26,8 +26,10 @@ go2_nav2/
 │   └── go2_slam_mapping.launch.py
 ├── maps/
 │   ├── shadow_blocked.pgm
+│   ├── shadow_blocked.png
 │   ├── shadow_blocked.yaml
 │   ├── shadow_open.pgm
+│   ├── shadow_open.png
 │   └── shadow_open.yaml
 ├── behavior_trees/
 │   └── navigate_to_pose_shadow.xml
@@ -54,8 +56,10 @@ go2_nav2/
 | `launch/go2_costmap_only.launch.py` | stationary perception·odometry와 local costmap owner만 조합하며 motion adapter와 goal은 시작하지 않는다. |
 | `launch/go2_slam_mapping.launch.py` | mapping scan·odometry와 단일 SLAM Toolbox owner를 조합한다. 기본 `execution_mode=onboard`, `continuity_profile=onboard_observe`를 선언하고 하위 launch에 전달한다. |
 | `maps/shadow_blocked.pgm` | blocked synthetic navigation 후보의 occupancy raster다. |
+| `maps/shadow_blocked.png` | blocked raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
 | `maps/shadow_blocked.yaml` | blocked raster의 image, resolution, origin과 threshold manifest다. |
 | `maps/shadow_open.pgm` | open/cancel/failure synthetic navigation 후보의 occupancy raster다. |
+| `maps/shadow_open.png` | open raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
 | `maps/shadow_open.yaml` | open raster의 image, resolution, origin과 threshold manifest다. |
 | `behavior_trees/navigate_to_pose_shadow.xml` | synthetic `NavigateToPose` 후보용 recovery·replanning BT 구조다. |
 | `go2_nav2/__init__.py` | 이 package가 validation orchestration을 소유하지 않는 Nav2 runtime asset 경계임을 설명한다. |
@@ -67,3 +71,12 @@ go2_nav2/
 이 package의 launch는 Nav2/SLAM runtime asset만 조합한다. validation executable은
 `ros2 run go2_validation <executable>`로 실행하며, fault·replay·mapping
 acceptance와 host lifecycle을 `go2_nav2`에서 실행하지 않는다.
+
+`go2_slam_mapping.launch.py`는 현재 replay 중심 검증 이력 때문에
+`use_sim_time=true`를 기본으로 선언한다. `execution_mode=onboard` 기본값과 별개이므로
+live Go2에서 사용할 때는 `use_sim_time:=false`를 명시하고 clock owner가 없음을
+preflight로 확인해야 한다. replay-only TF·scan profile이 onboard mode에서 거부된다는
+사실만으로 이 launch 전체가 live-ready라고 판단하지 않는다.
+
+각도 sweep 시각 비교본은 package runtime asset이 아니며,
+`.user/img/slam_map/angle_sweep_20260829/`에서 관리한다.
