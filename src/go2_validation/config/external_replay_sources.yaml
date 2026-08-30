@@ -2,6 +2,20 @@ schema_version: 1
 sources:
   - source_id: dimos_go2_indoor
     provenance: external_dynamic
+    external_semantics: dataset_origin_not_external_sensor
+    dataset_origin:
+      kind: third_party_external_replay
+      canonical_source_filename: go2_china_office_indoor.mcap
+    sensor_identity:
+      family: go2_built_in_l1_ulidar
+      status: unverified
+      inference_strength: high
+      evidence:
+        - rt_utlidar_topic_namespace
+        - utlidar_lidar_cloud_frame
+        - cloud_imu_odometry_rates_match_onboard_observation
+        - pinned_dimos_go2_mcap_store_and_l1_extrinsic
+      exact_project_robot_physical_calibration: not_verified
     repository_url: https://github.com/dimensionalOS/dimos
     commit: b4cd9789cc68876adf87ff40a404677f127d69bf
     lfs_pointer_url: https://github.com/dimensionalOS/dimos/blob/b4cd9789cc68876adf87ff40a404677f127d69bf/data/.lfs/go2_china_office_indoor.mcap.tar.gz
@@ -24,6 +38,11 @@ sources:
     ground_truth: false
     sensor_tf_profile: dimos_replay
     sensor_tf_profile_registry: package://bringup/config/static_tf_profiles.yaml
+    noncanonical_colocated_artifacts:
+      - filename: recording_go2_mid360_2026-05-29_4-45pm-PST_corrected.db
+        sensor_family: livox_mid360_pointlio_fixture
+        status: excluded_from_canonical_lineage
+        used_for_short_or_full_conversion: false
     selected_channels:
       - source_topic: rt/utlidar/cloud
         source_schema: sensor_msgs::msg::dds_::PointCloud2_

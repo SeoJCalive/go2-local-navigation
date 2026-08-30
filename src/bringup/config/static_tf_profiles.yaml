@@ -18,6 +18,14 @@ static_tf_profiles:
       status: source_aligned
       scope: external_replay_only
       physical_calibration_status: not_verified_on_project_robot
+      alignment_semantics:
+        kind: dataset_specific_replay_alignment
+        includes:
+          - near_upside_down_l1_mount
+          - stationary_ground_normal_leveling
+          - trajectory_heading_yaw_alignment
+        mechanical_calibration_only: false
+        current_project_robot_applicability: unverified
       parent_frame: base
       child_frame: utlidar_lidar
       translation_xyz_m: [0.28216, 0.0, -0.02467]

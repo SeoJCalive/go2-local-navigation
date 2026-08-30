@@ -30,6 +30,11 @@ external bag 전용이며 xyz `[0.28216, 0.0, -0.02467]`, quaternion
 `[-0.86682728, 0.48933769, -0.09113504, 0.02921455]`를 사용한다. 등록되지 않았거나
 비정규화 quaternion을 가진 profile은 launch 전에 거부한다.
 
+`dimos_replay`는 Mid-360 TF가 아니다. pinned DimOS의 Go2 L1 자료에서 가져왔지만
+near-upside-down mount 외에 정지 구간 지면 법선 leveling과 trajectory heading yaw
+정렬을 포함한다. 따라서 이 dataset을 위한 replay alignment이며 현재 Go2의 순수
+기계 장착 calibration이나 Unitree 공통 extrinsic으로 사용하지 않는다.
+
 `radar → utlidar_lidar` edge는 만들지 않는다. joint state publisher, sensor driver,
 RealSense·camera node, command·motion node, service, `/cmd_vel`, `/lowcmd`,
 Sport API, `map`·`odom`도 포함하지 않는다.
