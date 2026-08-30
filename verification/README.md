@@ -97,7 +97,7 @@ verification/
 - soak: `20260827_151053_stage10_soak`, 46 PASS·1 WARN
 - 11단계 `software_fault_recovery`: `completed`
 - 11단계 근거: `data/runs/fault_acceptance/stage11.json`, fault 10개 모두 PASS
-- 12단계 `mapping_localization_and_nav2_shadow`: `software_replay_continuity_resolved_for_exact_canonical_bag_profile_localization_and_nav2_pending`
+- 12단계 `mapping_localization_and_nav2_shadow`: `software_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending`
 - 12단계 입력 근거: `data/runs/mapping_input/stage12-ingress.json`, 정지·external short 모두 PASS
 - 12단계 mapping 근거: `data/runs/mapping/stage12.json`, 정지·external full 모두 PASS
 - 12단계 mapping record: `go2-local-navigation-slam-mapping-replay-20260827`
@@ -125,11 +125,39 @@ verification/
 - RViz/build: Global/Map `Ok`, candidate 새 TF warning 없음, captured 25초에서 whole-view
   trembling 또는 large teleport 없음(지도 정확도 근거 아님); 해당 replay 당시
   7 packages build, 267 tests, 0 failures/errors, 3 skipped
+- coarse search 7값 sweep:
+  `data/runs/mapping_coarse_sweep/20260829_coarse_search_7value_round1/summary.json`,
+  `0.0698~0.2792 rad` 중 4 passed·3 failed, `0.0698`이 continuity 우선 후속
+  후보지만 canonical 미채택
+- lower-band 0~4도 sweep:
+  `data/runs/mapping_coarse_sweep/20260829_lower_search_0to4deg_round1/summary.json`,
+  5개 후보가 모두 passed했다. `0°`는 yaw 최대값, `1°`는 translation 최대값이
+  각각 가장 작았으며, 두 후보 모두 canonical 미채택
+- external source identity: raw `go2_china_office_indoor.mcap` 8개 channel에서 derived
+  canonical은 `/utlidar/cloud`·`/utlidar/robot_odom`만 사용한다. 센서 계열은 Go2
+  built-in L1 ULIDAR로 high-confidence inferred·`unverified`이며, 함께 보관된
+  Mid-360·Point-LIO DB는 canonical 계보에서 제외
+- causal attribution: `go2-local-navigation-dimos-slam-causal-attribution-20260829`,
+  sequential scan matching은 최초 pose 열화 원인으로 `confirmed`, explicit loop
+  closure는 `refuted_as_primary`, occupancy generation은 `open`
+- causal artifact:
+  `.user/img/slam_map/full_causal9_scan_matching_ab_20260829/causal_attribution.json`;
+  matching-off는 진단 음성 대조군이며 production/default/canonical 미변경
+- occupancy quality resolution:
+  `go2-local-navigation-dimos-occupancy-quality-resolution-20260830`, matching-off pose를
+  고정했을 때 `unsupported_occupied`가 node `30` 또는 그 이전부터 지속됨
+- short occupancy candidate: `multi_segment_occupied`는 primary skeleton
+  `4000 → 4`, 감소율 `0.999`로 수치 gate를 통과했지만 blind visual QA에서
+  fan/streak와 topology 가독성이 악화돼 최종 winner 없음
+- full occupancy candidate: visual-approved winner가 없어 실행 `0`회;
+  production/live/default 변경 없음
 - 현재 package 경계 clean gate: `go2_validation` 분리 후 AGX 실제 workspace
   `install/`에 8 packages build, 287 tests, 0 failures/errors, 3 skipped;
-  executable `go2_validation=10`, `go2_nav2=0`; 원시 로그·JUnit·직접 QA는
+  당시 executable `go2_validation=10`, `go2_nav2=0`; 원시 로그·JUnit·직접 QA는
   `.omo/evidence/validation-package-refactor-closeout-20260828/README.md`; software-only
   구조 검증이며 replay·live 근거 수준을 승격하지 않음
+- sweep runner 추가 뒤 AGX targeted gate: `go2_validation` 157개 수집, 154 passed·3 skipped·0 failures·0 errors,
+  현재 executable `go2_validation=11`, `go2_nav2=0`
 - 외부 replay 변환 근거: `data/external/dimos_go2_indoor/runs/conversion.json`
 - 13단계 `software_only_freeze`: `deferred_until_stages_11_12_complete`
 - 14단계 `final_mount_integration`: `preparation_completed_execution_deferred`
@@ -142,11 +170,18 @@ verification/
 resolution은 emit3 delivery와 profile-scoped coarse `0.1745`에서 map-correction
 continuity를 통과했다. candidate cloud accounting은 `1843/1842/614`, intrinsic drop
 `1`, overflow/pending/regression `0/0/0`이고 artifact 저장·재로딩과 clean teardown,
-repeat도 통과했다. 이 해결은 Go2 OFF·physical execution false·command publication
+repeat도 통과했다. 후속 7값 sweep은 `0.0698`을 continuity 우선 후보로 좁혔고,
+lower-band `0~4°` 5값 sweep은 모두 통과했다. lower-band에서는 `0°`가 yaw,
+`1°`가 translation을 각각 최소화했지만 최저값 채택이나 canonical 변경은 하지 않았다.
+이 해결은 Go2 OFF·physical execution false·command publication
 false인 exact bag/profile의 replay 범위다. 앞선 TF/10-frame A/B failed/open 관찰은
 조건부 superseded된 역사적 근거로 보존한다. live hardware와 physical mount, map
-ground truth, saved-map localization, 전체 Nav2·NavigateToPose는 미검증이므로 다음
-software 단계도 이 항목들을 별도로 판정한다.
+ground truth, saved-map localization, 전체 Nav2·NavigateToPose는 미검증이다. 후속
+causal A/B는 최초 pose 열화를 sequential matcher에 귀속했다. 후속 고정 pose 분석은
+occupancy 결함이 node `30` 또는 그 이전부터 지속됨을 확인했지만, 수치 winner가 blind
+visual QA에서 회귀해 후보 없이 `root-cause-classified`로 닫혔다. matcher 내부의 잘못된
+correction 선택 조건과 후보의 fan/streak 확산 원인, occupancy 품질 해결은 남아 있다.
+다음 software 단계도 continuity, corrected pose와 occupancy map 품질을 별도로 판정한다.
 14·15단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
 의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.
 

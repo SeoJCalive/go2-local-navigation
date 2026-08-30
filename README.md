@@ -27,6 +27,13 @@ full canonical bag과 120초 short bag으로 변환했으며, 두 ingress 모두
 `base`, command publisher 0과 clean teardown을 통과했다. 이 결과는 mapping 입력과
 fault recovery 근거이며 SLAM 지도 품질, localization 또는 목적지 도달 근거가 아니다.
 
+이 자료의 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. raw
+`go2_china_office_indoor.mcap`은 8개 channel을 가지며 derived canonical bag은
+`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 사용한다. topic·frame·rate와 pinned
+DimOS 코드에 따라 센서 계열은 Go2 built-in L1 ULIDAR로 강하게 추론하지만 hardware
+manifest가 없어 `unverified`다. 같은 source 디렉터리의 Mid-360·Point-LIO DB는
+canonical short·full 계보에 포함되지 않는다.
+
 이어 Domain 63 loopback에서 stationary와 external-full을 1.0배속으로 재생해 두
 SLAM mapping run을 완료했다. `/map`, SLAM Toolbox 단독 `map → odom`, occupancy
 map·pose graph 저장과 재로딩, command publisher 0과 잔류 process 0을 확인했다.
@@ -60,6 +67,35 @@ teardown도 final A/B와 두 repeat에서 동일하게 통과했다. 이는 Go2 
 `physical_execution=false`, `command_publication=false`인 이 정확한 bag/profile의
 software replay continuity 결과만 뜻하며, 실물 장착·live fit·지도 ground truth·
 localization/Nav2는 계속 미검증이다.
+
+2026-08-29에는 같은 bag·emit3·TF·SLAM 공통값을 유지하고 coarse search만
+`0.0698~0.2792 rad` 7개로 바꿔 순차 비교했다. 앞의 네 값은 passed, 뒤의 세 값은
+yaw 기준으로 failed였고 `0.0698`은 `0.3752606931950222 m` /
+`0.08927691681128769 rad`를 기록했다. 이는 이번 범위의 continuity 우선 후속
+후보일 뿐, 최저 시험 경계이며 지도 ground truth·live 조건이 없으므로 기존
+replay canonical `0.1745`를 교체하지 않는다.
+
+이어서 같은 조건에서 `0~4°`를 `1°` 간격으로 추가 시험했다. 5개 후보가 모두
+passed했고, `0°`는 yaw 최대 `0.01852879921693318 rad`, `1°`는 translation
+최대 `0.2800537845414384 m`로 각각 해당 지표의 최저값이었다. 두 지표의 최소값이
+같은 후보에 모이지 않았으므로 `0°`·`1°` 모두 replay 후보로만 보존하고 운영
+canonical은 `0.1745`로 유지한다. 상세 결과와 한계는
+`records/experiments/go2_local_navigation_dimos_lower_search_20260829.md`와
+같은 stem의 YAML projection에서 조회한다.
+
+후속 causal A/B에서는 동일 입력에서 `use_scan_matching`만 끈 경우 short·full corrected
+pose가 odometric pose와 같아지고 held-out 재현성이 회복됐다. 따라서 최초 pose 열화는
+Karto sequential scan matching으로 확인했다. 반면 full loop-off는 장거리 edge를
+제거해도 회복되지 않아 explicit loop closure는 주원인에서 제외했다. matching-off에도
+PGM fan·streak와 occupancy support 손실이 남으므로 occupancy 생성은 `open`이다.
+matching-off는 진단 음성 대조군이며 package/default/canonical 설정은 변경하지 않았다.
+
+2026-08-30에는 matching-off의 동일 admitted scan·pose를 고정해 occupancy만 분석했다.
+`unsupported_occupied`는 첫 측정 prefix인 node `30` 또는 그 이전부터 지속됐다.
+`multi_segment_occupied` 후보는 primary skeleton을 `4000 → 4`셀로 줄여 수치 gate를
+통과했지만, blind visual QA에서는 baseline보다 fan/streak와 topology 가독성이
+악화됐다. 따라서 최종 winner는 없고 full candidate 실행은 `0`회다. 상태는
+`root-cause-classified`이며 `src/`, TF, scan profile, SLAM/default는 변경하지 않았다.
 
 최종 profile·상태·한계는 canonical record
 `go2-local-navigation-dimos-slam-continuity-resolution-20260828`의
@@ -128,7 +164,9 @@ recorder는 실제 `/odom` 5947개를 기록하고 control publisher 없이 clea
 로그·JUnit archive·install surface·직접 QA와 checksum은
 `.omo/evidence/validation-package-refactor-closeout-20260828/README.md`에 보존한다.
 이 수치는 software-only 구조·계약 검증이며 replay나 live 성능의 추가 합격
-근거가 아니다.
+근거가 아니다. 2026-08-29 sweep runner 추가 뒤에는 AGX에서 `go2_validation`을
+재빌드하고 157개를 수집해 154 passed·3 skipped·0 failures·0 errors와 현재 설치
+executable `go2_validation=11`을 확인했다.
 
 ## 로봇 전원 없이 RViz2로 URDF·TF 보기
 
@@ -228,7 +266,7 @@ joint로 추가하지 않는다.
 
 1. 10단계 정지 smoke·soak는 실행 완료 상태로 유지하되 yaw drift 경고를 후속 시험에 연결한다.
 2. 11단계 software fault recovery와 Todo 12의 stationary·external-full SLAM mapping은 완료했다.
-3. 12단계 software replay continuity는 canonical bag의 `dimos_odom_accumulated_emit3`와 profile-scoped coarse `0.1745`에서만 통과했다. 이후에는 saved-map localization, 전체 Nav2와 합성 NavigateToPose를 별도 검증하고, live DDS/TF fit은 이 replay 판정과 분리한다.
+3. 12단계 software replay continuity는 canonical bag의 `dimos_odom_accumulated_emit3`와 profile-scoped coarse `0.1745`에서만 통과했다. occupancy 분석은 최초 persistent 결함을 node `30` 또는 그 이전으로 좁혔지만 수치 winner가 blind visual QA에서 거부돼 production 후보는 없다. 다음 occupancy 후보는 같은 blind gate를 유지하고, saved-map localization·전체 Nav2·합성 NavigateToPose와 live DDS/TF fit은 이 replay 판정과 분리한다.
 4. 14단계에서만 AGX 최종 고정과 footprint·케이블·전원·열·센서 시야를 기록한다.
 5. 15단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
 
@@ -275,3 +313,13 @@ canonical emit3 replay-only resolution은
 `records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.md`와
 같은 stem의 YAML projection에 보존한다. 앞선 TF/10-frame A/B의 failed/open 결과는
 그 최종 profile 적용 전 조건의 역사적 근거로 보존한다.
+
+최신 pose·occupancy 원인 분리는
+`records/experiments/go2_local_navigation_dimos_slam_causal_attribution_20260829.md`와
+같은 stem의 YAML projection에 보존한다. 이 후속 기록은 continuity pass를 폐기하지
+않고 당시 근본 원인 설명만 부분 대체한다.
+
+고정 pose occupancy breakpoint와 후보 판정은
+`records/experiments/go2_local_navigation_dimos_occupancy_quality_resolution_20260830.md`와
+같은 stem의 YAML projection에 보존한다. 수치 gate의 winner와 blind visual-approved
+winner를 분리하며, 이 기록의 후보는 live/default 설정으로 승격하지 않는다.

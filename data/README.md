@@ -63,6 +63,21 @@
 아니다. repository의 Apache-2.0 license와 dataset 권리는 구분하며 현재 dataset
 상태는 `dataset_license_unverified`다.
 
+여기서 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. canonical
+short·full의 원본은 `source/go2_china_office_indoor.mcap`이다. topic·frame·rate와
+pinned DimOS Go2 코드에 근거해 센서 계열을 `go2_built_in_l1_ulidar`로 강하게
+추론하지만 hardware manifest가 없으므로 상태는 `unverified`다. 현재 프로젝트
+로봇과 동일한 물리 calibration이라는 뜻도 아니다.
+
+raw source는 `rt/utlidar/cloud`, `rt/utlidar/imu`, `rt/lowstate`,
+`rt/sportmodestate`, `rt/utlidar/robot_odom`, `rt/frontvideo`, `control_log`,
+`telemetry`의 8개 channel을 가진다. derived canonical short·full bag은 선택된
+`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 가진다.
+
+`source/recording_go2_mid360_2026-05-29_4-45pm-PST_corrected.db`는 같은 custody
+경계에 보관된 Mid-360·Point-LIO fixture지만 canonical short·full 변환에는 사용하지
+않았다. 파일이 같은 디렉터리에 있다는 사실을 데이터 계보로 해석하지 않는다.
+
 - `source/`: hash와 size를 통과해 승격된 archive와 단일 raw MCAP
 - `staging/`: bounded download와 secure extraction의 임시 파일
 - `derived/`: short·full canonical rosbag2 MCAP
@@ -187,3 +202,55 @@ bag/profile의 replay-verified 근거다. 앞선 TF A/B와 10-frame scan A/B의 
 `go2-local-navigation-dimos-slam-continuity-resolution-20260828`와 같은 stem의 Markdown이다.
 위 artifact는 이 정확한 replay 조건의 근거일 뿐 live 적합성·지도 정확도·localization·전체
 Nav2의 근거가 아니다.
+
+## DimOS coarse search 7값 sweep
+
+- `runs/mapping_coarse_sweep/20260829_coarse_search_7value_round1/summary.json`:
+  canonical short bag·`dimos_replay`·`dimos_odom_accumulated_emit3`를 고정하고
+  coarse search `0.0698~0.2792 rad` 7개를 비교한 원문이다.
+- 결과는 4 passed·3 failed이며 `0.2094 rad`부터 yaw 연속성 기준을 초과했다.
+- `0.0698`은 `0.3752606931950222 m` / `0.08927691681128769 rad`로 이번 범위의
+  continuity 우선 후속 후보지만, canonical 채택이나 지도 정확도 근거는 아니다.
+- 모든 후보는 cloud `1843/1842/614`, intrinsic drop `1`, command/control `0`,
+  map·pose graph 저장·재로딩과 clean teardown을 완료했다.
+- summary SHA-256은
+  `c6a4213e10b823c5548d23b8517a0d861e51d07c65701b345690d4a5c582b4db`이며,
+  canonical 설명·한계는 record
+  `go2-local-navigation-dimos-coarse-search-sweep-20260829`를 따른다.
+
+## DimOS coarse search lower-band 0~4도
+
+- `runs/mapping_coarse_sweep/20260829_lower_search_0to4deg_round1/summary.json`:
+  같은 canonical short bag·TF·scan·SLAM 조건에서 `0~4°` 5개 후보를 비교한
+  원문이다.
+- 5개 후보가 모두 passed했다. `0°`는 최대 yaw
+  `0.01852879921693318 rad`, `1°`는 최대 translation
+  `0.2800537845414384 m`로 각각 해당 지표의 최저값이었다.
+- cloud `1843/1842/614`, intrinsic drop `1`, overflow/pending/regression
+  `0/0/0`, artifact 저장·재로딩과 clean teardown은 모든 후보에서 통과했다.
+- summary SHA-256은
+  `158fedab211baf51142152ea08862a996a36558a06db295689bc634ecb83b117`이며,
+  상세 판정·한계는 record
+  `go2-local-navigation-dimos-lower-search-20260829`를 따른다.
+- `0°`와 `1°`는 각각 yaw·translation 우선 replay 후보로만 기록하고,
+  기존 canonical `0.1745 rad`는 변경하지 않았다.
+
+## Map PNG export
+
+관리 대상인 `data/`·`src/` 범위의 occupancy PGM 68개를 원본 옆에 동일 stem의
+PNG sidecar로 내보냈다. 예를 들어 `occupancy.pgm`은 `occupancy.png`가 되며,
+원본 PGM과 `occupancy.yaml`은 그대로 유지한다. `build/`·`install/` 아래의
+생성 복사본은 소스 산출물이 아니므로 별도 PNG를 관리하지 않는다. `data/runs/`
+아래의 PNG도 실행 산출물과 동일하게 Git 관리 대상이 아니다.
+
+각도에 따른 형상 변화를 비교할 수 있도록 다음 폴더에 2026-08-29 coarse sweep
+결과 12개를 별도로 모았다.
+
+- `.user/img/slam_map/angle_sweep_20260829/`: lower-band `0~4°` 5개와 기존
+  coarse `4~16°` 7개 PNG
+- `../src/go2_nav2/maps/shadow_blocked.png`, `shadow_open.png`: 합성 map의 PNG
+  sidecar
+
+비교 폴더의 PNG는 시각 확인용이다. 각 map의 resolution·origin·threshold와
+실행 출처는 원래 실행 디렉터리의 `occupancy.yaml`과 폴더 README를 기준으로 하며,
+PNG만으로 지도 정확도나 canonical angle 채택을 판단하지 않는다.

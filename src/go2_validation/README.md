@@ -55,6 +55,7 @@ go2_validation/
 │   ├── mapping_artifacts.py
 │   ├── mapping_cloud_accounting.py
 │   ├── mapping_command_builders.py
+│   ├── mapping_coarse_search_sweep_runner.py
 │   ├── mapping_input_acceptance_runner.py
 │   ├── mapping_input_capture.py
 │   ├── mapping_input_execution.py
@@ -108,9 +109,9 @@ go2_validation/
 | `package.xml` | validation runner가 사용하는 ROS 2 metadata와 의존성을 선언한다. |
 | `resource/go2_validation` | ament index package marker다. |
 | `setup.cfg` | ament Python script 설치 경로를 지정한다. |
-| `setup.py` | validation config·launch를 설치하고 기존 10개 validation executable을 이 package에만 등록한다. |
+| `setup.py` | validation config·launch를 설치하고 11개 validation executable을 이 package에만 등록한다. |
 | `config/execution_modes.yaml` | domain, clock owner, global TF owner, sim time과 loopback을 software validation mode별로 정의한다. |
-| `config/external_replay_sources.yaml` | pinned DimOS source의 custody, hash·size 제한, channel과 replay-only profile provenance를 정의한다. |
+| `config/external_replay_sources.yaml` | pinned DimOS source의 custody, hash·size 제한, dataset 출처와 센서 identity 상태, canonical channel과 replay-only profile provenance를 정의한다. |
 | `config/shadow_scenarios.yaml` | synthetic navigation 후보의 map·start/goal·terminal expectation을 정의한다. |
 | `launch/go2_fault_acceptance.launch.py` | Domain 61 synthetic fault fixture와 non-actuating derived-output owner를 조합한다. `execution_mode`와 `continuity_profile`을 선언해 mapping scan과 odometry adapter에 각각 전달한다. |
 | `launch/go2_integrated_preflight.launch.py` | `go2_nav2` controller preview와 bringup observer를 단일 shutdown 경계로 조합한다. |
@@ -139,6 +140,7 @@ go2_validation/
 | `go2_validation/mapping_artifacts.py` | occupancy map·image·pose graph 저장과 reload artifact 경계를 검증한다. |
 | `go2_validation/mapping_cloud_accounting.py` | accumulated mapping cloud node의 terminal accounting marker를 파싱한다. |
 | `go2_validation/mapping_command_builders.py` | Domain 63 launch/player의 shell-free argv와 profile-specific parameter를 조립한다. |
+| `go2_validation/mapping_coarse_search_sweep_runner.py` | canonical DimOS short bag에서 emit3 후보를 순차 비교하고 후보별 artifact·연속성 결과를 기록한다. 기본은 7개이며 `angle_offsets_rad` parameter로 lower-band 후보를 주입할 수 있다. |
 | `go2_validation/mapping_input_acceptance_runner.py` | Domain 62 mapping input observation의 순수 verdict와 sequential variant spec을 정의한다. |
 | `go2_validation/mapping_input_capture.py` | scan·odom·graph 표본을 mapping-input acceptance observation으로 투영한다. |
 | `go2_validation/mapping_input_execution.py` | Domain 62 variant의 mapping scan/odometry launch와 bounded rosbag player lifecycle을 소유한다. mapping scan에는 `execution_mode`만, external odometry에는 `continuity_profile=replay_enforce`를 전달한다. |
@@ -184,11 +186,29 @@ go2_validation/
 
 ## 실행 경계
 
+`mapping_coarse_search_sweep`는 기본적으로 기존 7개 후보를 사용한다. 특정 replay
+범위만 비교할 때는 `angle_offsets_rad`에 comma-separated radian 목록을 전달한다.
+예를 들어 0~4° lower-band 시험은 다음과 같이 실행한다.
+
+```bash
+ros2 run go2_validation mapping_coarse_search_sweep --ros-args \
+  -p run_label:=lower_search_0to4deg \
+  -p angle_offsets_rad:="0.0,0.01745,0.03490,0.05236,0.06980"
+```
+
+이 parameter는 validation runner의 후보 목록만 바꾸며, onboard 기본 profile이나
+production navigation launch의 coarse search 기본값을 바꾸지 않는다.
+
 이 package의 runner는 software-only observation, local artifact custody와 process
 lifecycle을 검증한다. `offline_fault`는 `execution_modes.yaml`의 runtime domain
 ID일 뿐 profile-loader execution mode가 아니다. 일반 onboard 경로는
 `execution_mode=onboard`와 `continuity_profile=onboard_observe`를 유지하며,
 replay 전용 profile은 해당 external replay caller가 명시한다.
+
+`external replay`는 외부 출처 dataset을 뜻하며 외장 LiDAR를 뜻하지 않는다.
+현재 canonical DimOS source의 센서 계열은 Go2 built-in L1 ULIDAR로 강하게
+추론하지만 hardware manifest가 없어 `unverified`다. 함께 보관된 Mid-360·Point-LIO
+DB는 canonical short·full 변환 계보에서 제외한다.
 
 external replay acquisition·conversion과 해당 MCAP test는
 `requirements/external-replay.txt`의 pinned Python dependency를 사용한다. AGX의

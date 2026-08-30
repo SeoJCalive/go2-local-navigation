@@ -4,7 +4,7 @@ record_id: "go2-local-navigation-acceptance-matrix-20260827"
 source_markdown: "../README.md"
 status: "current_candidate_matrix"
 recorded_at: "2026-08-27"
-latest_evidence_at: "2026-08-28"
+latest_evidence_at: "2026-08-30"
 provenance:
   kind: "manual_projection_from_project_contracts_and_execution_records"
   target: "go2_agx"
@@ -176,6 +176,22 @@ source_refs:
     record_id: "go2-local-navigation-dimos-slam-continuity-resolution-20260828"
     path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.yaml"
     role: "canonical bag emit3 replay-only continuity resolution, repeat·artifact·RViz·build/test 근거"
+  - source_id: "DIMOS-COARSE-SEARCH-SWEEP-20260829"
+    record_id: "go2-local-navigation-dimos-coarse-search-sweep-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_coarse_search_sweep_20260829.yaml"
+    role: "canonical bag emit3 coarse search 7값의 continuity·artifact·안전 비교와 후속 후보 미채택 근거"
+  - source_id: "DIMOS-LOWER-SEARCH-20260829"
+    record_id: "go2-local-navigation-dimos-lower-search-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_lower_search_20260829.yaml"
+    role: "canonical bag emit3 coarse search 0~4도 5값의 continuity·artifact·안전 비교와 후보 미채택 근거"
+  - source_id: "DIMOS-SLAM-CAUSAL-ATTRIBUTION-20260829"
+    record_id: "go2-local-navigation-dimos-slam-causal-attribution-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_slam_causal_attribution_20260829.yaml"
+    role: "sequential matcher 최초 pose 열화 확정, explicit loop 주원인 제외와 occupancy 잔여 open 근거"
+  - source_id: "DIMOS-OCCUPANCY-QUALITY-RESOLUTION-20260830"
+    record_id: "go2-local-navigation-dimos-occupancy-quality-resolution-20260830"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_occupancy_quality_resolution_20260830.yaml"
+    role: "고정 pose occupancy breakpoint, 수치 winner와 blind visual 거부, full 실행 0회 근거"
   - source_id: "SHADOW-ASSET-CONTRACT"
     record_id: "go2-local-navigation-shadow-assets-20260827"
     path: "../../src/go2_nav2/test/test_shadow_assets.py"
@@ -414,10 +430,10 @@ modules:
     current_claim:
       status: "partial"
       highest_evidence_level: "replay-verified"
-      claim: "exact canonical 120초 DimOS bag의 dimos_odom_accumulated_emit3(frame/emit 3/3, input/retry 64/64, min_height -0.10, queue 64)와 candidate-only coarse 0.1745에서 map-correction continuity, artifact 저장·재로딩과 clean teardown을 통과; response expansion false/loop closing true는 A/B 공통 통제값이고 baseline coarse 0.349와 global launch default 0.349/true/true는 구분하며, 이전 TF/10-frame A/B 실패는 역사적 근거로 보존"
-      limitations: ["replay-verified 범위는 exact canonical bag/profile뿐", "live Go2·physical mount·sensor/TF fit 미검증", "지도 정확도·loop closure 품질 미검증", "saved-map localization·전체 Nav2·NavigateToPose 미검증", "외부 dataset은 ground truth가 아님", "순수 SIGINT graceful teardown 미확인"]
+      claim: "exact canonical 120초 DimOS bag의 dimos_odom_accumulated_emit3와 candidate-only coarse 0.1745에서 map-correction continuity, artifact 저장·재로딩과 clean teardown을 반복 통과했다. 후속 coarse sweep 후보는 canonical로 채택하지 않았다. causal A/B는 Karto sequential scan matching을 최초 pose 열화 원인으로 확인했고 explicit loop closure는 주원인에서 제외했다. 고정 pose occupancy 분석은 unsupported_occupied가 node 30 또는 그 이전부터 지속됨을 확인했지만, 수치 winner multi_segment_occupied가 blind visual QA에서 회귀해 최종 후보 없이 root-cause-classified로 닫혔다. 이전 TF/10-frame A/B 실패와 continuity 결과는 조건별 역사적 근거로 보존한다."
+      limitations: ["replay-verified 범위는 exact canonical bag/profile뿐", "센서 계열은 Go2 built-in L1 ULIDAR high-confidence inference이며 hardware identity·현재 로봇 physical calibration은 unverified", "matching-off는 진단 음성 대조군이며 production 후보가 아님", "sequential matcher 내부의 잘못된 correction 선택 조건 미확인", "occupancy 최초 scan은 node 30 이전일 수 있음", "수치 skeleton 감소가 시각 topology 품질을 예측하지 못함", "후보의 fan/streak 확산 원인과 occupancy 품질 해결은 open", "live Go2·physical mount·sensor/TF fit 미검증", "지도 ground truth·saved-map localization·전체 Nav2·NavigateToPose 미검증", "순수 SIGINT graceful teardown 미확인"]
     attained_evidence_levels: ["implemented", "automated-tested", "replay-verified"]
-    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "EXTERNAL-REPLAY-CONVERSION", "MAPPING-INPUT-RUNTIME", "SLAM-MAPPING-REPLAY-RUN", "SLAM-MAPPING-RUNTIME", "DIMOS-TF-PROFILE-AB-RUN", "MAPPING-TF-PROFILE-AB-RUNTIME", "DIMOS-SCAN-PROJECTION-AB-RUN", "MAPPING-SCAN-PROJECTION-AB-RUNTIME", "DIMOS-SLAM-CONTINUITY-RESOLUTION-20260828"]
+    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "EXTERNAL-REPLAY-CONVERSION", "MAPPING-INPUT-RUNTIME", "SLAM-MAPPING-REPLAY-RUN", "SLAM-MAPPING-RUNTIME", "DIMOS-TF-PROFILE-AB-RUN", "MAPPING-TF-PROFILE-AB-RUNTIME", "DIMOS-SCAN-PROJECTION-AB-RUN", "MAPPING-SCAN-PROJECTION-AB-RUNTIME", "DIMOS-SLAM-CONTINUITY-RESOLUTION-20260828", "DIMOS-COARSE-SEARCH-SWEEP-20260829", "DIMOS-LOWER-SEARCH-20260829", "DIMOS-SLAM-CAUSAL-ATTRIBUTION-20260829", "DIMOS-OCCUPANCY-QUALITY-RESOLUTION-20260830"]
     acceptance_checks:
       - check_id: "backend-and-input-contract"
         status: "passed"
@@ -434,11 +450,26 @@ modules:
       - check_id: "canonical-emit3-map-correction-continuity"
         status: "passed"
         condition: "exact canonical 120초 bag에서 raw_single baseline 0.5535118551684397 m·0.3678837777692796 rad failed 대비 dimos_odom_accumulated_emit3/coarse 0.1745가 최대 0.41047936583987504 m·0.1800169168112875 rad, exceedance·unaligned·regressive 0, cloud 1843/1842/614, intrinsic drop 1, overflow/pending/regression 0/0/0, command/control 0, save/reload·clean teardown·repeat 1/2 passed, RViz Global/Map Ok·새 candidate TF warning 없음·25초 whole-view trembling/large teleport 없음, 7 packages·267 tests·0 failures/errors·3 skipped으로 passed"
+      - check_id: "coarse-search-seven-value-sweep"
+        status: "passed"
+        condition: "같은 canonical bag·emit3 조건에서 0.0698~0.2792 rad 7개 실행 완료, 4 passed·3 yaw failed, 0.1745 결과 재현, cloud accounting·artifact·command/control·teardown 공통 계약 통과; 0.0698은 follow-up candidate이며 canonical 미채택"
+      - check_id: "coarse-search-lower-band-five-value-sweep"
+        status: "passed"
+        condition: "같은 canonical bag·emit3 조건에서 0~4° 5개 실행 완료, 5 passed, 0.0698 결과 재현, cloud accounting·artifact·command/control·teardown 공통 계약 통과; 0°는 yaw, 1°는 translation 우선 후보이며 canonical 미채택"
+      - check_id: "sequential-scan-matcher-causal-attribution"
+        status: "passed"
+        condition: "동일 causal_9frame 입력에서 use_scan_matching=false만 적용하면 short·full corrected pose가 odometric pose와 같아지고 held-out 일관성이 회복됨; loop-off만으로는 회복되지 않아 sequential matcher를 최초 pose 열화 원인으로 확인"
+      - check_id: "occupancy-generation-residual"
+        status: "warning"
+        condition: "matching-off에서도 held-out pose 회복보다 최종 PGM 회복이 작고, 후속 고정 pose 분석에서 unsupported_occupied가 node 30 또는 그 이전부터 지속돼 occupancy 원인 class는 좁혀졌지만 품질 해결은 open"
+      - check_id: "occupancy-policy-candidate-visual-gate"
+        status: "failed"
+        condition: "multi_segment_occupied는 primary skeleton 4000→4와 수치 보존 gate를 통과했지만 blind visual QA에서 fan/streak와 topology 가독성이 회귀해 visual-approved winner null, full 실행 0회"
       - check_id: "dynamic-map-quality"
         status: "deferred"
         condition: "최종 고정 후 제한된 이동, loop closure와 실제 형상 비교"
-    failure_checks: ["입력 변환 부재", "map to odom 중복 owner", "TF jump", "map 저장·재로딩 실패"]
-    revalidation_triggers: ["static sensor TF profile 변경", "PointCloud2 to LaserScan 투영 또는 누적 변경", "mapping backend 선정 또는 변경", "LiDAR filter 변경", "odometry mapping 변경", "map frame 정책 변경"]
+    failure_checks: ["입력 변환 부재", "map to odom 중복 owner", "TF jump", "sequential matcher 잘못된 correction", "occupancy support 손실", "수치 개선과 blind visual topology 회귀 충돌", "map 저장·재로딩 실패"]
+    revalidation_triggers: ["static sensor TF profile 변경", "PointCloud2 to LaserScan 투영 또는 누적 변경", "coarse search 후보를 canonical 또는 live 기본값으로 채택", "scan matcher 또는 occupancy parameter 변경", "새 occupancy policy 또는 시각 기준 reference 추가", "mapping backend 선정 또는 변경", "LiDAR filter 변경", "odometry mapping 변경", "map frame 정책 변경"]
 
   - module_id: "global_navigation"
     owner: "go2_nav2"
@@ -559,9 +590,10 @@ modules:
 next_stage:
   stage_id: 12
   name: "mapping_localization_and_nav2_shadow"
-  status: "software_replay_continuity_resolved_for_exact_canonical_bag_profile_localization_and_nav2_pending"
+  status: "software_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending"
   prerequisites:
     - "live Go2·physical mount와 sensor/TF fit을 canonical replay 결과와 분리해 검증"
+    - "sequential matcher 최초 잘못된 correction과 occupancy 후보의 fan/streak 확산 원인을 분리해 검증"
     - "domain 64 saved-map localization과 domain 65 synthetic navigation 격리"
     - "전체 Nav2 lifecycle과 NavigateToPose scenario 판정"
     - "project command publisher 0과 motion gate false 유지"
