@@ -1,0 +1,40 @@
+schema_version: 1
+record_kind: execution_modes
+modes:
+  offline_fault:
+    domain_id: 61
+    clock_owner: fixture
+    global_tf_owner: none
+    use_sim_time: true
+    loopback_only: true
+  scan_replay:
+    domain_id: 62
+    clock_owner: rosbag_player
+    global_tf_owner: none
+    use_sim_time: true
+    loopback_only: true
+    sequential_variants: [project_stationary, external_dynamic]
+  mapping:
+    domain_id: 63
+    clock_owner: rosbag_player
+    global_tf_owner: slam_toolbox
+    use_sim_time: true
+    loopback_only: true
+  localization:
+    domain_id: 64
+    clock_owner: rosbag_player
+    global_tf_owner: amcl
+    use_sim_time: true
+    loopback_only: true
+  synthetic_navigation:
+    domain_id: 65
+    clock_owner: fixture
+    global_tf_owner: fixture
+    use_sim_time: true
+    loopback_only: true
+  live:
+    domain_id: 0
+    clock_owner: none
+    global_tf_owner: slam_toolbox
+    use_sim_time: false
+    loopback_only: false

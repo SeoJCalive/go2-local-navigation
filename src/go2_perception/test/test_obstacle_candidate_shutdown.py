@@ -139,3 +139,26 @@ def test_given_inactive_context_when_interrupted_then_node_does_not_log(
     assert node.destroyed
     assert runtime.shutdown_call_count == 0
     assert node.log_messages == []
+
+
+def test_given_inactive_context_when_mapping_gate_is_interrupted_then_it_exits_cleanly(
+    monkeypatch,
+) -> None:
+    runtime = _FakeRuntime()
+    _install_ros_stubs(monkeypatch, runtime)
+    monkeypatch.delitem(
+        sys.modules,
+        "go2_perception.mapping_cloud_gate_node",
+        raising=False,
+    )
+    mapping_module = importlib.import_module(
+        "go2_perception.mapping_cloud_gate_node"
+    )
+    node = _FakeNode()
+    monkeypatch.setattr(mapping_module, "MappingCloudGateNode", lambda: node)
+
+    mapping_module.main()
+
+    assert node.destroyed
+    assert runtime.shutdown_call_count == 0
+    assert node.log_messages == []

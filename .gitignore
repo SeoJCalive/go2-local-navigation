@@ -9,6 +9,10 @@
 # Runtime data and large recordings
 /data/*
 !/data/README.md
+/data/external/dimos_go2_indoor/source/
+/data/external/dimos_go2_indoor/staging/
+/data/external/dimos_go2_indoor/derived/
+/data/external/dimos_go2_indoor/runs/
 *.bag
 *.db3
 *.mcap
@@ -18,8 +22,10 @@
 .env
 .env.*
 .venv/
+.python_deps/
 .idea/
 .vscode/
 
 # Agent-local verification evidence
 /.omo/
+/.user/

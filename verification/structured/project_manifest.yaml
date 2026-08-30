@@ -6,7 +6,7 @@ title: "Go2 로컬 내비게이션 프로젝트 기초 골격"
 project_name: go2_local_navigation
 status: "candidate"
 recorded_at: "2026-08-22"
-latest_verified_at: "2026-08-27"
+latest_verified_at: "2026-08-30"
 provenance:
   kind: "design_from_current_agx_record"
   derived_from:
@@ -29,6 +29,19 @@ scope:
   - final_mount_integration_preparation
   - limited_physical_motion_validation_preparation
   - limited_motion_trial_readonly_recorder
+  - software_fault_recovery
+  - external_dynamic_replay_canonicalization
+  - mapping_input_replay_acceptance
+  - synthetic_navigation_asset_preparation
+  - slam_mapping_replay_acceptance
+  - external_replay_static_tf_profile_ab
+  - external_replay_scan_projection_ab
+  - external_replay_slam_continuity_resolution
+  - external_replay_coarse_search_seven_value_sweep
+  - external_replay_coarse_search_lower_band_0_to_4_degree_sweep
+  - external_replay_slam_causal_attribution
+  - external_replay_occupancy_quality_resolution
+  - validation_package_and_execution_profile_boundary
 verified_outputs:
   - "/odom"
   - "odom_to_base_dynamic_tf"
@@ -36,6 +49,20 @@ verified_outputs:
   - "/local_costmap/costmap"
   - "/go2_control/cmd_vel_candidate"
   - "/go2_control/sport_request_preview"
+software_navigation_stages:
+  - {id: 11, name: "software_fault_recovery"}
+  - {id: 12, name: "mapping_localization_and_nav2_shadow"}
+  - {id: 13, name: "software_only_freeze"}
+  - {id: 14, name: "final_mount_integration"}
+  - {id: 15, name: "limited_physical_motion_validation"}
+replay_provenance:
+  required_source_kinds: ["project_stationary", "external_dynamic"]
+  external_semantics: "dataset_origin_not_external_sensor"
+  external_sensor_identity:
+    family: "go2_built_in_l1_ulidar"
+    status: "unverified"
+    inference_strength: "high"
+    mid360_colocated_artifact_used: false
 completed_stages:
   - "stationary_bag_replay_acceptance"
   - "stationary_obstacle_candidate_perception"
@@ -49,22 +76,84 @@ completed_stages:
   - "stationary_smoke_and_soak_execution_completed_with_warning"
   - "final_mount_integration_preparation"
   - "limited_physical_motion_validation_preparation"
+  - "software_fault_recovery"
+  - "external_dynamic_replay_canonicalization"
+  - "mapping_input_replay_acceptance"
+  - "synthetic_navigation_asset_preparation"
+  - "stationary_and_external_full_slam_mapping"
+  - "external_replay_scan_projection_ab_partial_improvement"
+  - "external_replay_slam_continuity_resolution_emit3"
+  - "external_replay_coarse_search_seven_value_sweep"
+  - "external_replay_coarse_search_lower_band_0_to_4_degree_sweep"
+  - "external_replay_sequential_matcher_causal_attribution"
+  - "external_replay_occupancy_root_cause_classified_no_candidate"
+  - "validation_orchestration_package_separation_and_profile_guard"
 prepared_stages:
-  - stage: "final_mount_integration"
+  - stage_id: 12
+    stage: "mapping_localization_and_nav2_shadow"
+    preparation_status: "mapping_artifact_pipeline_completed_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending"
+    execution_status: "in_progress"
+  - stage_id: 14
+    stage: "final_mount_integration"
     preparation_status: "completed"
     execution_status: "deferred"
-  - stage: "limited_physical_motion_validation"
+  - stage_id: 15
+    stage: "limited_physical_motion_validation"
     preparation_status: "completed"
     execution_status: "deferred"
-next_stage: "final_mount_integration"
+next_stage: "mapping_localization_and_nav2_shadow"
 candidate_outputs:
   - "/go2_control/sport_request_preview"
   - "/go2_nav2/costmap_only_cmd_vel_unused"
+component_boundaries:
+  - component_id: "mapping_scan_projection"
+    owner: "go2_perception"
+    status: "experimental"
+    role: "PointCloud2를 mapping용 LaserScan으로 투영하고 외부 replay 누적 profile 후보를 제공"
+  - component_id: "slam_mapping_runtime"
+    owner: "go2_nav2"
+    status: "experimental"
+    role: "SLAM Toolbox launch·설정과 Nav2 runtime 자산을 제공"
+  - component_id: "software_validation_orchestration"
+    owner: "go2_validation"
+    status: "validation_tool"
+    role: "fault·replay·mapping acceptance와 통합 preflight를 실행하고 결과를 판정"
+  - component_id: "odometry_continuity"
+    owner: "go2_state_estimation"
+    status: "single_implementation_profile_selected"
+    profiles:
+      onboard: "onboard_observe"
+      replay: "replay_enforce"
 verification:
   entrypoint: "verification/README.md"
   structured_matrix: "verification/structured/acceptance_matrix.yaml"
-  latest_record_id: "go2-local-navigation-stationary-soak-20260827"
-  status: "stage_10_completed_with_warning_stages_11_12_prepared_execution_deferred"
+  latest_record_id: "go2-local-navigation-dimos-occupancy-quality-resolution-20260830"
+  latest_runtime_artifact: "data/runs/mapping_quality_resolution/20260830T051848Z-dimos-occupancy-quality-v1/occupancy/short_candidate_analysis/selection.json"
+  status: "stage_12_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending"
+  package_boundary_record_id: "go2-local-navigation-validation-package-refactor-20260828"
+  package_inventory:
+    count: 8
+    workspace_install_status: "verified_current"
+    workspace_install_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation/install"
+    validation_executable_owner: "go2_validation"
+    validation_executable_count: 11
+    nav2_validation_executable_count: 0
+    clean_test_summary: "287 tests, 0 errors, 0 failures, 3 skipped"
+    latest_targeted_validation_test_summary: "154 passed, 3 skipped"
+    evidence_summary: ".omo/evidence/validation-package-refactor-closeout-20260828/README.md"
+open_findings:
+  - finding_id: "external_dynamic_map_to_odom_continuity"
+    status: "resolved_for_exact_canonical_bag_profile_replay_only"
+    evidence: "dimos_odom_accumulated_emit3와 candidate-only coarse 0.1745가 canonical 120초 bag에서 map-correction 기준을 반복 통과했다. 7값 sweep은 0.0698~0.2792 rad에서 4 passed·3 failed를 기록했고, lower-band 0~4도 5개 sweep은 모두 passed했다. lower-band에서는 0°가 yaw 최대값, 1°가 translation 최대값을 각각 최소화했지만 두 후보 모두 canonical로 채택하지 않았다. response expansion false/loop closing true는 공통값이며, 이전 TF/10-frame 누적 실패는 적용 전 조건의 역사적 근거로 보존한다."
+    next_test: "TF·scan profile 2×2에서 continuity와 map 품질을 분리하고 다른 bag 또는 live Go2·physical mount·sensor/TF fit에서 재검증"
+  - finding_id: "sequential_scan_matching_pose_degradation"
+    status: "confirmed_for_canonical_replay_causal_input"
+    evidence: "use_scan_matching=false 단일 토글에서 short·full corrected pose가 odometric pose와 같아지고 held-out 일관성이 회복됐으며 loop-off만으로는 회복되지 않았다."
+    next_test: "최초 잘못된 sequential correction의 scan geometry·matcher response·candidate selection을 추적"
+  - finding_id: "occupancy_generation_residual"
+    status: "root_cause_classified_no_candidate"
+    evidence: "matching-off pose를 고정한 분석에서 unsupported_occupied가 node 30 또는 그 이전부터 지속됐다. multi_segment_occupied는 primary skeleton 4000→4의 수치 gate를 통과했지만 blind visual QA에서 fan/streak와 topology 가독성이 회귀해 visual-approved winner는 null이고 full 실행은 0회다."
+    next_test: "후보 전후 cell-state 전이에서 fan/streak 확산 원인을 추적하고 동일 admitted pose·scan과 blind visual gate로 새 정책을 검증"
 non_goals:
   - physical_motion_control
   - go2_control_topic_publication
@@ -75,6 +164,13 @@ source_refs:
   - source_id: "CURRENT-GO2-AGX-20260822"
     path: "/home/tjwocjf0915/research/Go2/CURRENT.md"
     role: "현재 AGX 환경 요약"
+  - source_id: "VALIDATION-PACKAGE-MIGRATION-20260828"
+    record_id: "go2-local-navigation-validation-package-refactor-20260828"
+    path: "/home/tjwocjf0915/research/Go2/records/migrations/go2_local_navigation_validation_package_refactor_20260828.yaml"
+    role: "validation package 소유권, execution profile 경계와 clean install-space 검증"
+  - source_id: "VALIDATION-PACKAGE-CLOSEOUT-EVIDENCE-20260828"
+    path: "../../.omo/evidence/validation-package-refactor-closeout-20260828/README.md"
+    role: "actual workspace install, raw build/test, JUnit, executable inventory and direct QA"
   - source_id: "UNITREE-ROS2-PINNED-668D1EC5"
     path: "https://github.com/unitreerobotics/unitree_ros2/tree/668d1ec5a05d1c38d3306bdca7d59f2ba3581a88"
     role: "공식 ROS 2 참고 자료"
@@ -88,12 +184,68 @@ source_refs:
   - source_id: "TRIAL-RECORDER-READONLY-QA-20260827"
     record_id: "go2-local-navigation-trial-recorder-readonly-qa-20260827"
     path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml"
-    role: "12단계 read-only recorder 구현·종료·실제 odometry QA 근거"
+    role: "15단계 read-only recorder 구현·종료·실제 odometry QA 근거"
+  - source_id: "SOFTWARE-FAULT-ACCEPTANCE-RUNTIME-20260827"
+    record_id: "go2-local-navigation-software-fault-runtime-20260827"
+    path: "../../data/runs/fault_acceptance/stage11.json"
+    role: "11단계 합성 fault 10개 suppression·recovery·teardown 실행 근거"
+  - source_id: "EXTERNAL-REPLAY-CONVERSION-RUNTIME-20260827"
+    record_id: "go2-local-navigation-external-replay-conversion-runtime-20260827"
+    path: "../../data/external/dimos_go2_indoor/runs/conversion.json"
+    role: "외부 source provenance와 short·full canonical 변환 근거"
+  - source_id: "MAPPING-INPUT-ACCEPTANCE-RUNTIME-20260827"
+    record_id: "go2-local-navigation-mapping-input-runtime-20260827"
+    path: "../../data/runs/mapping_input/stage12-ingress.json"
+    role: "12단계 정지·external short 입력과 clean teardown 실행 근거"
+  - source_id: "SLAM-MAPPING-REPLAY-RECORD-20260827"
+    record_id: "go2-local-navigation-slam-mapping-replay-20260827"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_slam_mapping_replay_20260827.yaml"
+    role: "12단계 정지·external-full SLAM map 저장·재로딩 판정과 한계"
+  - source_id: "SLAM-MAPPING-RUNTIME-20260827"
+    record_id: "go2-local-navigation-slam-mapping-runtime-20260827"
+    path: "../../data/runs/mapping/stage12.json"
+    role: "Domain 63 mapping stream·owner·artifact·teardown 실행 원문"
+  - source_id: "DIMOS-TF-PROFILE-AB-RECORD-20260828"
+    record_id: "go2-local-navigation-dimos-tf-profile-ab-20260828"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_tf_profile_ab_20260828.yaml"
+    role: "DimOS source extrinsic과 동일 short bag의 map to odom continuity A/B 판정"
+  - source_id: "MAPPING-TF-PROFILE-AB-RUNTIME-20260828"
+    record_id: "go2-local-navigation-mapping-tf-profile-ab-runtime-20260828"
+    path: "../../data/runs/mapping_tf_ab/20260828_dimos_tf_ab_retry1/summary.json"
+    role: "profile별 stream·연속성·artifact·teardown 실행 원문"
+  - source_id: "DIMOS-SCAN-PROJECTION-AB-RECORD-20260828"
+    record_id: "go2-local-navigation-dimos-scan-projection-ab-20260828"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_scan_projection_ab_20260828.yaml"
+    role: "단일 cloud와 10-frame odometry 보정 누적의 scan 밀도·연속성 판정"
+  - source_id: "MAPPING-SCAN-PROJECTION-AB-RUNTIME-20260828"
+    record_id: "go2-local-navigation-mapping-scan-projection-ab-runtime-20260828"
+    path: "../../data/runs/mapping_scan_ab/20260828_dimos_scan_ab_round3/summary.json"
+    role: "scan profile별 stream·beam 밀도·map to odom·source odom·artifact·teardown 원문"
+  - source_id: "DIMOS-SLAM-CONTINUITY-RESOLUTION-20260828"
+    record_id: "go2-local-navigation-dimos-slam-continuity-resolution-20260828"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.yaml"
+    role: "exact canonical bag emit3 replay-only continuity resolution, repeat·artifact·RViz·build/test 근거"
+  - source_id: "DIMOS-COARSE-SEARCH-SWEEP-20260829"
+    record_id: "go2-local-navigation-dimos-coarse-search-sweep-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_coarse_search_sweep_20260829.yaml"
+    role: "canonical bag emit3 coarse search 7값의 continuity·artifact·안전 비교와 후속 후보 미채택 근거"
+  - source_id: "DIMOS-LOWER-SEARCH-20260829"
+    record_id: "go2-local-navigation-dimos-lower-search-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_lower_search_20260829.yaml"
+    role: "canonical bag emit3 coarse search 0~4도 5값의 continuity·artifact·안전 비교와 후보 미채택 근거"
+  - source_id: "DIMOS-SLAM-CAUSAL-ATTRIBUTION-20260829"
+    record_id: "go2-local-navigation-dimos-slam-causal-attribution-20260829"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_slam_causal_attribution_20260829.yaml"
+    role: "sequential matcher 최초 pose 열화 확정, explicit loop 주원인 제외와 occupancy 잔여 open 근거"
+  - source_id: "DIMOS-OCCUPANCY-QUALITY-RESOLUTION-20260830"
+    record_id: "go2-local-navigation-dimos-occupancy-quality-resolution-20260830"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_dimos_occupancy_quality_resolution_20260830.yaml"
+    role: "고정 pose occupancy breakpoint, 수치 winner의 blind visual 거부와 full 실행 0회 근거"
   - source_id: "FINAL-MOUNT-ACCEPTANCE-PLAN"
     record_id: "go2-local-navigation-final-mount-acceptance-20260827"
     path: "final_mount_acceptance.yaml"
-    role: "11단계 준비 완료와 실제 실행 보류 조건"
+    role: "14단계 준비 완료와 실제 실행 보류 조건"
   - source_id: "LIMITED-PHYSICAL-MOTION-ACCEPTANCE-PLAN"
     record_id: "go2-local-navigation-limited-physical-motion-acceptance-20260827"
     path: "limited_physical_motion_acceptance.yaml"
-    role: "12단계 준비 완료와 실제 trial 보류 조건"
+    role: "15단계 준비 완료와 실제 trial 보류 조건"

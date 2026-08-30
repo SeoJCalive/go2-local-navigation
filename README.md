@@ -21,6 +21,88 @@ teardown을 함께 확인했고 46개 check가 모두 PASS였다. 이어서 30�
 check가 모두 PASS했고 30분 soak는 46 PASS·1 WARN이었다. 유일한 경고는 정지 yaw
 누적 drift `0.248012 rad`이며, 최종 장착 전 해결된 사실로 승격하지 않는다.
 
+같은 날 software-only Wave 1·2에서 Domain 61 합성 fault 10개와 Domain 62 정지·외부
+replay 입력을 검증했다. 외부 자료는 cloud `17,776`, odometry `173,616`개를 가진
+full canonical bag과 120초 short bag으로 변환했으며, 두 ingress 모두 `/scan` frame
+`base`, command publisher 0과 clean teardown을 통과했다. 이 결과는 mapping 입력과
+fault recovery 근거이며 SLAM 지도 품질, localization 또는 목적지 도달 근거가 아니다.
+
+이 자료의 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. raw
+`go2_china_office_indoor.mcap`은 8개 channel을 가지며 derived canonical bag은
+`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 사용한다. topic·frame·rate와 pinned
+DimOS 코드에 따라 센서 계열은 Go2 built-in L1 ULIDAR로 강하게 추론하지만 hardware
+manifest가 없어 `unverified`다. 같은 source 디렉터리의 Mid-360·Point-LIO DB는
+canonical short·full 계보에 포함되지 않는다.
+
+이어 Domain 63 loopback에서 stationary와 external-full을 1.0배속으로 재생해 두
+SLAM mapping run을 완료했다. `/map`, SLAM Toolbox 단독 `map → odom`, occupancy
+map·pose graph 저장과 재로딩, command publisher 0과 잔류 process 0을 확인했다.
+이는 map 생성·저장 경계의 replay 근거이며 지도 정확도·loop closure 품질이나
+localization·NavigateToPose의 근거로 승격하지 않는다.
+
+2026-08-28에는 DimOS 저장소의 Go2 LiDAR extrinsic을 외부 replay 전용
+`dimos_replay` TF profile로 추가하고 같은 120초 short bag을 기존
+`project_default`와 A/B했다. 최대 translation step은 `10.014682 → 8.768064 m`,
+yaw step은 `0.545220 → 0.366329 rad`로 감소했지만 두 profile 모두 현재 연속성
+기준 `0.5 m`·`0.2 rad`를 초과했다. 따라서 source extrinsic은 유효한 보정이지만
+순간이동의 단독 원인으로 확정하지 않으며, 기존 실물 기본 TF도 변경하지 않는다.
+
+같은 날 TF를 `dimos_replay`로 고정하고 raw 단일 cloud와 10-frame odometry 보정
+누적을 A/B했다. 누적 profile은 유효 beam 중앙값을 `36 → 251`, translation·yaw
+기준 초과 횟수를 각각 `487 → 94`, `49 → 4`로 줄였지만 최대 step은 여전히
+`8.221949 m`·`0.358414 rad`였다. 따라서 scan 희소성은 부분 원인으로 남기고,
+누적 profile은 외부 replay 실험 후보로만 유지한다.
+
+이후 canonical 120초 DimOS bag만을 다시 재생한 최종 resolution에서
+`dimos_odom_accumulated_emit3`는 frame/emit `3/3`, input/retry `64/64`, converter
+`min_height=-0.10`, queue `64`와 profile-scoped coarse `0.1745`를 사용했다.
+최종 A/B는 response expansion `false`, loop closing `true`를 양쪽 공통값으로
+통제했고 candidate에만 coarse `0.1745`를 적용했다. baseline coarse는 `0.349`였으며
+전역 launch 기본값 `0.349/true/true`는 바꾸지 않았다. baseline `raw_single`은
+`0.5535118551684397 m` / `0.3678837777692796 rad`로 failed였지만 candidate는
+`0.41047936583987504 m` / `0.1800169168112875 rad`, exceedance·unaligned·regressive
+모두 `0`으로 passed였다. cloud `1843` 수신·`1842` 처리·`614` output, intrinsic
+drop `1`, overflow/pending/regression `0`과 occupancy·pose graph 저장·재로딩, clean
+teardown도 final A/B와 두 repeat에서 동일하게 통과했다. 이는 Go2 OFF,
+`physical_execution=false`, `command_publication=false`인 이 정확한 bag/profile의
+software replay continuity 결과만 뜻하며, 실물 장착·live fit·지도 ground truth·
+localization/Nav2는 계속 미검증이다.
+
+2026-08-29에는 같은 bag·emit3·TF·SLAM 공통값을 유지하고 coarse search만
+`0.0698~0.2792 rad` 7개로 바꿔 순차 비교했다. 앞의 네 값은 passed, 뒤의 세 값은
+yaw 기준으로 failed였고 `0.0698`은 `0.3752606931950222 m` /
+`0.08927691681128769 rad`를 기록했다. 이는 이번 범위의 continuity 우선 후속
+후보일 뿐, 최저 시험 경계이며 지도 ground truth·live 조건이 없으므로 기존
+replay canonical `0.1745`를 교체하지 않는다.
+
+이어서 같은 조건에서 `0~4°`를 `1°` 간격으로 추가 시험했다. 5개 후보가 모두
+passed했고, `0°`는 yaw 최대 `0.01852879921693318 rad`, `1°`는 translation
+최대 `0.2800537845414384 m`로 각각 해당 지표의 최저값이었다. 두 지표의 최소값이
+같은 후보에 모이지 않았으므로 `0°`·`1°` 모두 replay 후보로만 보존하고 운영
+canonical은 `0.1745`로 유지한다. 상세 결과와 한계는
+`records/experiments/go2_local_navigation_dimos_lower_search_20260829.md`와
+같은 stem의 YAML projection에서 조회한다.
+
+후속 causal A/B에서는 동일 입력에서 `use_scan_matching`만 끈 경우 short·full corrected
+pose가 odometric pose와 같아지고 held-out 재현성이 회복됐다. 따라서 최초 pose 열화는
+Karto sequential scan matching으로 확인했다. 반면 full loop-off는 장거리 edge를
+제거해도 회복되지 않아 explicit loop closure는 주원인에서 제외했다. matching-off에도
+PGM fan·streak와 occupancy support 손실이 남으므로 occupancy 생성은 `open`이다.
+matching-off는 진단 음성 대조군이며 package/default/canonical 설정은 변경하지 않았다.
+
+2026-08-30에는 matching-off의 동일 admitted scan·pose를 고정해 occupancy만 분석했다.
+`unsupported_occupied`는 첫 측정 prefix인 node `30` 또는 그 이전부터 지속됐다.
+`multi_segment_occupied` 후보는 primary skeleton을 `4000 → 4`셀로 줄여 수치 gate를
+통과했지만, blind visual QA에서는 baseline보다 fan/streak와 topology 가독성이
+악화됐다. 따라서 최종 winner는 없고 full candidate 실행은 `0`회다. 상태는
+`root-cause-classified`이며 `src/`, TF, scan profile, SLAM/default는 변경하지 않았다.
+
+최종 profile·상태·한계는 canonical record
+`go2-local-navigation-dimos-slam-continuity-resolution-20260828`의
+`records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.md`와
+YAML projection에서 조회한다. final A/B·repeat·build/test run artifact 경로는
+[`data/README.md`](data/README.md)에 보존한다.
+
 ## 작업 위치와 규칙
 
 이 프로젝트는 저장소의
@@ -40,7 +122,8 @@ mount되어 있다. 저장소 루트 `AGENTS.md`가 이 경로에 재귀 적용�
 - `bringup`: launch·설정과 재사용 가능한 통합 preflight observer
 - `description`: 공식 Go2 전체 URDF와 TF 계약
 - `go2_control`: 비동작 기본 motion 계약, 제한·watchdog·Sport request 변환 후보
-- `go2_nav2`: 비동작 Nav2 local costmap·controller preview와 통합 runner
+- `go2_nav2`: 비동작 Nav2 local costmap·controller preview, experimental SLAM/mapping과 synthetic Nav2 runtime asset
+- `go2_validation`: fault·external replay·mapping·통합 preflight의 software-only validation orchestration
 
 현재 범위에는 프로젝트 내부 `/go2_control/cmd_vel_candidate`와
 `/go2_control/sport_request_preview`가 포함된다. 실제 `/api/sport/request` publish,
@@ -60,7 +143,7 @@ package contract와 로컬 `records/`가 계속 소유한다.
 source /home/bi-agx1/go2_runtime/go2_agx_ros2_humble_env.sh
 cd /home/bi-agx1/go2_projects/projects/go2_local_navigation
 source install/setup.bash
-ros2 run go2_nav2 integrated_preflight \
+ros2 run go2_validation integrated_preflight \
   --ros-args -p duration_sec:=30 -p run_label:=stage9
 ```
 
@@ -74,8 +157,16 @@ stem의 YAML projection을 따른다. runtime JSON과 로그는 Git 대상이 �
 `go2_control`은 현재 AGX graph와 공식 Unitree Request schema를 근거로 구현됐고
 motion adapter와 read-only trial recorder를 포함한 22개 package 테스트를 통과했다.
 recorder는 실제 `/odom` 5947개를 기록하고 control publisher 없이 clean exit했다.
-기본 이중 gate는 닫혀 있으며 실제 command 전송은 수행하지 않았다. 전체 7개
-패키지는 62 tests, 0 failures, 0 errors, 2 skipped로 검증됐다.
+기본 이중 gate는 닫혀 있으며 실제 command 전송은 수행하지 않았다. 2026-08-28
+`go2_validation` 분리와 profile 경계 반영 뒤 AGX 실제 workspace를 clean build해
+표준 `install/`에 반영했다. 전체 8 packages, 287 tests, 0 failures, 0 errors,
+3 skipped와 설치 executable `go2_validation=10`, `go2_nav2=0`을 확인했다. 원시
+로그·JUnit archive·install surface·직접 QA와 checksum은
+`.omo/evidence/validation-package-refactor-closeout-20260828/README.md`에 보존한다.
+이 수치는 software-only 구조·계약 검증이며 replay나 live 성능의 추가 합격
+근거가 아니다. 2026-08-29 sweep runner 추가 뒤에는 AGX에서 `go2_validation`을
+재빌드하고 157개를 수집해 154 passed·3 skipped·0 failures·0 errors와 현재 설치
+executable `go2_validation=11`을 확인했다.
 
 ## 로봇 전원 없이 RViz2로 URDF·TF 보기
 
@@ -158,6 +249,11 @@ canonical model과 프로젝트 root는 모두 `base`이며, 공식 native senso
 `description/urdf/go2_description.urdf`에서 확인하고, 좌표 확인 이미지는
 `description/urdf/go2_description_coordinate_check.png`에서 확인한다.
 
+static sensor TF는 `bringup/config/static_tf_profiles.yaml`에서 profile별로
+관리한다. 기본 `project_default`는 기존 실물·일반 launch에 계속 사용하고,
+`dimos_replay`는 해당 외부 bag을 재생할 때만 명시한다. source frame 대응은 외부
+replay용 project mapping이며 실물 센서의 물리 calibration으로 승격하지 않는다.
+
 하나의 TF edge에는 하나의 publisher만 둔다. 센서 입력과 perception 보고는
 읽기 전용으로 유지하며, `/cmd_vel`, Unitree control service, motor command,
 stand/walk, navigation command는 별도 승인 전까지 추가하거나 실행하지 않는다.
@@ -169,10 +265,10 @@ joint로 추가하지 않는다.
 ## 다음 확인 단계
 
 1. 10단계 정지 smoke·soak는 실행 완료 상태로 유지하되 yaw drift 경고를 후속 시험에 연결한다.
-2. 11단계 준비 절차에 따라 AGX를 최종 고정하고 footprint, 케이블, 전원, 열과 센서 시야를 기록한다.
-3. 최종 고정 뒤 9·10단계 비동작 시험을 새 artifact로 다시 실행한다.
-4. 12단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
-5. 그 뒤 동적 mapping, `map → odom`과 실제 목적지 도달을 순차 검증한다.
+2. 11단계 software fault recovery와 Todo 12의 stationary·external-full SLAM mapping은 완료했다.
+3. 12단계 software replay continuity는 canonical bag의 `dimos_odom_accumulated_emit3`와 profile-scoped coarse `0.1745`에서만 통과했다. occupancy 분석은 최초 persistent 결함을 node `30` 또는 그 이전으로 좁혔지만 수치 winner가 blind visual QA에서 거부돼 production 후보는 없다. 다음 occupancy 후보는 같은 blind gate를 유지하고, saved-map localization·전체 Nav2·합성 NavigateToPose와 live DDS/TF fit은 이 replay 판정과 분리한다.
+4. 14단계에서만 AGX 최종 고정과 footprint·케이블·전원·열·센서 시야를 기록한다.
+5. 15단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
 
 센서·odometry source probe 결과는
 `records/experiments/go2_local_navigation_sensor_odometry_probe_20260823.md`와
@@ -200,3 +296,30 @@ stem의 YAML projection에 보존한다.
 `records/experiments/go2_local_navigation_stationary_soak_20260827.md`,
 `records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.md`와
 같은 stem의 YAML projection에 보존한다.
+
+stationary·external-full SLAM mapping 결과는
+`records/experiments/go2_local_navigation_slam_mapping_replay_20260827.md`와 같은
+stem의 YAML projection에 보존한다.
+
+DimOS source extrinsic과 120초 TF profile A/B 결과는
+`records/experiments/go2_local_navigation_dimos_tf_profile_ab_20260828.md`와 같은
+stem의 YAML projection에 보존한다.
+
+DimOS 단일 cloud와 10-frame odometry 보정 누적 A/B 결과는
+`records/experiments/go2_local_navigation_dimos_scan_projection_ab_20260828.md`와
+같은 stem의 YAML projection에 보존한다.
+
+canonical emit3 replay-only resolution은
+`records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.md`와
+같은 stem의 YAML projection에 보존한다. 앞선 TF/10-frame A/B의 failed/open 결과는
+그 최종 profile 적용 전 조건의 역사적 근거로 보존한다.
+
+최신 pose·occupancy 원인 분리는
+`records/experiments/go2_local_navigation_dimos_slam_causal_attribution_20260829.md`와
+같은 stem의 YAML projection에 보존한다. 이 후속 기록은 continuity pass를 폐기하지
+않고 당시 근본 원인 설명만 부분 대체한다.
+
+고정 pose occupancy breakpoint와 후보 판정은
+`records/experiments/go2_local_navigation_dimos_occupancy_quality_resolution_20260830.md`와
+같은 stem의 YAML projection에 보존한다. 수치 gate의 winner와 blind visual-approved
+winner를 분리하며, 이 기록의 후보는 live/default 설정으로 승격하지 않는다.

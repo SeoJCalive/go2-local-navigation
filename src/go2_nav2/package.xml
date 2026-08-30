@@ -3,7 +3,7 @@
 <package format="3">
   <name>go2_nav2</name>
   <version>0.1.0</version>
-  <description>Go2 Nav2 local costmap과 controller preview 비동작 구성</description>
+  <description>Go2 비동작 Nav2 runtime asset과 experimental SLAM mapping 구성</description>
   <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
   <license>Apache-2.0</license>
 
@@ -18,7 +18,7 @@
   <exec_depend>nav2_costmap_2d</exec_depend>
   <exec_depend>nav2_dwb_controller</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
-  <exec_depend>rclpy</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
   <test_depend>python3-yaml</test_depend>

@@ -53,6 +53,37 @@ project:
   runtime_output_topic: "/odom"
   adapter_blockers: []
   source_value_conversion_to_base: "project_accepted_direct_copy_verified_onboard_runtime"
+  continuity:
+    status: "engineering_candidate_not_physical_safety_limit"
+    max_timestamp_gap_nanoseconds: 500000000
+    max_translation_delta_m: 0.5
+    max_yaw_delta_rad: 0.5
+    recovery_consecutive_valid_samples: 2
+  continuity_profiles:
+    default_profile: "onboard_observe"
+    profiles:
+      onboard_observe:
+        action: "observe_only"
+        max_timestamp_gap_nanoseconds: 500000000
+        max_translation_delta_m: 0.5
+        max_yaw_delta_rad: 0.5
+        recovery_consecutive_valid_samples: 2
+      replay_enforce:
+        action: "enforce"
+        max_timestamp_gap_nanoseconds: 500000000
+        max_translation_delta_m: 0.5
+        max_yaw_delta_rad: 0.5
+        recovery_consecutive_valid_samples: 2
+known_warnings:
+  stationary_yaw_drift:
+    value: 0.248012
+    unit: "rad"
+    status: "warning_unresolved"
+    source_record_id: "go2-local-navigation-stationary-soak-20260827"
+  source_covariance:
+    pose: "all_zero_observed"
+    twist: "all_zero_observed"
+    status: "warning_preserved"
 runtime_verification:
   record_id: "go2-local-navigation-odom-adapter-20260823"
   received_samples: 10634

@@ -1,5 +1,5 @@
-"""통합 preflight runner의 ROS parameter를 안전한 실행값으로 파싱한다."""
 
+"""통합 preflight runner의 ROS parameter를 안전한 실행값으로 파싱한다."""
 from dataclasses import dataclass
 from pathlib import Path
 import re
@@ -45,7 +45,7 @@ def parse_configuration(node: Node) -> RunConfiguration:
         raise ConfigurationError("duration_sec must be between 20 and 7200")
     if RUN_LABEL_PATTERN.fullmatch(label) is None:
         raise ConfigurationError("run_label must use lowercase letters, digits, _ or -")
-    project_root = Path(get_package_prefix("go2_nav2")).parents[1]
+    project_root = Path(get_package_prefix("go2_validation")).parents[1]
     output_root = (
         Path(output_value)
         if output_value

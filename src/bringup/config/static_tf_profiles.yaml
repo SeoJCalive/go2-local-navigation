@@ -1,0 +1,49 @@
+static_tf_profiles:
+  schema_version: 1
+  record_kind: static_tf_profile_registry
+  default_profile: project_default
+  profiles:
+    project_default:
+      status: project_accepted
+      scope: onboard_and_replay_default
+      physical_calibration_status: unverified
+      parent_frame: base
+      child_frame: utlidar_lidar
+      translation_xyz_m: [0.28945, 0.0, -0.046825]
+      quaternion_xyzw: [0.0, 0.9913405653290647, 0.0, 0.1313159683094573]
+      source:
+        kind: existing_project_configuration
+        source_path: bringup/launch/go2_static_tf.launch.py
+    dimos_replay:
+      status: source_aligned
+      scope: external_replay_only
+      physical_calibration_status: not_verified_on_project_robot
+      alignment_semantics:
+        kind: dataset_specific_replay_alignment
+        includes:
+          - near_upside_down_l1_mount
+          - stationary_ground_normal_leveling
+          - trajectory_heading_yaw_alignment
+        mechanical_calibration_only: false
+        current_project_robot_applicability: unverified
+      parent_frame: base
+      child_frame: utlidar_lidar
+      translation_xyz_m: [0.28216, 0.0, -0.02467]
+      quaternion_xyzw: [-0.86682728, 0.48933769, -0.09113504, 0.02921455]
+      source_rotation_matrix:
+        - [0.504486, -0.843018, 0.186588]
+        - [-0.853668, -0.519391, -0.038544]
+        - [0.129405, -0.139840, -0.981682]
+      rotation_projection: normalized_quaternion_from_source_matrix
+      frame_mapping:
+        source_parent: base_link
+        source_child: lidar
+        project_parent: base
+        project_child: utlidar_lidar
+        status: project_mapping_applied
+      source:
+        kind: related_repository
+        repository_url: https://github.com/dimensionalOS/dimos
+        commit: b4cd9789cc68876adf87ff40a404677f127d69bf
+        source_path: dimos/robot/unitree/go2/dds/extrinsics.py
+        integration_commit: 9448e9608dfdd27e735a1ae16bed09cd61601d61

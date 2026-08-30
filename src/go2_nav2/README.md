@@ -1,8 +1,10 @@
 # `go2_nav2`
 
-이 패키지는 현재 프로젝트의 Nav2 local costmap·controller와 전체 비동작 stack
-runner를 소유한다. 기존 센서·TF·odometry·motion 변환 코드는 복제하지 않고 각
-패키지의 실행 경계를 조합한다.
+`go2_nav2`는 비동작 Nav2 runtime asset만 소유한다. local costmap, controller
+preview, SLAM mapping launch와 그 설정·map·BT가 대상이다. SLAM/mapping과 synthetic
+Nav2 asset은 모두 실험 후보이며, production navigation runtime 또는 실제 motion
+승인을 뜻하지 않는다. fault, replay, mapping acceptance, 통합 preflight 같은
+software-only 검증 orchestration은 `go2_validation`이 소유한다.
 
 ## 폴더 및 파일 구조
 
@@ -10,128 +12,71 @@ runner를 소유한다. 기존 센서·TF·odometry·motion 변환 코드는 복
 go2_nav2/
 ├── README.md
 ├── package.xml
-├── setup.py
-├── setup.cfg
 ├── resource/
 │   └── go2_nav2
+├── setup.cfg
+├── setup.py
 ├── config/
+│   ├── nav2_non_actuating.yaml
 │   ├── navigation_contract.yaml
-│   └── nav2_non_actuating.yaml
+│   └── slam_mapping.yaml
 ├── launch/
-│   ├── go2_costmap_only.launch.py
 │   ├── go2_controller_preview.launch.py
-│   └── go2_integrated_preflight.launch.py
+│   ├── go2_costmap_only.launch.py
+│   └── go2_slam_mapping.launch.py
+├── maps/
+│   ├── shadow_blocked.pgm
+│   ├── shadow_blocked.png
+│   ├── shadow_blocked.yaml
+│   ├── shadow_open.pgm
+│   ├── shadow_open.png
+│   └── shadow_open.yaml
+├── behavior_trees/
+│   └── navigate_to_pose_shadow.xml
 ├── go2_nav2/
-│   ├── __init__.py
-│   ├── preflight_runner_configuration.py
-│   └── preflight_runner_node.py
+│   └── __init__.py
 └── test/
     ├── test_navigation_configuration.py
-    └── test_preflight_package_ownership.py
+    └── test_shadow_assets.py
 ```
 
 ## 파일별 역할
 
 | 파일 | 역할 |
 | --- | --- |
-| `README.md` | 비동작 Nav2·통합 preflight 구성, 입력·출력, 검증 범위와 물리 미확인 항목을 설명한다. |
-| `package.xml` | Nav2 controller·costmap·DWB, `bringup`과 기존 프로젝트 패키지의 실행 의존성을 선언한다. |
-| `setup.py` | config와 launch를 ROS 2 share 경로에 설치하고 `integrated_preflight` entry point를 등록한다. |
-| `setup.cfg` | Python 실행 파일 설치 경로를 지정한다. |
-| `resource/go2_nav2` | ament index가 패키지를 찾는 marker다. |
-| `config/navigation_contract.yaml` | 공식 근거·AGX 설치 관찰·engineering candidate·미확인을 분리한다. |
-| `config/nav2_non_actuating.yaml` | local costmap과 controller server가 실제로 읽는 parameter다. |
-| `launch/go2_costmap_only.launch.py` | static TF·odometry·obstacle candidate와 비동작 local costmap owner만 시작한다. |
-| `launch/go2_controller_preview.launch.py` | controller 출력을 내부 candidate topic으로 보내고 gate가 닫힌 adapter preview까지 연결한다. |
-| `launch/go2_integrated_preflight.launch.py` | 필수 비동작 stack과 시간 제한 observer를 함께 시작하고 observer 완료 뒤 전체 launch를 종료한다. |
-| `go2_nav2/__init__.py` | 비동작 Nav2 조합과 통합 runner의 Python package 경계를 설명한다. |
-| `go2_nav2/preflight_runner_configuration.py` | 실행 시간·label·산출물 경로 ROS parameter를 안전한 실행 구성으로 파싱한다. |
-| `go2_nav2/preflight_runner_node.py` | 통합 launch, `tegrastats`, kernel 관찰과 clean teardown을 순서대로 실행해 최종 JSON을 만든다. |
-| `test/test_navigation_configuration.py` | frame·obstacle source·controller plugin·candidate 제한값을 검사한다. |
-| `test/test_preflight_package_ownership.py` | 통합 runner가 이 패키지에 있고 `bringup → go2_nav2` 순환 의존성이 없는지 검사한다. |
+| `README.md` | runtime-only 경계, 실험 후보 상태와 retained asset을 설명한다. |
+| `package.xml` | Nav2 runtime asset을 위한 ROS 2 metadata와 의존성을 선언한다. |
+| `resource/go2_nav2` | ament index package marker다. |
+| `setup.cfg` | ament Python script 설치 경로를 지정한다. |
+| `setup.py` | config, launch, map, BT asset을 package share 경로에 설치한다. validation executable은 등록하지 않는다. |
+| `config/nav2_non_actuating.yaml` | local costmap·controller preview의 frame, obstacle source, candidate velocity 제한과 닫힌 gate parameter를 정의한다. |
+| `config/navigation_contract.yaml` | 비동작 Nav2 runtime의 source, candidate 상태, 안전 경계와 실험 상태를 구조화한다. |
+| `config/slam_mapping.yaml` | SLAM Toolbox mapping의 frame, scan, map 저장과 기본 search parameter를 정의한다. |
+| `launch/go2_controller_preview.launch.py` | controller output을 내부 candidate topic으로 remap하고 닫힌 motion adapter preview를 시작한다. |
+| `launch/go2_costmap_only.launch.py` | stationary perception·odometry와 local costmap owner만 조합하며 motion adapter와 goal은 시작하지 않는다. |
+| `launch/go2_slam_mapping.launch.py` | mapping scan·odometry와 단일 SLAM Toolbox owner를 조합한다. 기본 `execution_mode=onboard`, `continuity_profile=onboard_observe`를 선언하고 하위 launch에 전달한다. |
+| `maps/shadow_blocked.pgm` | blocked synthetic navigation 후보의 occupancy raster다. |
+| `maps/shadow_blocked.png` | blocked raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
+| `maps/shadow_blocked.yaml` | blocked raster의 image, resolution, origin과 threshold manifest다. |
+| `maps/shadow_open.pgm` | open/cancel/failure synthetic navigation 후보의 occupancy raster다. |
+| `maps/shadow_open.png` | open raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
+| `maps/shadow_open.yaml` | open raster의 image, resolution, origin과 threshold manifest다. |
+| `behavior_trees/navigate_to_pose_shadow.xml` | synthetic `NavigateToPose` 후보용 recovery·replanning BT 구조다. |
+| `go2_nav2/__init__.py` | 이 package가 validation orchestration을 소유하지 않는 Nav2 runtime asset 경계임을 설명한다. |
+| `test/test_navigation_configuration.py` | costmap frame·obstacle source·controller 제한과 costmap-only launch의 non-actuating 경계를 검사한다. |
+| `test/test_shadow_assets.py` | map raster·BT와 `go2_validation` 소유 scenario config의 연결을 검사한다. |
 
-## 데이터 흐름
+## 실행 경계
 
-costmap-only 경로는 다음과 같다.
+이 package의 launch는 Nav2/SLAM runtime asset만 조합한다. validation executable은
+`ros2 run go2_validation <executable>`로 실행하며, fault·replay·mapping
+acceptance와 host lifecycle을 `go2_nav2`에서 실행하지 않는다.
 
-```text
-/utlidar/robot_odom → /odom + odom → base
-/utlidar/cloud → /perception/obstacle_candidates
-TF + obstacle candidates → /local_costmap/costmap
-controller output → /go2_nav2/costmap_only_cmd_vel_unused
-```
+`go2_slam_mapping.launch.py`는 현재 replay 중심 검증 이력 때문에
+`use_sim_time=true`를 기본으로 선언한다. `execution_mode=onboard` 기본값과 별개이므로
+live Go2에서 사용할 때는 `use_sim_time:=false`를 명시하고 clock owner가 없음을
+preflight로 확인해야 한다. replay-only TF·scan profile이 onboard mode에서 거부된다는
+사실만으로 이 launch 전체가 live-ready라고 판단하지 않는다.
 
-costmap-only launch는 Humble standalone costmap의 종료 결함을 피하기 위해 lifecycle
-정리가 가능한 `controller_server`가 local costmap을 소유한다. motion adapter와 action
-goal은 시작하지 않으며 controller output은 소비자가 없는 격리 topic으로 보낸다.
-
-controller preview 경로는 다음과 같다.
-
-```text
-odom frame FollowPath
-  → controller_server
-  → /go2_control/cmd_vel_candidate
-  → go2_motion_adapter
-  → /go2_control/sport_request_preview
-  ╳ /api/sport/request
-```
-
-`go2_controller_preview.launch.py`는 `output_enabled=false`와
-`physical_validation_approved=false`를 직접 지정한다. Nav2의 일반 `cmd_vel`은
-프로젝트 내부 candidate topic으로 remap하며 실제 Sport control publisher를 만들지
-않는다.
-
-통합 preflight 경로는 다음과 같다.
-
-```text
-integrated_preflight runner
-  → go2_integrated_preflight.launch.py
-  → static TF + odometry + obstacle candidate + controller + closed motion adapter
-  → bringup/integrated_preflight_observer
-  → result.json + launch.log + tegrastats.log
-```
-
-runner는 observer가 기록한 graph·TF·topic·gate 결과에 host 자원, kernel event와
-teardown 결과를 합친다. 실행 중 project owner의 `/api/sport/request`·`/lowcmd`
-publisher가 하나라도 관찰되면 실패한다.
-
-```bash
-ros2 run go2_nav2 integrated_preflight \
-  --ros-args -p duration_sec:=30 -p run_label:=stage9
-```
-
-## AGX 검증 상태
-
-2026-08-27 costmap-only와 controller preview를 정지 상태에서 실행했다. 두 경로 모두
-`controller_server`와 local costmap이 active가 됐고 `/local_costmap/costmap`은 약
-`1.667 Hz`였다. controller preview의 0.30 m 시험 경로는 로봇이 움직이지 않아 5초
-progress checker에서 예상대로 aborted됐다.
-
-motion adapter의 `/api/sport/request` publisher가 없고 두 gate가 false임을 확인했다.
-최종 종료에서는 odometry adapter를 포함한 모든 process가 clean exit했다. standalone
-`nav2_costmap_2d` 1.1.20은 lifecycle 종료 뒤에도 class-loader signal 종료가 발생해
-현재 launch 경로에서 제외했다.
-
-같은 날 30초 통합 preflight run `20260827_020502_stage9`에서 46개 check가 모두
-PASS였다. 필수 node 7개와 TF 5개, 실제 센서·odom·obstacle candidate·local costmap,
-닫힌 두 gate, 최대 온도 `42.718°C`와 잔류 process 0개를 확인했다. 이 결과는 30분
-soak나 물리 navigation 검증이 아니다.
-
-이어진 Stage 10에서 30초 smoke는 47 PASS였고 30분 soak는 46 PASS·1 WARN이었다.
-모든 필수 topic과 host·teardown 항목은 통과했지만 정지 yaw 누적 drift
-`0.248012 rad`가 현재 `0.10 rad` 경고 기준을 넘었다. 따라서 runner의 30분
-생존·연속성은 확인됐지만 odometry 장시간 yaw 안정성은 통과로 승격하지 않는다.
-
-## 현재 candidate 경계
-
-- Nav2 기준 frame: `odom`, robot frame: `base`
-- obstacle source: `/perception/obstacle_candidates`, `PointCloud2`
-- obstacle 처리: marking만 사용하며 clearing과 free-space 주장은 하지 않음
-- controller plugin: 설치된 Humble `dwb_core::DWBLocalPlanner`
-- 속도·가속도 상한: `go2_control` candidate 이하
-- robot radius `0.30 m`: 비동작 costmap 연결용 candidate
-- planner, SLAM, localization, `map → odom`, 실제 목적지 도달은 현재 범위가 아님
-
-공식 parameter 구조는 Nav2 Humble의
-[nav2_params.yaml](https://github.com/ros-navigation/navigation2/blob/humble/nav2_bringup/params/nav2_params.yaml)을
-기준으로 하고, plugin 이름은 AGX에 설치된 `1.1.20` package 선언과 대조한다.
+각도 sweep 시각 비교본은 package runtime asset이 아니며,
+`.user/img/slam_map/angle_sweep_20260829/`에서 관리한다.

@@ -62,6 +62,8 @@ class LidarAcceptanceNode(Node):
             height=message.height,
             width=message.width,
             point_step=message.point_step,
+            row_step=message.row_step,
+            data_length=len(message.data),
             field_names=tuple(field.name for field in message.fields),
         )
         if not self._first_layout_logged:

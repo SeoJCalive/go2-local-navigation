@@ -23,6 +23,7 @@ setup(
         ]),
         (os.path.join("share", package_name), ["package.xml"]),
         (os.path.join("share", package_name, "config"), glob("config/*.yaml")),
+        (os.path.join("share", package_name, "launch"), glob("launch/*.py")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -34,6 +35,9 @@ setup(
     entry_points={
         "console_scripts": [
             "obstacle_candidates = go2_perception.obstacle_candidate_node:main",
+            "mapping_cloud_gate = go2_perception.mapping_cloud_gate_node:main",
+            "mapping_cloud_accumulator = "
+            "go2_perception.mapping_cloud_accumulator_node:main",
         ],
     },
 )

@@ -1,0 +1,52 @@
+maps:
+  open: maps/shadow_open.yaml
+  blocked: maps/shadow_blocked.yaml
+scenarios:
+  - id: success
+    map_id: open
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 9, y: 9}
+    expected_action_terminal_status: SUCCEEDED
+    timeout_sec: 30
+    path_expectation: present
+    candidate_expectation: present
+  - id: cancel
+    map_id: open
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 9, y: 9}
+    expected_action_terminal_status: CANCELED
+    timeout_sec: 10
+    path_expectation: present
+    candidate_expectation: present
+  - id: blocked_goal
+    map_id: blocked
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 8, y: 9}
+    expected_action_terminal_status: ABORTED
+    timeout_sec: 10
+    path_expectation: absent
+    candidate_expectation: absent
+  - id: outside_map_goal
+    map_id: open
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 12, y: 9}
+    expected_action_terminal_status: ABORTED
+    timeout_sec: 10
+    path_expectation: absent
+    candidate_expectation: absent
+  - id: planner_failure
+    map_id: open
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 9, y: 9}
+    expected_action_terminal_status: ABORTED
+    timeout_sec: 10
+    path_expectation: absent
+    candidate_expectation: absent
+  - id: no_progress
+    map_id: open
+    start_cell: {x: 2, y: 2}
+    goal_cell: {x: 9, y: 9}
+    expected_action_terminal_status: ABORTED
+    timeout_sec: 15
+    path_expectation: present
+    candidate_expectation: present

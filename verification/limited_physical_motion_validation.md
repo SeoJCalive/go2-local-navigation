@@ -1,4 +1,4 @@
-# 12단계: 제한적 물리 이동 검증 준비 protocol
+# 15단계: 제한적 물리 이동 검증 준비 protocol
 
 이 문서는 최종 장착 후 최신 명시 승인으로만 시작할 수 있는 제한적 물리 이동 시험의
 준비 protocol이다. 절차·구조화 계획·read-only recorder 준비는 완료됐지만 물리
@@ -15,10 +15,10 @@
 
 ## 범위와 gate
 
-- 단계 ID: `stage_12_limited_physical_motion_validation`
+- 단계 ID: `stage_15_limited_physical_motion_validation`
 - 준비 상태: `completed`
 - 실제 물리 검증 상태: `deferred`
-- 시작 조건: 11단계 최종 장착 acceptance의 실제 기록, 이동 중 외부 tether가 없는 전원, 최신 사용자 승인, 단일 command owner 확인, 시험 공간과 emergency stop 절차 확인
+- 시작 조건: 14단계 최종 장착 acceptance의 실제 기록, 이동 중 외부 tether가 없는 전원, 최신 사용자 승인, 단일 command owner 확인, 시험 공간과 emergency stop 절차 확인
 - 금지 조건: 승인 없는 gate 개방, 복수 command owner, `/lowcmd`, stand/walk/posture 전환 추가, RealSense IMU 사용
 - 자세 조건: 이 프로젝트는 stand command를 보내지 않는다. 시험에 안정적인 기립 자세가 필요하면 승인된 작업자가 기존 안전 인터페이스로 별도 수행하고 그 상태와 승인 범위를 trial 시작 전에 기록한다.
 - command owner: 시험 시작 전에 하나의 process와 하나의 output path만 식별해 기록한다. owner 식별 결과가 없으면 trial을 시작하지 않는다.

@@ -6,6 +6,7 @@ never publishes commands, calls services, or accesses physical-control APIs.
 """
 
 from collections.abc import Iterator
+from struct import error as StructError
 from typing import Final
 
 import rclpy
@@ -67,10 +68,16 @@ class ObstacleCandidateNode(Node):
             self.get_logger().warning(f"candidate cloud skipped: TF lookup failed: {error}")
             return
 
-        candidates = transform_and_filter_points(
-            _source_points(message),
-            _rigid_transform_from(tf_message),
-        )
+        try:
+            candidates = transform_and_filter_points(
+                _source_points(message),
+                _rigid_transform_from(tf_message),
+            )
+        except (AssertionError, StructError, TypeError, ValueError) as error:
+            self.get_logger().warning(
+                f"candidate cloud skipped: malformed layout: {error}"
+            )
+            return
         header = Header()
         header.stamp = message.header.stamp
         header.frame_id = OUTPUT_FRAME_ID

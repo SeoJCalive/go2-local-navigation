@@ -1,6 +1,7 @@
 import importlib
 import sys
-from types import ModuleType
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
 
 
 class _ExternalShutdownException(Exception):
@@ -71,11 +72,37 @@ class _FakeAdapterNode:
     def rejected_sample_count(self) -> int:
         return 0
 
+    @property
+    def continuity_violation_count(self) -> int:
+        return 0
+
     def get_logger(self) -> _FakeLogger:
         return _FakeLogger(self.log_messages)
 
     def destroy_node(self) -> None:
         self.destroyed = True
+
+
+class _RecordingNode:
+    def __init__(self, *_args: str) -> None:
+        self.publisher_calls: list[tuple[str, SimpleNamespace]] = []
+        self.subscription_calls: list[tuple[str, SimpleNamespace]] = []
+
+    def create_publisher(self, _message_type, topic: str, qos):
+        self.publisher_calls.append((topic, qos))
+        return type("Publisher", (), {})()
+
+    def create_subscription(self, _message_type, topic: str, _callback, qos):
+        self.subscription_calls.append((topic, qos))
+
+    def create_timer(self, _period_sec: float, _callback) -> None:
+        return None
+
+    def declare_parameter(self, _name: str, default_value: str) -> SimpleNamespace:
+        return SimpleNamespace(value=default_value)
+
+    def get_logger(self) -> _FakeLogger:
+        return _FakeLogger([])
 
 
 def _install_ros_stubs(monkeypatch, runtime: _FakeRuntime) -> None:
@@ -88,11 +115,11 @@ def _install_ros_stubs(monkeypatch, runtime: _FakeRuntime) -> None:
     executors_module = ModuleType("rclpy.executors")
     executors_module.ExternalShutdownException = _ExternalShutdownException
     node_module = ModuleType("rclpy.node")
-    node_module.Node = type("Node", (), {})
+    node_module.Node = _RecordingNode
     qos_module = ModuleType("rclpy.qos")
     qos_module.DurabilityPolicy = type("DurabilityPolicy", (), {"VOLATILE": "volatile"})
     qos_module.HistoryPolicy = type("HistoryPolicy", (), {"KEEP_LAST": "keep_last"})
-    qos_module.QoSProfile = type("QoSProfile", (), {"__init__": lambda self, **kwargs: None})
+    qos_module.QoSProfile = SimpleNamespace
     qos_module.ReliabilityPolicy = type("ReliabilityPolicy", (), {"RELIABLE": "reliable"})
 
     geometry_msgs_module = ModuleType("geometry_msgs")
@@ -102,7 +129,12 @@ def _install_ros_stubs(monkeypatch, runtime: _FakeRuntime) -> None:
     nav_msgs_msg_module = ModuleType("nav_msgs.msg")
     nav_msgs_msg_module.Odometry = type("Odometry", (), {})
     tf2_ros_module = ModuleType("tf2_ros")
-    tf2_ros_module.TransformBroadcaster = type("TransformBroadcaster", (), {})
+    tf2_ros_module.TransformBroadcaster = lambda _node: None
+    ament_index_python_module = ModuleType("ament_index_python")
+    ament_packages_module = ModuleType("ament_index_python.packages")
+    ament_packages_module.get_package_share_directory = lambda _name: str(
+        Path(__file__).parents[1]
+    )
 
     for module_name, module in (
         ("rclpy", rclpy_module),
@@ -114,6 +146,8 @@ def _install_ros_stubs(monkeypatch, runtime: _FakeRuntime) -> None:
         ("nav_msgs", nav_msgs_module),
         ("nav_msgs.msg", nav_msgs_msg_module),
         ("tf2_ros", tf2_ros_module),
+        ("ament_index_python", ament_index_python_module),
+        ("ament_index_python.packages", ament_packages_module),
     ):
         monkeypatch.setitem(sys.modules, module_name, module)
 
@@ -211,3 +245,28 @@ def test_given_active_context_when_executor_conversion_fails_then_error_is_visib
     assert node.destroyed
     assert raised_error is not None
     assert str(raised_error) == "Unable to convert call argument to Python object"
+
+
+def test_given_startup_burst_when_adapter_is_created_then_source_qos_is_bounded_separately(
+    monkeypatch,
+) -> None:
+    runtime = _FakeRuntime()
+    _install_ros_stubs(monkeypatch, runtime)
+    monkeypatch.delitem(
+        sys.modules,
+        "go2_state_estimation.odometry_adapter_node",
+        raising=False,
+    )
+    adapter_module = importlib.import_module(
+        "go2_state_estimation.odometry_adapter_node"
+    )
+
+    node = adapter_module.OdometryAdapterNode()
+
+    source_topic, source_qos = node.subscription_calls[0]
+    output_topic, output_qos = node.publisher_calls[0]
+    assert source_topic == "/utlidar/robot_odom"
+    assert source_qos.depth == 64
+    assert output_topic == "/odom"
+    assert output_qos.depth == 1
+    assert source_qos is not output_qos
