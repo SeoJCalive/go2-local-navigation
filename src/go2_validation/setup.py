@@ -36,6 +36,8 @@ setup(
             "go2_validation.mapping_tf_profile_ab_runner:main",
             "mapping_scan_profile_ab = "
             "go2_validation.mapping_scan_profile_ab_runner:main",
+            "mapping_coarse_search_sweep = "
+            "go2_validation.mapping_coarse_search_sweep_runner:main",
             "external_replay_acquisition = "
             "go2_validation.external_replay_acquisition_runner:main",
             "external_replay_convert = "

@@ -15,6 +15,7 @@ EXECUTABLES: Final = frozenset(
         "mapping_acceptance",
         "mapping_tf_profile_ab",
         "mapping_scan_profile_ab",
+        "mapping_coarse_search_sweep",
         "external_replay_acquisition",
         "external_replay_convert",
     }
@@ -52,7 +53,7 @@ def test_given_package_metadata_when_read_then_validation_executables_have_one_o
     navigation_setup = (NAV2_ROOT / "setup.py").read_text(encoding="utf-8")
 
     assert all(f'"{executable} = ' in validation_setup for executable in EXECUTABLES)
-    assert validation_setup.count("go2_validation.") == 10
+    assert validation_setup.count("go2_validation.") == 11
     assert all(executable not in navigation_setup for executable in EXECUTABLES)
     assert "console_scripts" not in navigation_setup
 
