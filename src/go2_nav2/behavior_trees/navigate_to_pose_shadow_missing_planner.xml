@@ -1,0 +1,6 @@
+<!-- planner_failure 시나리오에서 존재하지 않는 planner ID를 요청하는 진단용 BT다. -->
+<root main_tree_to_execute="NavigateToPoseShadowMissingPlanner">
+  <BehaviorTree ID="NavigateToPoseShadowMissingPlanner">
+    <ComputePathToPose goal="{goal}" path="{path}" planner_id="MissingPlanner" />
+  </BehaviorTree>
+</root>

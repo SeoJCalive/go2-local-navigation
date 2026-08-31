@@ -3,7 +3,6 @@ from typing import Final
 
 from setuptools import find_packages, setup
 
-
 PACKAGE_NAME: Final = "go2_validation"
 
 setup(
@@ -29,19 +28,40 @@ setup(
             "navigation_runtime_preflight = go2_validation.runtime_preflight:main",
             "fault_fixture = go2_validation.fault_fixture_node:main",
             "fault_acceptance = go2_validation.fault_acceptance_runner:main",
-            "mapping_input_acceptance = "
-            "go2_validation.mapping_input_acceptance_runner:main",
+            (
+                "mapping_input_acceptance = "
+                "go2_validation.mapping_input_acceptance_runner:main"
+            ),
             "mapping_acceptance = go2_validation.mapping_acceptance_runner:main",
-            "mapping_tf_profile_ab = "
-            "go2_validation.mapping_tf_profile_ab_runner:main",
-            "mapping_scan_profile_ab = "
-            "go2_validation.mapping_scan_profile_ab_runner:main",
-            "mapping_coarse_search_sweep = "
-            "go2_validation.mapping_coarse_search_sweep_runner:main",
-            "external_replay_acquisition = "
-            "go2_validation.external_replay_acquisition_runner:main",
-            "external_replay_convert = "
-            "go2_validation.external_replay_conversion_runner:main",
+            (
+                "saved_map_localization_acceptance = "
+                "go2_validation.localization_acceptance_runner:main"
+            ),
+            (
+                "mapping_tf_profile_ab = "
+                "go2_validation.mapping_tf_profile_ab_runner:main"
+            ),
+            (
+                "mapping_scan_profile_ab = "
+                "go2_validation.mapping_scan_profile_ab_runner:main"
+            ),
+            (
+                "mapping_coarse_search_sweep = "
+                "go2_validation.mapping_coarse_search_sweep_runner:main"
+            ),
+            (
+                "external_replay_acquisition = "
+                "go2_validation.external_replay_acquisition_runner:main"
+            ),
+            (
+                "external_replay_convert = "
+                "go2_validation.external_replay_conversion_runner:main"
+            ),
+            "shadow_fixture = go2_validation.shadow_fixture_node:main",
+            (
+                "nav2_shadow_acceptance = "
+                "go2_validation.shadow_acceptance_runner:main"
+            ),
         ],
     },
 )

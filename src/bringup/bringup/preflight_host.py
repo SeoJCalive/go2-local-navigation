@@ -1,15 +1,14 @@
 """AGX host의 thermal trip·kernel event·잔류 process를 관찰한다."""
 
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import re
 import signal
 import subprocess
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 from bringup.preflight_resources import KernelObservation
-
 
 KERNEL_FAILURE_PATTERN: Final = re.compile(
     r"out of memory|oom-kill|thermal.*thrott|thrott.*thermal",
@@ -18,6 +17,8 @@ KERNEL_FAILURE_PATTERN: Final = re.compile(
 PROCESS_MARKERS: Final = (
     "async_slam_toolbox_node",
     "base_to_utlidar_lidar_static_tf",
+    "behavior_server",
+    "bt_navigator",
     "controller_server",
     "go2_integrated_preflight_observer",
     "go2_fault_fixture",
@@ -25,10 +26,14 @@ PROCESS_MARKERS: Final = (
     "go2_motion_adapter",
     "go2_obstacle_candidates",
     "go2_odometry_adapter",
+    "lifecycle_manager_navigation",
     "lifecycle_manager_controller",
+    "map_server",
+    "planner_server",
     "robot_state_publisher",
     "pointcloud_to_laserscan_node",
     "static_transform_publisher",
+    "synthetic_navigation_fixture",
 )
 
 

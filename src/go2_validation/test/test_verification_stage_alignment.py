@@ -3,7 +3,6 @@ from typing import Final
 
 import yaml
 
-
 PROJECT_ROOT: Final = Path(__file__).resolve().parents[3]
 
 
@@ -35,9 +34,10 @@ def test_given_verification_documents_when_loaded_then_stage_order_is_canonical(
         {"id": 15, "name": "limited_physical_motion_validation"},
     ]
     assert "software_fault_recovery" in manifest["completed_stages"]
-    assert manifest["next_stage"] == "mapping_localization_and_nav2_shadow"
-    assert matrix["next_stage"]["stage_id"] == 12
-    assert matrix["next_stage"]["name"] == "mapping_localization_and_nav2_shadow"
+    assert "software_only_freeze" in manifest["completed_stages"]
+    assert manifest["next_stage"] == "final_mount_integration"
+    assert matrix["next_stage"]["stage_id"] == 14
+    assert matrix["next_stage"]["name"] == "final_mount_integration"
     assert final_mount["stage_id"] == 14
     assert physical_motion["stage_id"] == 15
 
