@@ -13,6 +13,7 @@ EXECUTABLES: Final = frozenset(
         "mapping_input_acceptance",
         "mapping_acceptance",
         "saved_map_localization_acceptance",
+        "live_navigation_acceptance",
         "mapping_tf_profile_ab",
         "mapping_scan_profile_ab",
         "mapping_coarse_search_sweep",
@@ -38,6 +39,7 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
         "go2_costmap_only.launch.py",
         "go2_controller_preview.launch.py",
         "go2_nav2_shadow.launch.py",
+        "go2_nav2_live_observer.launch.py",
         "go2_saved_map_localization.launch.py",
         "go2_slam_mapping.launch.py",
     }
@@ -51,6 +53,7 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
     assert _children(NAV2_ROOT / "test") == {
         "test_navigation_configuration.py",
         "test_localization_shadow_configuration.py",
+        "test_live_navigation_observer_configuration.py",
         "test_nav2_shadow_runtime_configuration.py",
         "test_shadow_assets.py",
     }
@@ -61,7 +64,7 @@ def test_given_package_metadata_when_read_then_validation_executables_have_one_o
     navigation_setup = (NAV2_ROOT / "setup.py").read_text(encoding="utf-8")
 
     assert all(f'"{executable} = ' in validation_setup for executable in EXECUTABLES)
-    assert validation_setup.count("go2_validation.") == 14
+    assert validation_setup.count("go2_validation.") == 15
     assert all(executable not in navigation_setup for executable in EXECUTABLES)
     assert "console_scripts" not in navigation_setup
 

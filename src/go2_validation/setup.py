@@ -38,6 +38,10 @@ setup(
                 "go2_validation.localization_acceptance_runner:main"
             ),
             (
+                "live_navigation_acceptance = "
+                "go2_validation.live_navigation_acceptance_runner:main"
+            ),
+            (
                 "mapping_tf_profile_ab = "
                 "go2_validation.mapping_tf_profile_ab_runner:main"
             ),
