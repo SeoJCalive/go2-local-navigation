@@ -13,7 +13,7 @@ provenance:
     - "/home/tjwocjf0915/research/Go2/CURRENT.md"
     - "/home/tjwocjf0915/research/Go2/project_catalog/README.md"
   physical_execution: "powered_stationary_no_motion"
-  direct_onboard_verification: "static_tf_odometry_adapter_bag_replay_obstacle_candidates_motion_dry_run_nav2_preview_integrated_preflight_stationary_soak_trial_recorder_readonly_qa_and_domain0_live_mapping_shadow"
+  direct_onboard_verification: "static_tf_odometry_adapter_bag_replay_obstacle_candidates_motion_dry_run_nav2_preview_integrated_preflight_stationary_soak_trial_recorder_readonly_qa_domain0_live_mapping_and_live_localization_no_goal_nav2_observer"
   software_only_verification: "domain_64_saved_map_localization_and_domain_65_synthetic_nav2_shadow"
   latest_freeze_go2_powered: false
   latest_onboard_go2_powered: true
@@ -49,6 +49,7 @@ scope:
   - synthetic_full_nav2_shadow_acceptance
   - software_only_freeze
   - domain0_stationary_live_mapping_shadow
+  - domain0_live_localization_no_goal_nav2_observer
 verified_outputs:
   - "/scan"
   - "/odom"
@@ -104,6 +105,7 @@ completed_stages:
   - "synthetic_nav2_six_scenario_action_contract"
   - "software_only_freeze"
   - "domain0_live_scan_and_stationary_slam_mapping_shadow"
+  - "domain0_live_saved_map_localization_and_no_goal_nav2_observer"
 prepared_stages:
   - stage_id: 12
     stage: "mapping_localization_and_nav2_shadow"
@@ -126,6 +128,10 @@ supplemental_validations:
     parent_stage_id: 12
     name: "domain0_live_mapping_supplement"
     status: "completed_stationary_onboard_with_warning"
+  - validation_id: "12-L2"
+    parent_stage_id: 12
+    name: "domain0_live_localization_nav2_observer_supplement"
+    status: "completed_stationary_onboard_connectivity_with_warning"
 next_stage: "final_mount_integration"
 candidate_outputs:
   - "/go2_control/sport_request_preview"
@@ -147,6 +153,10 @@ component_boundaries:
     owner: "go2_nav2"
     status: "experimental"
     role: "합성 map·TF·odometry에서 전체 Nav2 lifecycle과 inert velocity 경계를 제공"
+  - component_id: "domain0_live_navigation_observer_runtime"
+    owner: "go2_nav2"
+    status: "experimental_validation_asset"
+    role: "실제 scan·odometry와 저장 지도에서 goal 없이 AMCL·Nav2 lifecycle·costmap을 연결하고 velocity를 inert topic으로 격리"
   - component_id: "software_validation_orchestration"
     owner: "go2_validation"
     status: "validation_tool"
@@ -160,19 +170,19 @@ component_boundaries:
 verification:
   entrypoint: "verification/README.md"
   structured_matrix: "verification/structured/acceptance_matrix.yaml"
-  latest_record_id: "go2-local-navigation-domain0-live-mapping-shadow-20260831"
-  latest_runtime_artifact: "data/runs/live_mapping/20260831_142854_todo12l_domain0_live_mapping/artifacts"
-  status: "stage_12l_completed_stationary_onboard_with_warning"
+  latest_record_id: "go2-local-navigation-domain0-live-localization-nav2-observer-20260831"
+  latest_runtime_artifact: "data/runs/live_navigation/20260831_151704_todo12l2-domain0-live/result.json"
+  status: "stage_12l2_completed_stationary_onboard_connectivity_with_warning"
   package_boundary_record_id: "go2-local-navigation-validation-package-refactor-20260828"
   package_inventory:
     count: 8
     workspace_install_status: "verified_current"
     workspace_install_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation/install"
     validation_executable_owner: "go2_validation"
-    validation_executable_count: 14
+    validation_executable_count: 15
     nav2_validation_executable_count: 0
-    clean_test_summary: "318 tests, 0 errors, 0 failures, 5 skipped"
-    latest_targeted_validation_test_summary: "318 tests, 0 errors, 0 failures, 5 skipped"
+    clean_test_summary: "327 tests, 0 errors, 0 failures, 5 skipped"
+    latest_targeted_validation_test_summary: "12 tests, 0 errors, 0 failures, 0 skipped"
     evidence_summary: ".omo/evidence/validation-package-refactor-closeout-20260828/README.md"
 open_findings:
   - finding_id: "external_dynamic_map_to_odom_continuity"
@@ -189,12 +199,12 @@ open_findings:
     next_test: "후보 전후 cell-state 전이에서 fan/streak 확산 원인을 추적하고 동일 admitted pose·scan과 blind visual gate로 새 정책을 검증"
   - finding_id: "saved_map_localization_accuracy"
     status: "connectivity_verified_accuracy_unverified"
-    evidence: "Domain 64에서 stationary bag과 그 bag으로 생성한 저장 지도를 연결해 AMCL finite pose, active lifecycle과 단일 map→odom owner를 확인했다."
+    evidence: "Domain 64 replay와 12-L2 Domain 0 live no-goal run에서 저장 지도, AMCL finite pose, active lifecycle과 단일 map→odom owner를 확인했다. Live run은 초기 finite pose 1개뿐이며 ground truth가 없다."
     next_test: "최종 장착 뒤 실제 기준 위치·방향과 localization pose를 비교"
   - finding_id: "domain_0_live_shadow"
-    status: "mapping_completed_stationary_onboard_localization_nav2_deferred"
-    evidence: "12-L에서 onboard 기본 profile의 live scan·정지 SLAM map·단일 map→odom owner·artifact service·single-SIGINT teardown을 command output 없이 확인했다. 지도 정확도와 저장 전후 map 동일성은 미확인이다."
-    next_test: "최종 장착 뒤 mapping을 재검증하고 실제 입력의 saved-map localization·no-goal Nav2 observer를 실행"
+    status: "mapping_localization_and_no_goal_nav2_completed_stationary_onboard_with_accuracy_deferred"
+    evidence: "12-L에서 live scan·정지 SLAM·artifact service를, 12-L2에서 같은 저장 지도와 실제 scan·odometry의 AMCL·Nav2 lifecycle·두 costmap·no-goal·no-command·clean teardown을 확인했다. 지도·localization 정확도와 실제 goal은 미확인이다."
+    next_test: "최종 장착 뒤 mapping·localization·no-goal observer를 재검증하고 ground truth 및 별도 승인 아래 실제 goal 시험으로 진행"
 non_goals:
   - physical_motion_control
   - go2_control_topic_publication
@@ -298,6 +308,14 @@ source_refs:
     record_id: "go2-local-navigation-domain0-live-mapping-shadow-20260831"
     path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_domain0_live_mapping_shadow_20260831.yaml"
     role: "Domain 0 live scan·정지 SLAM·artifact service·single-owner·clean teardown 보완 근거"
+  - source_id: "DOMAIN0-LIVE-LOCALIZATION-NAV2-OBSERVER-20260831"
+    record_id: "go2-local-navigation-domain0-live-localization-nav2-observer-20260831"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_domain0_live_localization_nav2_observer_20260831.yaml"
+    role: "Domain 0 실제 scan·odometry의 saved-map localization·no-goal Nav2 lifecycle·안전·teardown 보완 근거"
+  - source_id: "DOMAIN0-LIVE-NAVIGATION-RUNTIME-20260831"
+    record_id: "go2-local-navigation-domain0-live-navigation-runtime-20260831"
+    path: "../../data/runs/live_navigation/20260831_151704_todo12l2-domain0-live/result.json"
+    role: "12-L2 stream·AMCL·costmap·lifecycle·owner·no-goal·command·teardown 실행 원문"
   - source_id: "FINAL-MOUNT-ACCEPTANCE-PLAN"
     record_id: "go2-local-navigation-final-mount-acceptance-20260827"
     path: "final_mount_acceptance.yaml"

@@ -1,9 +1,10 @@
 # `go2_validation`
 
 `go2_validation`은 fault, external replay, mapping, saved-map localization, 합성
-Nav2 shadow와 통합 preflight의 software-only 검증 도구 package다. Nav2 runtime
-asset을 `go2_nav2`에서 읽어 조합할 수 있지만 production navigation runtime
-component가 아니며 실제 command publish·motion·physical execution을 소유하지 않는다.
+Nav2 shadow, Domain 0 live no-goal observer와 통합 preflight의 검증 도구 package다.
+Nav2 runtime asset을 `go2_nav2`에서 읽어 조합할 수 있지만 production navigation
+runtime component가 아니며 실제 command publish·motion·physical execution을
+소유하지 않는다.
 
 기존 executable 이름은 유지한다. 예를 들어 통합 preflight는 다음 package owner로
 실행한다.
@@ -54,6 +55,11 @@ go2_validation/
 │   ├── localization_acceptance_runner.py
 │   ├── localization_runtime_execution.py
 │   ├── localization_runtime_observer.py
+│   ├── live_navigation_acceptance.py
+│   ├── live_navigation_acceptance_runner.py
+│   ├── live_navigation_graph.py
+│   ├── live_navigation_runtime.py
+│   ├── live_navigation_runtime_observer.py
 │   ├── mapping_acceptance.py
 │   ├── mapping_acceptance_runner.py
 │   ├── mapping_artifacts.py
@@ -100,6 +106,8 @@ go2_validation/
     ├── test_fault_runtime_capture.py
     ├── test_localization_acceptance.py
     ├── test_localization_runtime.py
+    ├── test_live_navigation_acceptance.py
+    ├── test_live_navigation_runtime.py
     ├── test_mapping_acceptance.py
     ├── test_mapping_cloud_accounting.py
     ├── test_mapping_coarse_search_sweep.py
@@ -131,7 +139,7 @@ go2_validation/
 | `package.xml` | validation runner가 사용하는 ROS 2 metadata와 의존성을 선언한다. |
 | `resource/go2_validation` | ament index package marker다. |
 | `setup.cfg` | ament Python script 설치 경로를 지정한다. |
-| `setup.py` | validation config·launch를 설치하고 14개 validation executable을 이 package에만 등록한다. |
+| `setup.py` | validation config·launch를 설치하고 15개 validation executable을 이 package에만 등록한다. |
 | `config/execution_modes.yaml` | domain, clock owner, global TF owner, sim time과 loopback을 software validation mode별로 정의한다. |
 | `config/external_replay_sources.yaml` | pinned DimOS source의 custody, hash·size 제한, dataset 출처와 센서 identity 상태, canonical channel과 replay-only profile provenance를 정의한다. |
 | `config/shadow_scenarios.yaml` | synthetic navigation 후보의 map·start/goal·terminal expectation을 정의한다. |
@@ -161,6 +169,11 @@ go2_validation/
 | `go2_validation/localization_acceptance_runner.py` | 저장 지도와 stationary bag 경로를 받아 localization 실행 결과 JSON을 기록한다. |
 | `go2_validation/localization_runtime_execution.py` | Domain 64 launch·paused player·observer와 bounded teardown lifecycle을 소유한다. |
 | `go2_validation/localization_runtime_observer.py` | map·AMCL pose·lifecycle·TF owner·command 경계를 payload 보존 없이 관찰한다. |
+| `go2_validation/live_navigation_acceptance.py` | Domain 0 실제 stream·AMCL·Nav2와 no-goal·command·teardown 관찰을 순수 verdict로 판정한다. |
+| `go2_validation/live_navigation_acceptance_runner.py` | live 환경·저장 지도·실행 시간을 경계에서 확인하고 12-L2 결과 JSON을 기록한다. |
+| `go2_validation/live_navigation_graph.py` | 실제 graph의 global TF owner, bare DDS와 ROS command endpoint, 금지 node 최대값을 분리해 집계한다. |
+| `go2_validation/live_navigation_runtime.py` | live launch·read-only observer·map identity와 단일 SIGINT bounded teardown을 소유한다. |
+| `go2_validation/live_navigation_runtime_observer.py` | payload를 저장하거나 publish하지 않고 stream·lifecycle·costmap·goal·velocity·TF·command graph를 관찰한다. |
 | `go2_validation/mapping_acceptance.py` | mapping stream, ownership, artifact와 teardown observation을 passed/failed verdict로 판정한다. |
 | `go2_validation/mapping_acceptance_runner.py` | stationary·external-full Domain 63 validation을 순차 실행하고 summary JSON을 기록한다. |
 | `go2_validation/mapping_artifacts.py` | occupancy map·image·pose graph 저장과 reload artifact 경계를 검증한다. |
@@ -206,6 +219,8 @@ go2_validation/
 | `test/test_fault_runtime_capture.py` | fixture marker와 downstream capture projection을 검사한다. |
 | `test/test_localization_acceptance.py` | AMCL 단일 owner, command 0, finite pose와 clean teardown 판정을 검사한다. |
 | `test/test_localization_runtime.py` | Domain 64 launch·paused bag argv와 observer destroy 경계를 검사한다. |
+| `test/test_live_navigation_acceptance.py` | 실제 입력 연결, AMCL owner, no-goal, command 0과 clean teardown 판정을 검사한다. |
+| `test/test_live_navigation_runtime.py` | Domain 0 wall-time·onboard profile·inert output과 goal·publisher API 부재를 검사한다. |
 | `test/test_mapping_acceptance.py` | mapping verdict, ownership, artifact, accounting과 runner boundary를 검사한다. |
 | `test/test_mapping_cloud_accounting.py` | accumulated cloud terminal accounting marker와 profile requirement를 검사한다. |
 | `test/test_mapping_coarse_search_sweep.py` | 기본 7개와 0~4도 주입 후보의 순서·간격, external replay profile 불변 조건을 검사한다. |
@@ -253,6 +268,12 @@ Domain 64 localization은 stationary bag과 그 bag에서 생성한 저장 지�
 판정한다. Domain 65 Nav2 shadow는 합성 시간·TF·odometry와 inert velocity topic만
 사용한다. 두 runner의 통과를 위치 정확도, 지도 정확도, live Go2 적합성, 실제
 장애물 회피 또는 목적지 도달로 해석하지 않는다.
+
+12-L2 `live_navigation_acceptance`는 Domain 0 wall time에서 12-L 저장 지도와 실제
+`/scan`·`/odom`을 사용하지만 action goal을 보내지 않는다. `/plan`, goal status와
+non-zero inert velocity가 없어야 통과하며 Sport·lowcmd의 Go2 bare DDS endpoint는
+ROS publisher와 분리해 기록한다. 이 통과는 live 연결성 근거일 뿐 localization
+추적 정확도나 실제 navigation 합격이 아니다.
 
 `external replay`는 외부 출처 dataset을 뜻하며 외장 LiDAR를 뜻하지 않는다.
 현재 canonical DimOS source의 센서 계열은 Go2 built-in L1 ULIDAR로 강하게

@@ -133,6 +133,24 @@ live `/scan`, `/odom`, `/map`, SLAM Toolbox 단독 `map → odom`, 저장·재�
 따른다. 저장 occupancy와 재로딩 직후 live map의 크기가 달랐으므로 이 artifact는
 연결성·service 검증용이며 지도 정확도나 저장 전후 픽셀 동일성의 합격 근거가 아니다.
 
+## Domain 0 live localization·no-goal Nav2 observer
+
+2026-08-31 Go2 ON·AGX 임시 배치·정지 조건에서 12-L 저장 지도를 실제 `/scan`·
+`/odom`과 연결한 local-only runtime artifact는 다음 경로에 있다.
+
+- `runs/live_navigation/20260831_151704_todo12l2-domain0-live/result.json`: stream,
+  AMCL·Nav2 lifecycle, costmap, TF owner, no-goal·command·teardown 최종 PASS
+- `runs/live_navigation/20260831_151704_todo12l2-domain0-live/launch.log`: Map Server,
+  AMCL, 네 Nav2 server와 종료 로그
+
+`use_sim_time=false`, onboard 기본 profile에서 `/scan` `948`, `/odom` `9286`, finite
+AMCL pose `1`, global/local costmap 각 `1`, AMCL 단독 `map → odom`과 전체 lifecycle
+active를 확인했다. action goal·path·non-zero inert velocity·ROS command publisher와
+종료 뒤 잔류 node·process는 모두 `0`이었다. 반복 수치·checksum·warning은
+`records/experiments/go2_local_navigation_domain0_live_localization_nav2_observer_20260831.yaml`을
+따른다. 초기 finite pose 하나와 정지 `18×65` 지도만 사용했으므로 localization
+정확도·실제 goal·목적지 도달 근거로 사용하지 않는다.
+
 ## Domain 64 saved-map localization
 
 2026-08-31 Go2 OFF·loopback 조건의 최종 산출물은 다음 경로에 있다.

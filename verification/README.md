@@ -111,6 +111,13 @@ verification/
 - 12-L 근거: `go2-local-navigation-domain0-live-mapping-shadow-20260831`, live scan
   `15.394 Hz`·721 beams·NaN 0, 정지 `/map` `0.5 Hz`, SLAM Toolbox 단독
   `map → odom`, occupancy·pose graph 저장·재로딩 응답과 clean teardown 확인
+- 12-L2 Domain 0 live localization·no-goal Nav2 observer:
+  `completed_stationary_onboard_connectivity_with_warning`
+- 12-L2 근거:
+  `go2-local-navigation-domain0-live-localization-nav2-observer-20260831`, 실제 `/scan`
+  `948`·`/odom` `9286`, finite AMCL pose `1`, global/local costmap 각 `1`, 여섯
+  lifecycle node active, AMCL 단독 `map → odom`, goal·path·non-zero inert velocity·
+  ROS command publisher·residual `0` 확인
 - 역사적 TF continuity failed/open: `go2-local-navigation-dimos-tf-profile-ab-20260828`, 같은 120초 bag의
   `project_default`·`dimos_replay` 모두 translation·yaw step 기준 실패
 - 후속 runtime: `data/runs/mapping_tf_ab/20260828_dimos_tf_ab_retry1/summary.json`,
@@ -181,15 +188,16 @@ verification/
   전체 PASS, success `SUCCEEDED`, cancel `CANCELED`, 나머지 네 시나리오 `ABORTED`
 - Domain 65 안전 경계: physical command·control·Unitree node `0`, fixture·launch
   exit `0/0`, residual process·node·teardown owner `0`
-- 12단계 한계: localization 연결성과 합성 Nav2 action 계약은 software-only이며,
-  12-L은 정지 live mapping 연결성만 확인했다. 지도·위치 정확도, live localization,
-  no-goal Nav2 observer와 실제 장애물 회피·목적지 도달은 미검증
+- 12단계 한계: Domain 64 localization 연결성과 Domain 65 합성 Nav2 action 계약은
+  software-only다. 12-L은 정지 live mapping, 12-L2는 live saved-map localization·
+  no-goal Nav2 lifecycle 연결성만 확인했다. 지도·위치 추적 정확도, 실제 goal·장애물
+  회피·목적지 도달은 미검증
 - 13단계 `software_only_freeze`: `completed_software_only_freeze`
 - 13단계 근거: `software_only_freeze.md`,
   `structured/software_only_freeze.yaml`, `software_only_freeze.sha256`
 - Stage 13 동결 당시 Domain 0 live shadow: Go2 OFF 조건으로 `deferred`
-- 현재 Domain 0 상태: live scan·정지 SLAM mapping은 12-L에서 보완 완료;
-  live localization·no-goal Nav2 observer는 `deferred`
+- 현재 Domain 0 상태: live scan·정지 SLAM mapping은 12-L, live saved-map
+  localization·no-goal Nav2 observer 연결성은 12-L2에서 보완 완료
 - 14단계 `final_mount_integration`: `preparation_completed_execution_deferred`
 - 15단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
 - recorder 근거: `go2-local-navigation-trial-recorder-readonly-qa-20260827`
@@ -215,7 +223,8 @@ visual QA에서 회귀해 후보 없이 `root-cause-classified`로 닫혔다. ma
 correction 선택 조건과 후보의 fan/streak 확산 원인, occupancy 품질 해결은 남아 있다.
 13단계는 이 software-only 상태를 checksum과 source/runtime provenance로 동결했다.
 동결 당시 Go2 OFF로 보류된 Domain 0 가운데 live scan·정지 SLAM mapping은 후속
-12-L에서 보완했다. 이는 최종 고정이나 지도·localization 정확도를 의미하지 않으며,
+12-L, live saved-map localization·no-goal Nav2 observer 연결성은 12-L2에서 보완했다.
+이는 최종 고정, 지도·localization 정확도 또는 실제 goal 수행을 의미하지 않으며,
 다음 물리 실행 단계는 계속 14단계다.
 14·15단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
 의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.

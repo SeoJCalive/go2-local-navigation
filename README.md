@@ -54,6 +54,16 @@ costmap, TF owner, 물리 command publisher 0과 clean teardown을 통과했다.
 입력에서의 Nav2 action 계약 근거이며 실제 Go2 목적지 도달이나 장애물 회피 근거가
 아니다.
 
+같은 날 12-L Domain 0 supplement에서는 Go2를 켠 임시 정지 상태에서 live `/scan`·
+`/odom`으로 SLAM map과 12-L 저장 지도를 만들었다. 이어 12-L2에서는 그 저장 지도를
+Map Server·AMCL에 연결하고 Planner·Controller·Behavior Server·BT Navigator를 goal
+없이 함께 기동했다. `/scan` `948`개, `/odom` `9286`개, finite AMCL pose `1`개와 두
+costmap을 수신했고 모든 lifecycle node가 active였으며 AMCL만 `map → odom`을
+소유했다. action goal, path, non-zero inert velocity, ROS command publisher와 잔류
+node·process는 모두 `0`이었다. 이는 실제 입력의 localization·Nav2 연결성을 확인한
+것이며 정지 상태의 작은 지도와 초기 pose 하나만 사용했으므로 위치 추적 정확도나
+실제 목적지 도달 근거가 아니다.
+
 2026-08-28에는 DimOS 저장소의 Go2 LiDAR extrinsic을 외부 replay 전용
 `dimos_replay` TF profile로 추가하고 같은 120초 short bag을 기존
 `project_default`와 A/B했다. 최대 translation step은 `10.014682 → 8.768064 m`,
@@ -136,8 +146,8 @@ mount되어 있다. 저장소 루트 `AGENTS.md`가 이 경로에 재귀 적용�
 - `bringup`: launch·설정과 재사용 가능한 통합 preflight observer
 - `description`: 공식 Go2 전체 URDF와 TF 계약
 - `go2_control`: 비동작 기본 motion 계약, 제한·watchdog·Sport request 변환 후보
-- `go2_nav2`: 비동작 Nav2 preview, experimental SLAM·saved-map localization과 합성 전체 Nav2 runtime asset
-- `go2_validation`: fault·replay·mapping·localization·Nav2 shadow·통합 preflight의 software-only validation orchestration
+- `go2_nav2`: 비동작 Nav2 preview, experimental SLAM·saved-map localization, Domain 0 no-goal observer와 합성 전체 Nav2 runtime asset
+- `go2_validation`: fault·replay·mapping·localization·Nav2 shadow·Domain 0 live observer·통합 preflight의 validation orchestration
 
 현재 범위에는 프로젝트 내부 `/go2_control/cmd_vel_candidate`와
 `/go2_control/sport_request_preview`가 포함된다. 실제 `/api/sport/request` publish,
@@ -185,6 +195,10 @@ Nav2 shadow를 추가한 Stage 13 동결 검증은 전체 8 packages, 318 tests,
 0 errors, 5 skipped와 설치 executable `go2_validation=14`, `go2_nav2=0`을 확인했다.
 Domain 64·65의 조건·checksum과 주장 한계는
 [`software-only freeze`](verification/software_only_freeze.md)를 따른다.
+후속 12-L2 구현 뒤 현재 workspace 전체 검증은 8 packages, 327 tests, 0 failures,
+0 errors, 5 skipped와 설치 executable `go2_validation=15`, `go2_nav2=0`을 확인했다.
+이는 live no-goal observer의 구현·연결성 검증이며 기존 freeze snapshot을 소급
+변경하지 않는다.
 
 ## 로봇 전원 없이 RViz2로 URDF·TF 보기
 
@@ -285,7 +299,7 @@ joint로 추가하지 않는다.
 1. 10단계 정지 smoke·soak는 실행 완료 상태로 유지하되 yaw drift 경고를 후속 시험에 연결한다.
 2. 11단계 software fault recovery와 12단계의 mapping·saved-map localization·합성 Nav2 shadow는 software-only 범위에서 완료했다.
 3. 외부 replay continuity와 occupancy 품질은 별도 판정으로 유지한다. canonical continuity는 정확한 bag/profile에서만 통과했고 occupancy production 후보는 없으며, Domain 64 localization 연결성과 Domain 65 Nav2 action 결과를 지도·위치 정확도로 승격하지 않는다.
-4. 13단계 software-only freeze 당시 보류됐던 Domain 0 중 live scan·정지 SLAM mapping은 12-L supplement에서 `stationary-onboard-verified`로 보완했다. live localization·no-goal Nav2 observer와 지도 정확도는 계속 보류한다.
+4. 13단계 software-only freeze 당시 보류됐던 Domain 0 중 live scan·정지 SLAM mapping은 12-L, live saved-map localization·no-goal Nav2 observer 연결성은 12-L2에서 `stationary-onboard-verified`로 보완했다. 지도·위치 정확도와 실제 goal은 계속 보류한다.
 5. 다음 실행 단계인 14단계에서 AGX 최종 고정과 footprint·케이블·전원·열·센서 시야를 기록한다.
 6. 15단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
 
@@ -322,6 +336,10 @@ stem의 YAML projection에 보존한다.
 
 Domain 0 live scan·정지 SLAM mapping supplement 결과는
 `records/experiments/go2_local_navigation_domain0_live_mapping_shadow_20260831.md`와
+같은 stem의 YAML projection에 보존한다.
+
+Domain 0 live saved-map localization·no-goal Nav2 observer 결과는
+`records/experiments/go2_local_navigation_domain0_live_localization_nav2_observer_20260831.md`와
 같은 stem의 YAML projection에 보존한다.
 
 DimOS source extrinsic과 120초 TF profile A/B 결과는

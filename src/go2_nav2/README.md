@@ -1,10 +1,10 @@
 # `go2_nav2`
 
 `go2_nav2`는 비동작 Nav2 runtime asset만 소유한다. local costmap, controller
-preview, SLAM mapping, saved-map localization과 합성 전체 Nav2 launch·설정·map·BT가
-대상이다. 이 asset은 모두 실험 후보이며 production navigation runtime 또는 실제
-motion 승인을 뜻하지 않는다. fault, replay, mapping, localization, Nav2 shadow
-acceptance와 통합 preflight 같은 software-only 검증 orchestration은
+preview, SLAM mapping, saved-map localization, Domain 0 no-goal observer와 합성 전체
+Nav2 launch·설정·map·BT가 대상이다. 이 asset은 모두 실험 후보이며 production
+navigation runtime 또는 실제 motion 승인을 뜻하지 않는다. fault, replay, mapping,
+localization, Nav2 shadow acceptance와 통합 preflight 같은 검증 orchestration은
 `go2_validation`이 소유한다.
 
 ## 폴더 및 파일 구조
@@ -26,6 +26,7 @@ go2_nav2/
 ├── launch/
 │   ├── go2_controller_preview.launch.py
 │   ├── go2_costmap_only.launch.py
+│   ├── go2_nav2_live_observer.launch.py
 │   ├── go2_nav2_shadow.launch.py
 │   ├── go2_saved_map_localization.launch.py
 │   └── go2_slam_mapping.launch.py
@@ -43,6 +44,7 @@ go2_nav2/
 │   └── __init__.py
 └── test/
     ├── test_localization_shadow_configuration.py
+    ├── test_live_navigation_observer_configuration.py
     ├── test_nav2_shadow_runtime_configuration.py
     ├── test_navigation_configuration.py
     └── test_shadow_assets.py
@@ -64,6 +66,7 @@ go2_nav2/
 | `config/slam_mapping.yaml` | SLAM Toolbox mapping의 frame, scan, map 저장과 기본 search parameter를 정의한다. |
 | `launch/go2_controller_preview.launch.py` | controller output을 내부 candidate topic으로 remap하고 닫힌 motion adapter preview를 시작한다. |
 | `launch/go2_costmap_only.launch.py` | stationary perception·odometry와 local costmap owner만 조합하며 motion adapter와 goal은 시작하지 않는다. |
+| `launch/go2_nav2_live_observer.launch.py` | Domain 0 실제 scan·odometry에 저장 지도 AMCL과 네 Nav2 server를 연결하되 goal node를 만들지 않고 velocity를 inert `/go2_nav2/shadow_cmd_vel`로 격리한다. |
 | `launch/go2_nav2_shadow.launch.py` | Domain 65 Map Server와 Nav2 전체 lifecycle을 합성 fixture에 연결하고 velocity를 inert `/go2_nav2/shadow_cmd_vel`로 격리한다. |
 | `launch/go2_saved_map_localization.launch.py` | Domain 64의 저장 지도, replay scan·odometry, Map Server와 AMCL만 조합한다. planner·controller·command node는 시작하지 않는다. |
 | `launch/go2_slam_mapping.launch.py` | mapping scan·odometry와 단일 SLAM Toolbox owner를 조합한다. 기본 `execution_mode=onboard`, `continuity_profile=onboard_observe`를 선언하고 하위 launch에 전달한다. |
@@ -77,6 +80,7 @@ go2_nav2/
 | `behavior_trees/navigate_to_pose_shadow_missing_planner.xml` | planner-failure 시나리오에서 존재하지 않는 planner ID를 요청하는 진단용 BT다. |
 | `go2_nav2/__init__.py` | 이 package가 validation orchestration을 소유하지 않는 Nav2 runtime asset 경계임을 설명한다. |
 | `test/test_localization_shadow_configuration.py` | Map Server·AMCL frame·owner와 command 경로 부재를 검사한다. |
+| `test/test_live_navigation_observer_configuration.py` | 실제 입력 localization include, 네 Nav2 server와 합성 fixture 부재를 검사한다. |
 | `test/test_nav2_shadow_runtime_configuration.py` | Domain 65 lifecycle, inert velocity remap과 planner-failure BT를 검사한다. |
 | `test/test_navigation_configuration.py` | costmap frame·obstacle source·controller 제한과 costmap-only launch의 non-actuating 경계를 검사한다. |
 | `test/test_shadow_assets.py` | map raster·BT와 `go2_validation` 소유 scenario config의 연결을 검사한다. |
@@ -95,8 +99,10 @@ preflight로 확인해야 한다. replay-only TF·scan profile이 onboard mode�
 
 `go2_saved_map_localization.launch.py`와 `go2_nav2_shadow.launch.py`는 각각 Domain
 64·65의 software-only 검증에서 실행했다. 전자는 AMCL 연결성과 owner를 확인한
-replay 자산이고, 후자는 합성 action 계약을 확인한 자산이다. 둘 다 위치 정확도,
-지도 정확도, live Go2 적합성 또는 실제 목적지 도달을 증명하지 않는다.
+replay 자산이고, 후자는 합성 action 계약을 확인한 자산이다.
+`go2_nav2_live_observer.launch.py`는 12-L2에서 Domain 0 실제 입력과 12-L 저장 지도를
+사용해 AMCL·Nav2 lifecycle·costmap 연결성을 goal 없이 확인했다. 세 결과 모두 위치·
+지도 정확도나 실제 목적지 도달을 증명하지 않는다.
 
 각도 sweep 시각 비교본은 package runtime asset이 아니며,
 `.user/img/slam_map/angle_sweep_20260829/`에서 관리한다.
