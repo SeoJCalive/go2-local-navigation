@@ -1,9 +1,9 @@
 # `go2_validation`
 
-`go2_validation`은 fault, external replay, mapping, 통합 preflight의
-software-only 검증 도구 package다. Nav2 runtime asset을 `go2_nav2`에서 읽어
-조합할 수 있지만 production navigation runtime component가 아니며, 실제 command
-publish·motion·physical execution을 소유하지 않는다.
+`go2_validation`은 fault, external replay, mapping, saved-map localization, 합성
+Nav2 shadow와 통합 preflight의 software-only 검증 도구 package다. Nav2 runtime
+asset을 `go2_nav2`에서 읽어 조합할 수 있지만 production navigation runtime
+component가 아니며 실제 command publish·motion·physical execution을 소유하지 않는다.
 
 기존 executable 이름은 유지한다. 예를 들어 통합 preflight는 다음 package owner로
 실행한다.
@@ -50,6 +50,10 @@ go2_validation/
 │   ├── fault_runtime_capture.py
 │   ├── fault_runtime_execution.py
 │   ├── fault_runtime_observer.py
+│   ├── localization_acceptance.py
+│   ├── localization_acceptance_runner.py
+│   ├── localization_runtime_execution.py
+│   ├── localization_runtime_observer.py
 │   ├── mapping_acceptance.py
 │   ├── mapping_acceptance_runner.py
 │   ├── mapping_artifacts.py
@@ -77,6 +81,16 @@ go2_validation/
 │   ├── preflight_runner_configuration.py
 │   ├── preflight_runner_node.py
 │   ├── runtime_preflight.py
+│   ├── shadow_acceptance_runner.py
+│   ├── shadow_action_runner.py
+│   ├── shadow_environment.py
+│   ├── shadow_fixture.py
+│   ├── shadow_fixture_node.py
+│   ├── shadow_observer.py
+│   ├── shadow_runtime_execution.py
+│   ├── shadow_runtime_model.py
+│   ├── shadow_scenarios.py
+│   ├── shadow_verdict.py
 │   └── typing_compat.py
 └── test/
     ├── test_external_replay_acquisition.py
@@ -84,8 +98,11 @@ go2_validation/
     ├── test_fault_acceptance.py
     ├── test_fault_fixture.py
     ├── test_fault_runtime_capture.py
+    ├── test_localization_acceptance.py
+    ├── test_localization_runtime.py
     ├── test_mapping_acceptance.py
     ├── test_mapping_cloud_accounting.py
+    ├── test_mapping_coarse_search_sweep.py
     ├── test_mapping_input_acceptance.py
     ├── test_mapping_input_capture.py
     ├── test_mapping_player_startup.py
@@ -96,6 +113,11 @@ go2_validation/
     ├── test_mapping_stable_emit3_profile.py
     ├── test_mapping_tf_profile_ab.py
     ├── test_preflight_package_ownership.py
+    ├── test_shadow_acceptance_runner.py
+    ├── test_shadow_action_runner.py
+    ├── test_shadow_fixture.py
+    ├── test_shadow_scenarios.py
+    ├── test_shadow_verdict.py
     ├── test_validation_package_boundary.py
     ├── test_verification_stage_alignment.py
     └── test_wave1_contracts.py
@@ -109,7 +131,7 @@ go2_validation/
 | `package.xml` | validation runner가 사용하는 ROS 2 metadata와 의존성을 선언한다. |
 | `resource/go2_validation` | ament index package marker다. |
 | `setup.cfg` | ament Python script 설치 경로를 지정한다. |
-| `setup.py` | validation config·launch를 설치하고 11개 validation executable을 이 package에만 등록한다. |
+| `setup.py` | validation config·launch를 설치하고 14개 validation executable을 이 package에만 등록한다. |
 | `config/execution_modes.yaml` | domain, clock owner, global TF owner, sim time과 loopback을 software validation mode별로 정의한다. |
 | `config/external_replay_sources.yaml` | pinned DimOS source의 custody, hash·size 제한, dataset 출처와 센서 identity 상태, canonical channel과 replay-only profile provenance를 정의한다. |
 | `config/shadow_scenarios.yaml` | synthetic navigation 후보의 map·start/goal·terminal expectation을 정의한다. |
@@ -135,6 +157,10 @@ go2_validation/
 | `go2_validation/fault_runtime_capture.py` | fixture marker와 실제 downstream stamp를 결합한 순수 capture를 만든다. |
 | `go2_validation/fault_runtime_execution.py` | 한 fault launch attempt의 child lifecycle, observer, teardown 결과를 소유한다. |
 | `go2_validation/fault_runtime_observer.py` | Domain 61 event·derived output·TF·command graph를 읽기 전용으로 관찰한다. |
+| `go2_validation/localization_acceptance.py` | Domain 64의 scan·odom·map·AMCL pose·owner·teardown 관찰을 순수 verdict로 판정한다. |
+| `go2_validation/localization_acceptance_runner.py` | 저장 지도와 stationary bag 경로를 받아 localization 실행 결과 JSON을 기록한다. |
+| `go2_validation/localization_runtime_execution.py` | Domain 64 launch·paused player·observer와 bounded teardown lifecycle을 소유한다. |
+| `go2_validation/localization_runtime_observer.py` | map·AMCL pose·lifecycle·TF owner·command 경계를 payload 보존 없이 관찰한다. |
 | `go2_validation/mapping_acceptance.py` | mapping stream, ownership, artifact와 teardown observation을 passed/failed verdict로 판정한다. |
 | `go2_validation/mapping_acceptance_runner.py` | stationary·external-full Domain 63 validation을 순차 실행하고 summary JSON을 기록한다. |
 | `go2_validation/mapping_artifacts.py` | occupancy map·image·pose graph 저장과 reload artifact 경계를 검증한다. |
@@ -162,14 +188,27 @@ go2_validation/
 | `go2_validation/preflight_runner_configuration.py` | integrated preflight duration, label, output path를 runner configuration으로 파싱한다. |
 | `go2_validation/preflight_runner_node.py` | host lifecycle, resource capture, observer launch와 final preflight result를 조합한다. |
 | `go2_validation/runtime_preflight.py` | validation mode의 domain·clock·sim-time·network observation을 fail-fast 판정한다. |
+| `go2_validation/shadow_acceptance_runner.py` | Domain 65 여섯 시나리오를 순차 실행하고 시나리오별 JSON과 전체 summary를 기록한다. |
+| `go2_validation/shadow_action_runner.py` | `NavigateToPose` goal, feedback 이후 cancel, terminal status와 grid 좌표 변환을 소유한다. |
+| `go2_validation/shadow_environment.py` | Domain 65, CycloneDDS loopback, multicast 비활성, simulated time hard gate를 판정한다. |
+| `go2_validation/shadow_fixture.py` | 시나리오별 합성 pose 진행·freeze와 clock·TF owner 계획을 정의한다. |
+| `go2_validation/shadow_fixture_node.py` | `/clock`, `/odom`, `map → odom`, `odom → base`를 합성하고 inert velocity만 적분한다. |
+| `go2_validation/shadow_observer.py` | Nav2 lifecycle·costmap·path·candidate·TF owner·command·teardown surface를 관찰한다. |
+| `go2_validation/shadow_runtime_execution.py` | 한 시나리오의 fixture·Nav2 child process, action 실행과 bounded teardown을 소유한다. |
+| `go2_validation/shadow_runtime_model.py` | observer와 executor가 공유하는 불변 runtime surface와 terminal evidence를 정의한다. |
+| `go2_validation/shadow_scenarios.py` | 합성 map·grid cell·기대 terminal·출력 존재 조건을 typed manifest로 파싱한다. |
+| `go2_validation/shadow_verdict.py` | 여섯 시나리오의 terminal·output·owner·안전·teardown 합격 조건을 판정한다. |
 | `go2_validation/typing_compat.py` | Python compatibility를 위한 exhaustive variant helper를 제공한다. |
 | `test/test_external_replay_acquisition.py` | archive traversal, hash, size, free-space, cleanup과 custody 경계를 검사한다. |
 | `test/test_external_replay_converter.py` | channel, CDR semantic, window, determinism, QoS와 output cap을 검사한다. |
 | `test/test_fault_acceptance.py` | fault suppression, recovery, safety oracle와 fault launch argv를 검사한다. |
 | `test/test_fault_fixture.py` | deterministic fixture timeline, NAN serialization과 odometry recovery ordering을 검사한다. |
 | `test/test_fault_runtime_capture.py` | fixture marker와 downstream capture projection을 검사한다. |
+| `test/test_localization_acceptance.py` | AMCL 단일 owner, command 0, finite pose와 clean teardown 판정을 검사한다. |
+| `test/test_localization_runtime.py` | Domain 64 launch·paused bag argv와 observer destroy 경계를 검사한다. |
 | `test/test_mapping_acceptance.py` | mapping verdict, ownership, artifact, accounting과 runner boundary를 검사한다. |
 | `test/test_mapping_cloud_accounting.py` | accumulated cloud terminal accounting marker와 profile requirement를 검사한다. |
+| `test/test_mapping_coarse_search_sweep.py` | 기본 7개와 0~4도 주입 후보의 순서·간격, external replay profile 불변 조건을 검사한다. |
 | `test/test_mapping_input_acceptance.py` | Domain 62 ingress verdict, bag argv와 mode/profile forwarding을 검사한다. |
 | `test/test_mapping_input_capture.py` | scan timestamp·rate·range와 odometry overlap projection을 검사한다. |
 | `test/test_mapping_player_startup.py` | paused player discovery·Resume ordering과 typed failure를 검사한다. |
@@ -180,6 +219,11 @@ go2_validation/
 | `test/test_mapping_stable_emit3_profile.py` | replay-only stable emit3 profile의 accounting·continuity 선택을 검사한다. |
 | `test/test_mapping_tf_profile_ab.py` | TF profile A/B, map correction continuity, scan profile과 argv selection을 검사한다. |
 | `test/test_preflight_package_ownership.py` | integrated preflight owner가 `go2_validation`이고 package cycle이 없는지 검사한다. |
+| `test/test_shadow_acceptance_runner.py` | 여섯 결과 summary와 Domain 65 loopback 환경 hard gate를 검사한다. |
+| `test/test_shadow_action_runner.py` | Navfn grid 좌표, child argv와 feedback 기반 cancel gate를 검사한다. |
+| `test/test_shadow_fixture.py` | 시나리오별 fixture 진행 정책과 rclpy node clock 보존을 검사한다. |
+| `test/test_shadow_scenarios.py` | 여섯 terminal 계약과 success timeout 여유를 검사한다. |
+| `test/test_shadow_verdict.py` | terminal·출력·command·control·teardown의 시나리오별 판정을 검사한다. |
 | `test/test_validation_package_boundary.py` | runtime-only `go2_nav2`와 validation-only `go2_validation`의 파일·executable·argv 경계를 검사한다. |
 | `test/test_verification_stage_alignment.py` | software stage와 physical stage 경계가 혼합되지 않는지 검사한다. |
 | `test/test_wave1_contracts.py` | execution mode, fault, mapping, odometry와 TF owner의 공통 contract를 검사한다. |
@@ -204,6 +248,11 @@ lifecycle을 검증한다. `offline_fault`는 `execution_modes.yaml`의 runtime 
 ID일 뿐 profile-loader execution mode가 아니다. 일반 onboard 경로는
 `execution_mode=onboard`와 `continuity_profile=onboard_observe`를 유지하며,
 replay 전용 profile은 해당 external replay caller가 명시한다.
+
+Domain 64 localization은 stationary bag과 그 bag에서 생성한 저장 지도의 연결성만
+판정한다. Domain 65 Nav2 shadow는 합성 시간·TF·odometry와 inert velocity topic만
+사용한다. 두 runner의 통과를 위치 정확도, 지도 정확도, live Go2 적합성, 실제
+장애물 회피 또는 목적지 도달로 해석하지 않는다.
 
 `external replay`는 외부 출처 dataset을 뜻하며 외장 LiDAR를 뜻하지 않는다.
 현재 canonical DimOS source의 센서 계열은 Go2 built-in L1 ULIDAR로 강하게

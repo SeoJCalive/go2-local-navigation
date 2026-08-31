@@ -1,0 +1,188 @@
+schema_version: 1
+record_kind: "software_only_freeze"
+record_id: "go2-local-navigation-software-only-freeze-20260831"
+title: "Go2 local navigation Stage 13 software-only 동결"
+status: "completed_software_only_freeze"
+recorded_at: "2026-08-31"
+source_markdown: "../software_only_freeze.md"
+provenance:
+  kind: "manual_projection_from_agx_source_runtime_and_local_records"
+  target: "go2_agx"
+  project_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation"
+  go2_powered: false
+  physical_execution: false
+  command_publication: false
+  loopback_only: true
+  interpretation_rule: "software 연결성·계약 근거를 지도·위치 정확도나 물리 합격으로 승격하지 않음"
+git_state:
+  project:
+    branch: "codex/stage12-localization-nav2-shadow"
+    baseline_head: "7bb72ae"
+    head_changed_by_freeze: false
+    worktree: "dirty_expected_stage12_stage13_changes"
+    commit_performed: false
+    push_performed: false
+  knowledge:
+    branch: "codex/stage12-localization-nav2-shadow"
+    baseline_head: "707b599"
+    head_changed_by_freeze: false
+    worktree: "dirty_expected_stage13_records"
+    commit_performed: false
+    push_performed: false
+stages:
+  - stage_id: 11
+    name: "software_fault_recovery"
+    status: "completed"
+  - stage_id: 12
+    name: "mapping_localization_and_nav2_shadow"
+    status: "completed_software_only"
+  - stage_id: 13
+    name: "software_only_freeze"
+    status: "completed_software_only_freeze"
+  - stage_id: 14
+    name: "final_mount_integration"
+    status: "preparation_completed_execution_deferred"
+  - stage_id: 15
+    name: "limited_physical_motion_validation"
+    status: "preparation_completed_execution_deferred"
+runtime_environment:
+  ros_distribution: "humble"
+  rmw: "rmw_cyclonedds_cpp"
+  interface: "lo"
+  multicast: false
+  participant_index: "auto"
+  max_auto_participant_index: 120
+  cyclonedds_uri: '<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="lo" priority="default" multicast="false" /></Interfaces></General><Discovery><ParticipantIndex>auto</ParticipantIndex><MaxAutoParticipantIndex>120</MaxAutoParticipantIndex></Discovery></Domain></CycloneDDS>'
+runtime_results:
+  saved_map_localization:
+    status: "passed"
+    evidence_level: "replay-verified"
+    domain_id: 64
+    result_path: "../../data/runs/localization/stage13-freeze-domain64-max120/result.json"
+    result_sha256: "722c09b3785e3305700921b73ccb55c2de8e587b300e5cf596d319185b0d106a"
+    map_path: "../../data/runs/mapping/project_stationary/artifacts/occupancy.yaml"
+    map_checksum: "f023d6d53c9818b3926a930f406263349a67a807f89c2ddf5dd7730f57ad1333"
+    bag_path: "../../data/bags/go2_stationary_raw_20260826_1829"
+    bag_tree_checksum: "c5e3ccef43ec754af364d06ddb09f0ab591fd360445d20910289d6134c741fcd"
+    scan_count: 300
+    odom_count: 2923
+    map_count: 1
+    pose_count: 1
+    finite_pose_count: 1
+    lifecycle_states: {amcl: "active", map_server: "active"}
+    global_edge: "map_to_odom"
+    global_owner_nodes: ["/amcl"]
+    command_publisher_max: 0
+    control_node_max: 0
+    player_exit_code: 0
+    launch_exit_code: 0
+    residual_nodes: []
+    residual_processes: []
+    teardown_clock_publishers: 0
+    teardown_global_owner_nodes: []
+    claim_limit: "AMCL 연결성·소유권 검증이며 localization 정확도 증명이 아님"
+  localization_initial_failure:
+    status: "failed_preserved"
+    result_path: "../../data/runs/localization/stage13-freeze-domain64/result.json"
+    reason_code: "mapping_player_readiness_failed"
+    direct_cause: "CycloneDDS participant index search range exhausted for mapping cloud gate and rosbag player"
+    resolved_by: "ParticipantIndex auto and MaxAutoParticipantIndex 120 in execution URI"
+    production_source_changed: false
+  nav2_shadow:
+    status: "passed"
+    evidence_level: "synthetic-verified"
+    domain_id: 65
+    result_path: "../../data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json"
+    result_sha256: "6f312dbe9a586bfd84da83fe6d54a21d77486a7da364b79bfab629d69f1d19f7"
+    clock_owner: "/synthetic_navigation_fixture"
+    map_to_odom_owner: "/synthetic_navigation_fixture"
+    odom_to_base_owner: "/synthetic_navigation_fixture"
+    lifecycle_nodes: ["map_server", "planner_server", "controller_server", "behavior_server", "bt_navigator"]
+    scenarios:
+      - {scenario_id: "success", terminal: "SUCCEEDED", status: "passed"}
+      - {scenario_id: "cancel", terminal: "CANCELED", status: "passed"}
+      - {scenario_id: "blocked_goal", terminal: "ABORTED", status: "passed"}
+      - {scenario_id: "outside_map_goal", terminal: "ABORTED", status: "passed"}
+      - {scenario_id: "planner_failure", terminal: "ABORTED", status: "passed"}
+      - {scenario_id: "no_progress", terminal: "ABORTED", status: "passed"}
+    physical_command_publisher_max: 0
+    control_node_max: 0
+    unitree_node_max: 0
+    fixture_exit_codes: [0, 0, 0, 0, 0, 0]
+    launch_exit_codes: [0, 0, 0, 0, 0, 0]
+    residual_nodes: []
+    residual_processes: []
+    teardown_clock_publishers: 0
+    teardown_tf_owners: []
+    claim_limit: "합성 Nav2 action 계약이며 실제 Go2 목적지 도달·장애물 회피 증명이 아님"
+verification:
+  package_count: 8
+  build_exit_code: 0
+  tests: 318
+  failures: 0
+  errors: 0
+  skipped: 5
+  go2_validation_executable_count: 14
+  go2_nav2_validation_executable_count: 0
+  ruff: "passed"
+  python_no_excuse: "passed"
+  checksum_manifest: "../software_only_freeze.sha256"
+  checksum_entry_count: 267
+  checksum_manifest_self_included: false
+  checksum_scope:
+    git_visible_project_files: "all_present"
+    additional_runtime_files:
+      - "../../data/runs/localization/stage13-freeze-domain64-max120/result.json"
+      - "../../data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json"
+    ignored_generated_files: "excluded_except_listed_runtime_results"
+external_fixture:
+  status: "available_local_only"
+  dataset_license: "unverified"
+  redistribution: false
+  archive_sha256: "569b8401f15745ef68663dc3ac5fba0dcbdc7ed4ac9f599b3a9db895f63bf2a4"
+  raw_mcap_sha256: "aef56651d396c7deb4123e03dce23606458476dd94cd1c7b81fa9d2dfe70c157"
+  short_bag_tree_sha256: "40cd02d0eddfadfe62bf9df715a06d37171a4a7b0beacb088556785043622ec3"
+  full_bag_tree_sha256: "92032cca48613f6e7ed36c4d6a78ee7688f653459856538a281f1cfb10f483ba"
+warnings:
+  - warning_id: "stationary_yaw_drift"
+    status: "warning"
+    value_rad: 0.248012
+    source_record_id: "go2-local-navigation-stationary-soak-20260827"
+  - warning_id: "external_replay_occupancy_quality"
+    status: "open"
+    detail: "visual-approved production candidate 없음"
+deferred:
+  - {item: "domain_0_live_shadow", status: "deferred", reason: "Go2 powered off"}
+  - {item: "final_mount_power_thermal_cable_footprint", status: "deferred"}
+  - {item: "live_sensor_tf_fit", status: "unverified"}
+  - {item: "map_accuracy", status: "unverified"}
+  - {item: "localization_accuracy", status: "unverified"}
+  - {item: "physical_axis_stopmove_obstacle_goal", status: "deferred"}
+excluded:
+  - {item: "realsense_imu", status: "excluded"}
+source_refs:
+  - source_id: "PROJECT-FREEZE-MARKDOWN"
+    path: "../software_only_freeze.md"
+    role: "동결 판정, 실행 조건과 주장 한계"
+  - source_id: "DOMAIN64-LOCALIZATION-RUNTIME"
+    path: "../../data/runs/localization/stage13-freeze-domain64-max120/result.json"
+    role: "저장 지도 localization stream·lifecycle·owner·teardown 원문"
+  - source_id: "DOMAIN65-NAV2-SHADOW-RUNTIME"
+    path: "../../data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json"
+    role: "여섯 NavigateToPose scenario·안전·teardown 원문"
+  - source_id: "PROJECT-MANIFEST"
+    record_id: "go2-local-navigation-project-20260822"
+    path: "project_manifest.yaml"
+    role: "완료 단계, package와 다음 실행 단계"
+  - source_id: "ACCEPTANCE-MATRIX"
+    record_id: "go2-local-navigation-acceptance-matrix-20260827"
+    path: "acceptance_matrix.yaml"
+    role: "모듈별 검증 수준과 보류 조건"
+  - source_id: "KNOWLEDGE-STAGE12-RECORD"
+    record_id: "go2-local-navigation-stage12-localization-nav2-shadow-20260831"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_stage12_localization_nav2_shadow_20260831.yaml"
+    role: "Domain 64·65 실행 해석과 세부 수치"
+  - source_id: "KNOWLEDGE-FREEZE-RECORD"
+    record_id: "go2-local-navigation-software-only-freeze-20260831"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_software_only_freeze_20260831.yaml"
+    role: "두 저장소 동결 상태와 후속 경계"

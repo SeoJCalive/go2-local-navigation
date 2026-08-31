@@ -12,11 +12,14 @@ verification/
 ├── README.md
 ├── final_mount_integration.md
 ├── limited_physical_motion_validation.md
+├── software_only_freeze.md
+├── software_only_freeze.sha256
 └── structured/
     ├── project_manifest.yaml
     ├── acceptance_matrix.yaml
     ├── final_mount_acceptance.yaml
-    └── limited_physical_motion_acceptance.yaml
+    ├── limited_physical_motion_acceptance.yaml
+    └── software_only_freeze.yaml
 ```
 
 | 파일 | 역할 |
@@ -24,10 +27,13 @@ verification/
 | `README.md` | 검증 수준, 판정 상태, 읽는 순서와 갱신 기준을 설명한다. |
 | `final_mount_integration.md` | 14단계 최종 장착·배선·전원·열·footprint 확인 절차를 설명한다. |
 | `limited_physical_motion_validation.md` | 15단계 축별 물리 시험, 승인·StopMove·측정 record 절차를 설명한다. |
+| `software_only_freeze.md` | 12단계 software 결과와 13단계 동결 범위, 실행 조건, warning·deferred를 설명한다. |
+| `software_only_freeze.sha256` | 동결 대상 present 파일을 재검증하는 SHA-256 목록이다. 자기 자신은 포함하지 않는다. |
 | `structured/project_manifest.yaml` | 프로젝트 범위, 현재 완료 단계, 안전 비목표와 근거 위치를 구조화한다. |
 | `structured/acceptance_matrix.yaml` | 모듈 ID, 입출력, 현재 검증 수준, 근거 ID, 합격 조건, 보류 시험과 재검증 조건을 구조화한다. |
 | `structured/final_mount_acceptance.yaml` | 14단계 준비 완료와 실제 장착 보류 항목을 구조화한다. |
 | `structured/limited_physical_motion_acceptance.yaml` | 15단계 준비·recorder 상태와 실제 trial 보류 항목을 구조화한다. |
+| `structured/software_only_freeze.yaml` | Git 기준점, runtime·fixture checksum, 검증 요약과 미승격 경계를 구조화한다. |
 
 ## 읽는 순서
 
@@ -97,10 +103,14 @@ verification/
 - soak: `20260827_151053_stage10_soak`, 46 PASS·1 WARN
 - 11단계 `software_fault_recovery`: `completed`
 - 11단계 근거: `data/runs/fault_acceptance/stage11.json`, fault 10개 모두 PASS
-- 12단계 `mapping_localization_and_nav2_shadow`: `software_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending`
+- 12단계 `mapping_localization_and_nav2_shadow`: `completed_software_only`
 - 12단계 입력 근거: `data/runs/mapping_input/stage12-ingress.json`, 정지·external short 모두 PASS
 - 12단계 mapping 근거: `data/runs/mapping/stage12.json`, 정지·external full 모두 PASS
 - 12단계 mapping record: `go2-local-navigation-slam-mapping-replay-20260827`
+- 12-L Domain 0 live mapping supplement: `completed_stationary_onboard_with_warning`
+- 12-L 근거: `go2-local-navigation-domain0-live-mapping-shadow-20260831`, live scan
+  `15.394 Hz`·721 beams·NaN 0, 정지 `/map` `0.5 Hz`, SLAM Toolbox 단독
+  `map → odom`, occupancy·pose graph 저장·재로딩 응답과 clean teardown 확인
 - 역사적 TF continuity failed/open: `go2-local-navigation-dimos-tf-profile-ab-20260828`, 같은 120초 bag의
   `project_default`·`dimos_replay` 모두 translation·yaw step 기준 실패
 - 후속 runtime: `data/runs/mapping_tf_ab/20260828_dimos_tf_ab_retry1/summary.json`,
@@ -159,14 +169,34 @@ verification/
 - sweep runner 추가 뒤 AGX targeted gate: `go2_validation` 157개 수집, 154 passed·3 skipped·0 failures·0 errors,
   현재 executable `go2_validation=11`, `go2_nav2=0`
 - 외부 replay 변환 근거: `data/external/dimos_go2_indoor/runs/conversion.json`
-- 13단계 `software_only_freeze`: `deferred_until_stages_11_12_complete`
+- Domain 64 saved-map localization:
+  `data/runs/localization/stage13-freeze-domain64-max120/result.json`, PASS,
+  `/scan=300`, `/odom=2923`, finite AMCL pose `1`, AMCL 단독 `map → odom`,
+  command/control·residual·teardown owner `0`
+- Domain 64 첫 실패:
+  `data/runs/localization/stage13-freeze-domain64/result.json`, 기본 CycloneDDS
+  participant-index 탐색 범위 부족으로 cloud gate와 player가 participant 생성 실패
+- Domain 65 Nav2 shadow:
+  `data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json`, 여섯 시나리오
+  전체 PASS, success `SUCCEEDED`, cancel `CANCELED`, 나머지 네 시나리오 `ABORTED`
+- Domain 65 안전 경계: physical command·control·Unitree node `0`, fixture·launch
+  exit `0/0`, residual process·node·teardown owner `0`
+- 12단계 한계: localization 연결성과 합성 Nav2 action 계약은 software-only이며,
+  12-L은 정지 live mapping 연결성만 확인했다. 지도·위치 정확도, live localization,
+  no-goal Nav2 observer와 실제 장애물 회피·목적지 도달은 미검증
+- 13단계 `software_only_freeze`: `completed_software_only_freeze`
+- 13단계 근거: `software_only_freeze.md`,
+  `structured/software_only_freeze.yaml`, `software_only_freeze.sha256`
+- Stage 13 동결 당시 Domain 0 live shadow: Go2 OFF 조건으로 `deferred`
+- 현재 Domain 0 상태: live scan·정지 SLAM mapping은 12-L에서 보완 완료;
+  live localization·no-goal Nav2 observer는 `deferred`
 - 14단계 `final_mount_integration`: `preparation_completed_execution_deferred`
 - 15단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
 - recorder 근거: `go2-local-navigation-trial-recorder-readonly-qa-20260827`
 
 10단계 경고는 30분 정지 yaw 누적 drift이며 중앙 매트릭스에서 warning으로 유지한다.
 12단계에서는 PointCloud2→LaserScan 입력, replay provenance, 합성 map·BT·scenario
-자산과 Domain 63 SLAM map 생성·저장·pose graph 재로딩까지 완료했다. 후속 canonical
+자산과 Domain 63 SLAM map 생성·저장·pose graph 재로딩을 완료했다. 후속 canonical
 resolution은 emit3 delivery와 profile-scoped coarse `0.1745`에서 map-correction
 continuity를 통과했다. candidate cloud accounting은 `1843/1842/614`, intrinsic drop
 `1`, overflow/pending/regression `0/0/0`이고 artifact 저장·재로딩과 clean teardown,
@@ -176,12 +206,17 @@ lower-band `0~4°` 5값 sweep은 모두 통과했다. lower-band에서는 `0°`�
 이 해결은 Go2 OFF·physical execution false·command publication
 false인 exact bag/profile의 replay 범위다. 앞선 TF/10-frame A/B failed/open 관찰은
 조건부 superseded된 역사적 근거로 보존한다. live hardware와 physical mount, map
-ground truth, saved-map localization, 전체 Nav2·NavigateToPose는 미검증이다. 후속
-causal A/B는 최초 pose 열화를 sequential matcher에 귀속했다. 후속 고정 pose 분석은
+ground truth는 미검증이다. Domain 64는 저장 지도와 AMCL 연결성·단일 owner를,
+Domain 65는 합성 Nav2 여섯 action terminal과 비물리 경계를 통과했다. 이 결과는
+localization 정확도나 실제 주행 근거가 아니다. 후속 causal A/B는 최초 pose 열화를
+sequential matcher에 귀속했다. 후속 고정 pose 분석은
 occupancy 결함이 node `30` 또는 그 이전부터 지속됨을 확인했지만, 수치 winner가 blind
 visual QA에서 회귀해 후보 없이 `root-cause-classified`로 닫혔다. matcher 내부의 잘못된
 correction 선택 조건과 후보의 fan/streak 확산 원인, occupancy 품질 해결은 남아 있다.
-다음 software 단계도 continuity, corrected pose와 occupancy map 품질을 별도로 판정한다.
+13단계는 이 software-only 상태를 checksum과 source/runtime provenance로 동결했다.
+동결 당시 Go2 OFF로 보류된 Domain 0 가운데 live scan·정지 SLAM mapping은 후속
+12-L에서 보완했다. 이는 최종 고정이나 지도·localization 정확도를 의미하지 않으며,
+다음 물리 실행 단계는 계속 14단계다.
 14·15단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
 의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.
 

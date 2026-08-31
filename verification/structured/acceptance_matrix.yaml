@@ -4,7 +4,7 @@ record_id: "go2-local-navigation-acceptance-matrix-20260827"
 source_markdown: "../README.md"
 status: "current_candidate_matrix"
 recorded_at: "2026-08-27"
-latest_evidence_at: "2026-08-30"
+latest_evidence_at: "2026-08-31"
 provenance:
   kind: "manual_projection_from_project_contracts_and_execution_records"
   target: "go2_agx"
@@ -196,6 +196,22 @@ source_refs:
     record_id: "go2-local-navigation-shadow-assets-20260827"
     path: "../../src/go2_nav2/test/test_shadow_assets.py"
     role: "합성 map·BT·scenario와 install-space 계약 근거"
+  - source_id: "SAVED-MAP-LOCALIZATION-RUNTIME"
+    record_id: "go2-local-navigation-saved-map-localization-runtime-20260831"
+    path: "../../data/runs/localization/stage13-freeze-domain64-max120/result.json"
+    role: "Domain 64 저장 지도·AMCL stream·lifecycle·owner·teardown 실행 원문"
+  - source_id: "DOMAIN0-LIVE-MAPPING-SHADOW"
+    record_id: "go2-local-navigation-domain0-live-mapping-shadow-20260831"
+    path: "/home/tjwocjf0915/research/Go2/records/experiments/go2_local_navigation_domain0_live_mapping_shadow_20260831.yaml"
+    role: "Domain 0 live scan·정지 SLAM map·artifact service·single-owner·clean teardown 근거"
+  - source_id: "NAV2-SHADOW-RUNTIME"
+    record_id: "go2-local-navigation-nav2-shadow-runtime-20260831"
+    path: "../../data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json"
+    role: "Domain 65 여섯 NavigateToPose scenario와 안전·teardown 실행 원문"
+  - source_id: "SOFTWARE-ONLY-FREEZE"
+    record_id: "go2-local-navigation-software-only-freeze-20260831"
+    path: "software_only_freeze.yaml"
+    role: "Stage 13 Git·runtime·checksum·warning·deferred 동결"
   - source_id: "FINAL-MOUNT-PLAN"
     record_id: "go2-local-navigation-final-mount-acceptance-20260827"
     path: "final_mount_acceptance.yaml"
@@ -423,17 +439,17 @@ modules:
   - module_id: "mapping_localization"
     owner: "go2_nav2_runtime_and_go2_validation_orchestration"
     lifecycle_status: "experimental"
-    role: "map 생성·저장·재로딩과 map to odom 소유권 제공"
+    role: "map 생성·저장·재로딩과 saved-map localization의 map to odom 소유권 제공"
     interfaces:
       inputs: ["LiDAR-derived mapping input", "/odom"]
-      outputs: ["/map", "map to odom"]
+      outputs: ["/map", "/amcl_pose", "map to odom"]
     current_claim:
       status: "partial"
-      highest_evidence_level: "replay-verified"
-      claim: "exact canonical 120초 DimOS bag의 dimos_odom_accumulated_emit3와 candidate-only coarse 0.1745에서 map-correction continuity, artifact 저장·재로딩과 clean teardown을 반복 통과했다. 후속 coarse sweep 후보는 canonical로 채택하지 않았다. causal A/B는 Karto sequential scan matching을 최초 pose 열화 원인으로 확인했고 explicit loop closure는 주원인에서 제외했다. 고정 pose occupancy 분석은 unsupported_occupied가 node 30 또는 그 이전부터 지속됨을 확인했지만, 수치 winner multi_segment_occupied가 blind visual QA에서 회귀해 최종 후보 없이 root-cause-classified로 닫혔다. 이전 TF/10-frame A/B 실패와 continuity 결과는 조건별 역사적 근거로 보존한다."
-      limitations: ["replay-verified 범위는 exact canonical bag/profile뿐", "센서 계열은 Go2 built-in L1 ULIDAR high-confidence inference이며 hardware identity·현재 로봇 physical calibration은 unverified", "matching-off는 진단 음성 대조군이며 production 후보가 아님", "sequential matcher 내부의 잘못된 correction 선택 조건 미확인", "occupancy 최초 scan은 node 30 이전일 수 있음", "수치 skeleton 감소가 시각 topology 품질을 예측하지 못함", "후보의 fan/streak 확산 원인과 occupancy 품질 해결은 open", "live Go2·physical mount·sensor/TF fit 미검증", "지도 ground truth·saved-map localization·전체 Nav2·NavigateToPose 미검증", "순수 SIGINT graceful teardown 미확인"]
-    attained_evidence_levels: ["implemented", "automated-tested", "replay-verified"]
-    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "EXTERNAL-REPLAY-CONVERSION", "MAPPING-INPUT-RUNTIME", "SLAM-MAPPING-REPLAY-RUN", "SLAM-MAPPING-RUNTIME", "DIMOS-TF-PROFILE-AB-RUN", "MAPPING-TF-PROFILE-AB-RUNTIME", "DIMOS-SCAN-PROJECTION-AB-RUN", "MAPPING-SCAN-PROJECTION-AB-RUNTIME", "DIMOS-SLAM-CONTINUITY-RESOLUTION-20260828", "DIMOS-COARSE-SEARCH-SWEEP-20260829", "DIMOS-LOWER-SEARCH-20260829", "DIMOS-SLAM-CAUSAL-ATTRIBUTION-20260829", "DIMOS-OCCUPANCY-QUALITY-RESOLUTION-20260830"]
+      highest_evidence_level: "stationary-onboard-verified"
+      claim: "exact canonical 120초 DimOS bag의 dimos_odom_accumulated_emit3와 candidate-only coarse 0.1745에서 map-correction continuity, artifact 저장·재로딩과 clean teardown을 반복 통과했다. 후속 coarse sweep 후보는 canonical로 채택하지 않았다. causal A/B는 Karto sequential scan matching을 최초 pose 열화 원인으로 확인했고 explicit loop closure는 주원인에서 제외했다. 고정 pose occupancy 분석은 unsupported_occupied가 node 30 또는 그 이전부터 지속됨을 확인했지만, 수치 winner multi_segment_occupied가 blind visual QA에서 회귀해 최종 후보 없이 root-cause-classified로 닫혔다. Domain 64 stationary saved-map replay는 active Map Server·AMCL, finite pose와 AMCL 단독 map→odom owner를 통과했다. 12-L Domain 0 onboard run은 live scan·정지 SLAM map·단일 map→odom owner·artifact service·single-SIGINT teardown을 통과했다. 이전 TF/10-frame A/B 실패와 continuity 결과는 조건별 역사적 근거로 보존한다."
+      limitations: ["replay-verified 범위는 exact canonical bag/profile과 stationary saved-map 연결성뿐", "Domain 0 onboard 근거는 임시 배치·정지 mapping 연결성뿐", "센서 계열은 Go2 built-in L1 ULIDAR high-confidence inference이며 hardware identity·최종 장착 calibration은 unverified", "matching-off는 진단 음성 대조군이며 production 후보가 아님", "sequential matcher 내부의 잘못된 correction 선택 조건 미확인", "occupancy 최초 scan은 node 30 이전일 수 있음", "수치 skeleton 감소가 시각 topology 품질을 예측하지 못함", "후보의 fan/streak 확산 원인과 occupancy 품질 해결은 open", "live 저장 전후 map 크기 차이와 ground truth·localization 정확도 미확인", "Domain 63 replay의 순수 SIGINT graceful teardown은 미확인"]
+    attained_evidence_levels: ["implemented", "automated-tested", "replay-verified", "stationary-onboard-verified"]
+    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "EXTERNAL-REPLAY-CONVERSION", "MAPPING-INPUT-RUNTIME", "SLAM-MAPPING-REPLAY-RUN", "SLAM-MAPPING-RUNTIME", "DIMOS-TF-PROFILE-AB-RUN", "MAPPING-TF-PROFILE-AB-RUNTIME", "DIMOS-SCAN-PROJECTION-AB-RUN", "MAPPING-SCAN-PROJECTION-AB-RUNTIME", "DIMOS-SLAM-CONTINUITY-RESOLUTION-20260828", "DIMOS-COARSE-SEARCH-SWEEP-20260829", "DIMOS-LOWER-SEARCH-20260829", "DIMOS-SLAM-CAUSAL-ATTRIBUTION-20260829", "DIMOS-OCCUPANCY-QUALITY-RESOLUTION-20260830", "SAVED-MAP-LOCALIZATION-RUNTIME", "DOMAIN0-LIVE-MAPPING-SHADOW"]
     acceptance_checks:
       - check_id: "backend-and-input-contract"
         status: "passed"
@@ -441,6 +457,15 @@ modules:
       - check_id: "offline-shadow-runtime"
         status: "passed"
         condition: "격리 입력으로 SLAM 저장 service readiness, map output·저장·재로딩과 bounded shutdown 확인"
+      - check_id: "saved-map-localization-runtime"
+        status: "passed"
+        condition: "Domain 64 stationary bag과 저장 지도를 연결해 scan 300, odom 2923, finite AMCL pose 1, active lifecycle, AMCL 단독 map→odom, command/control·residual·teardown owner 0 확인"
+      - check_id: "domain-zero-live-scan-and-mapping"
+        status: "passed"
+        condition: "Go2 ON·AGX 임시 정지·onboard 기본 profile에서 scan 15.394 Hz·721 beams·NaN 0, map 0.5 Hz, SLAM Toolbox 단독 map→odom, save·serialize·deserialize 응답, command output 0과 single-SIGINT clean teardown 확인"
+      - check_id: "domain-zero-live-map-reload-fidelity"
+        status: "warning"
+        condition: "live scan을 pause하지 않은 저장 occupancy 18×65와 재로딩 직후 map 43×93이 달라 service 연결은 통과했지만 pixel identity·지도 정확도는 미확인"
       - check_id: "external-dynamic-map-continuity"
         status: "failed"
         condition: "historical TF/10-frame A/B에서 최대 translation step 0.5 m·yaw step 0.2 rad 기준 초과; emit3 resolution 전 조건의 failed/open 근거"
@@ -468,8 +493,8 @@ modules:
       - check_id: "dynamic-map-quality"
         status: "deferred"
         condition: "최종 고정 후 제한된 이동, loop closure와 실제 형상 비교"
-    failure_checks: ["입력 변환 부재", "map to odom 중복 owner", "TF jump", "sequential matcher 잘못된 correction", "occupancy support 손실", "수치 개선과 blind visual topology 회귀 충돌", "map 저장·재로딩 실패"]
-    revalidation_triggers: ["static sensor TF profile 변경", "PointCloud2 to LaserScan 투영 또는 누적 변경", "coarse search 후보를 canonical 또는 live 기본값으로 채택", "scan matcher 또는 occupancy parameter 변경", "새 occupancy policy 또는 시각 기준 reference 추가", "mapping backend 선정 또는 변경", "LiDAR filter 변경", "odometry mapping 변경", "map frame 정책 변경"]
+    failure_checks: ["입력 변환 부재", "map to odom 중복 owner", "TF jump", "sequential matcher 잘못된 correction", "occupancy support 손실", "수치 개선과 blind visual topology 회귀 충돌", "map 저장·재로딩 실패", "AMCL lifecycle 또는 finite pose 실패"]
+    revalidation_triggers: ["static sensor TF profile 변경", "PointCloud2 to LaserScan 투영 또는 누적 변경", "coarse search 후보를 canonical 또는 live 기본값으로 채택", "scan matcher 또는 occupancy parameter 변경", "새 occupancy policy 또는 시각 기준 reference 추가", "mapping 또는 localization backend 변경", "AMCL parameter 변경", "저장 지도 변경", "LiDAR filter 변경", "odometry mapping 변경", "map frame 정책 변경", "최종 장착 또는 sensor 위치 변경"]
 
   - module_id: "global_navigation"
     owner: "go2_nav2"
@@ -480,23 +505,53 @@ modules:
       outputs: ["global path", "controller path input"]
     current_claim:
       status: "partial"
-      highest_evidence_level: "automated-tested"
-      claim: "합성 map·BT·여섯 scenario와 install-space 자산 계약을 구성·검증"
-      limitations: ["전체 Nav2 runtime 미구현", "NavigateToPose 미실행", "saved-map localization 미구현", "실제 motion 승인 없음"]
-    attained_evidence_levels: ["implemented", "automated-tested"]
-    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "SHADOW-ASSET-CONTRACT"]
+      highest_evidence_level: "synthetic-verified"
+      claim: "Domain 65 합성 map·clock·TF·odometry에서 전체 Nav2 lifecycle과 success, cancel, blocked goal, outside-map goal, planner failure, no-progress의 terminal·output·안전·teardown 계약을 통과"
+      limitations: ["합성 fixture 결과", "Domain 0 live mapping만 실행하고 live localization·Nav2 observer는 미실행", "실제 motion 승인 없음", "실제 장애물 회피·목적지 도달 미검증"]
+    attained_evidence_levels: ["implemented", "automated-tested", "synthetic-verified"]
+    evidence_refs: ["PROJECT-MANIFEST", "NAVIGATION-CONTRACT", "SHADOW-ASSET-CONTRACT", "NAV2-SHADOW-RUNTIME"]
     acceptance_checks:
       - check_id: "offline-global-shadow"
-        status: "unverified"
-        condition: "합성 map과 격리 odometry에서 plan, cancel, blocked goal 확인"
+        status: "passed"
+        condition: "Domain 65 합성 map·TF·odometry에서 여섯 NavigateToPose terminal, path·candidate 기대, 전체 lifecycle, command/control/Unitree 0과 clean teardown 확인"
       - check_id: "stationary-live-boundary"
-        status: "unverified"
-        condition: "실제 command와 분리된 AGX shadow graph 확인"
+        status: "deferred"
+        condition: "Domain 0 live mapping은 통과했지만 실제 입력을 사용한 saved-map localization·no-goal Nav2 observer는 미실행"
       - check_id: "physical-goal-reaching"
         status: "deferred"
         condition: "motion, odometry, mapping과 obstacle 검증 완료 후 최신 승인"
     failure_checks: ["planner lifecycle 실패", "global path 미생성", "frame 불일치", "cancel 무시", "실제 command 경로 조기 연결"]
     revalidation_triggers: ["planner plugin 변경", "global costmap 변경", "BT 변경", "map 또는 localization 변경"]
+
+  - module_id: "software_only_freeze"
+    stage_id: 13
+    owner: "project_verification"
+    role: "software-only source·runtime·Git·checksum과 미승격 경계를 반복 검증 가능한 기준점으로 고정"
+    interfaces:
+      inputs: ["project source", "local-only fixture", "runtime JSON", "two repository Git state"]
+      outputs: ["software_only_freeze.yaml", "software_only_freeze.sha256"]
+    current_claim:
+      status: "verified"
+      highest_evidence_level: "synthetic-verified"
+      claim: "Stage 11·12 결과, Domain 64·65 runtime, 8-package build/test, warning과 deferred 항목을 HEAD 변경 없이 동결"
+      limitations: ["working-tree freeze이며 commit·push 아님", "Domain 0 live shadow deferred", "실물 합격 없음"]
+    attained_evidence_levels: ["implemented", "automated-tested", "replay-verified", "synthetic-verified"]
+    evidence_refs: ["SOFTWARE-ONLY-FREEZE", "SAVED-MAP-LOCALIZATION-RUNTIME", "NAV2-SHADOW-RUNTIME"]
+    acceptance_checks:
+      - check_id: "freeze-manifest-and-checksum"
+        status: "passed"
+        condition: "present file checksum 재검증과 manifest 자기 자신 제외"
+      - check_id: "git-head-preservation"
+        status: "passed"
+        condition: "project 7bb72ae와 knowledge 707b599 기준 HEAD를 변경하지 않고 commit·push 0"
+      - check_id: "claim-level-separation"
+        status: "passed"
+        condition: "replay·synthetic·warning·deferred·unverified·excluded를 구분"
+      - check_id: "domain-zero-live-shadow"
+        status: "deferred"
+        condition: "Go2 OFF 조건에서 live source 미제공"
+    failure_checks: ["checksum mismatch", "manifest self inclusion", "runtime status와 문서 불일치", "물리 claim 승격", "Git HEAD 변경"]
+    revalidation_triggers: ["source·config·map·BT 변경", "runtime artifact 교체", "dependency·ROS version 변경", "새 Git commit", "warning 또는 deferred 상태 변경"]
 
   - module_id: "stationary_system_stability"
     owner: "project_bringup"
@@ -588,12 +643,11 @@ modules:
     revalidation_triggers: ["recorder schema 변경", "motion gate 변경", "candidate limit 변경", "최종 mount 완료", "새 물리 승인"]
 
 next_stage:
-  stage_id: 12
-  name: "mapping_localization_and_nav2_shadow"
-  status: "software_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending"
+  stage_id: 14
+  name: "final_mount_integration"
+  status: "preparation_completed_execution_deferred"
   prerequisites:
-    - "live Go2·physical mount와 sensor/TF fit을 canonical replay 결과와 분리해 검증"
-    - "sequential matcher 최초 잘못된 correction과 occupancy 후보의 fan/streak 확산 원인을 분리해 검증"
-    - "domain 64 saved-map localization과 domain 65 synthetic navigation 격리"
-    - "전체 Nav2 lifecycle과 NavigateToPose scenario 판정"
-    - "project command publisher 0과 motion gate false 유지"
+    - "AGX bracket·connector·cable·이동용 전원 구성을 실제 artifact로 기록"
+    - "LiDAR·기본 front camera 시야와 최종 footprint를 실측"
+    - "닫힌 command gate에서 9단계 preflight와 10단계 stationary soak 재실행"
+    - "정지 yaw drift warning과 live sensor·TF fit을 새 장착 조건에서 재검증"
