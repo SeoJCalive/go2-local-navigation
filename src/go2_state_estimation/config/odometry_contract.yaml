@@ -68,7 +68,7 @@ project:
         max_translation_delta_m: 0.5
         max_yaw_delta_rad: 0.5
         recovery_consecutive_valid_samples: 2
-      replay_enforce:
+      validation_enforce:
         action: "enforce"
         max_timestamp_gap_nanoseconds: 500000000
         max_translation_delta_m: 0.5

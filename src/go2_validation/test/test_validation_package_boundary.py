@@ -10,15 +10,7 @@ EXECUTABLES: Final = frozenset(
         "navigation_runtime_preflight",
         "fault_fixture",
         "fault_acceptance",
-        "mapping_input_acceptance",
-        "mapping_acceptance",
-        "saved_map_localization_acceptance",
         "live_navigation_acceptance",
-        "mapping_tf_profile_ab",
-        "mapping_scan_profile_ab",
-        "mapping_coarse_search_sweep",
-        "external_replay_acquisition",
-        "external_replay_convert",
         "shadow_fixture",
         "nav2_shadow_acceptance",
     }
@@ -64,22 +56,22 @@ def test_given_package_metadata_when_read_then_validation_executables_have_one_o
     navigation_setup = (NAV2_ROOT / "setup.py").read_text(encoding="utf-8")
 
     assert all(f'"{executable} = ' in validation_setup for executable in EXECUTABLES)
-    assert validation_setup.count("go2_validation.") == 15
+    assert validation_setup.count("go2_validation.") == 7
     assert all(executable not in navigation_setup for executable in EXECUTABLES)
     assert "console_scripts" not in navigation_setup
 
 
-def test_given_mapping_argv_when_profile_scope_is_selected_then_mode_and_continuity_are_explicit() -> None:
-    command_builder = (
-        VALIDATION_ROOT / "go2_validation/mapping_command_builders.py"
-    ).read_text(encoding="utf-8")
-    mapping_launch = (NAV2_ROOT / "launch/go2_slam_mapping.launch.py").read_text(
-        encoding="utf-8"
+def test_given_validation_package_when_replay_is_retired_then_no_rosbag_surface_remains() -> None:
+    # Given: the active validation implementation and its ROS package manifest.
+    implementation = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((VALIDATION_ROOT / "go2_validation").glob("*.py"))
     )
+    manifest = (VALIDATION_ROOT / "package.xml").read_text(encoding="utf-8")
 
-    assert 'execution_mode: str = "onboard"' in command_builder
-    assert 'continuity_profile: str = "onboard_observe"' in command_builder
-    assert 'f"execution_mode:={configuration.execution_mode}"' in command_builder
-    assert 'f"continuity_profile:={configuration.continuity_profile}"' in command_builder
-    assert 'DeclareLaunchArgument("continuity_profile", default_value="onboard_observe")' in mapping_launch
-    assert '"continuity_profile": continuity_profile' in mapping_launch
+    # When: the package boundary is inspected after replay retirement.
+    active_surface = implementation + manifest
+
+    # Then: no rosbag runtime API or package dependency is retained.
+    assert "rosbag2_" not in active_surface
+    assert "external_replay" not in active_surface

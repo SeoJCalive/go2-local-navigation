@@ -27,7 +27,7 @@ OBSERVED_SAMPLE = OdometrySample(
     twist_covariance=(0.0,) * 36,
 )
 PROFILE_PATH: Final = Path(__file__).parents[1] / "config" / "odometry_contract.yaml"
-ENFORCE_PROFILE = load_continuity_profile(PROFILE_PATH, "replay_enforce")
+ENFORCE_PROFILE = load_continuity_profile(PROFILE_PATH, "validation_enforce")
 
 
 def test_given_observed_source_when_validated_then_keeps_child_and_blocks_adapter() -> None:

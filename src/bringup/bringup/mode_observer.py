@@ -11,9 +11,6 @@ class ExecutionMode(str, Enum):
     """software-only navigation이 지원하는 폐쇄된 실행 mode다."""
 
     FAULT_RECOVERY = "fault_recovery"
-    SCAN_REPLAY = "scan_replay"
-    MAPPING = "mapping"
-    LOCALIZATION = "localization"
     SYNTHETIC_NAVIGATION = "synthetic_navigation"
     LIVE_SHADOW = "live_shadow"
 
@@ -79,9 +76,6 @@ SHADOW_MAP_SLAM_TF: Final = GlobalTfOwnerContract(
 )
 MODE_CONTRACTS: Final = {
     ExecutionMode.FAULT_RECOVERY: ModeContract("61", False, NO_GLOBAL_TF),
-    ExecutionMode.SCAN_REPLAY: ModeContract("62", False, NO_GLOBAL_TF),
-    ExecutionMode.MAPPING: ModeContract("63", False, MAP_SLAM_TF),
-    ExecutionMode.LOCALIZATION: ModeContract("64", False, MAP_AMCL_TF),
     ExecutionMode.SYNTHETIC_NAVIGATION: ModeContract("65", False, MAP_FIXTURE_TF),
     ExecutionMode.LIVE_SHADOW: ModeContract("0", True, SHADOW_MAP_SLAM_TF),
 }

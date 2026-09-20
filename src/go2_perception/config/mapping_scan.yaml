@@ -14,87 +14,13 @@ mapping_scan:
     message_type: "sensor_msgs/msg/LaserScan"
     frame_id: "base"
     minimum_rate_hz: 1.0
-  runtime:
-    domain_id: 62
-    loopback_only: true
-    use_sim_time: true
-    clock_owner: "rosbag_player"
-    global_map_to_odom_owners: 0
   projection_profiles:
     default_profile: "raw_single"
     profiles:
       raw_single:
         status: "project_default"
-        scope: "onboard_and_replay_default"
+        scope: "onboard_only"
         converter_input_topic: "/go2_mapping/cloud_validated"
-        accumulator:
-          enabled: false
-          frame_limit: 1
-          emit_every: 1
-          input_qos_depth: 1
-          retry_queue_capacity: 1
-          target_frame: "odom"
-          output_topic: "/go2_mapping/cloud_accumulated"
-      dimos_odom_accumulated:
-        status: "engineering_candidate"
-        scope: "dimos_external_replay_only"
-        converter_input_topic: "/go2_mapping/cloud_accumulated"
-        accumulator:
-          enabled: true
-          frame_limit: 10
-          emit_every: 1
-          input_qos_depth: 64
-          retry_queue_capacity: 64
-          target_frame: "odom"
-          output_topic: "/go2_mapping/cloud_accumulated"
-        source:
-          repository_url: "https://github.com/dimensionalOS/dimos"
-          commit: "b4cd9789cc68876adf87ff40a404677f127d69bf"
-          source_path: "dimos/robot/unitree/go2/dds/cli/render.py"
-          source_behavior: "cloud_stamp_odom_interpolation_then_world_voxel_accumulation"
-        physical_suitability: "unverified"
-      dimos_odom_accumulated_emit10:
-        status: "engineering_candidate"
-        scope: "dimos_external_replay_only"
-        converter_input_topic: "/go2_mapping/cloud_accumulated"
-        converter_override:
-          min_height: -0.10
-          queue_size: 64
-        accumulator:
-          enabled: true
-          frame_limit: 10
-          emit_every: 10
-          input_qos_depth: 64
-          retry_queue_capacity: 64
-          target_frame: "odom"
-          output_topic: "/go2_mapping/cloud_accumulated"
-        source:
-          repository_url: "https://github.com/dimensionalOS/dimos"
-          commit: "b4cd9789cc68876adf87ff40a404677f127d69bf"
-          source_path: "dimos/robot/unitree/go2/dds/cli/render.py"
-          source_behavior: "cloud_stamp_odom_interpolation_then_world_voxel_accumulation"
-        physical_suitability: "unverified"
-      dimos_odom_accumulated_emit3:
-        status: "engineering_candidate"
-        scope: "dimos_external_replay_only"
-        converter_input_topic: "/go2_mapping/cloud_accumulated"
-        converter_override:
-          min_height: -0.10
-          queue_size: 64
-        accumulator:
-          enabled: true
-          frame_limit: 3
-          emit_every: 3
-          input_qos_depth: 64
-          retry_queue_capacity: 64
-          target_frame: "odom"
-          output_topic: "/go2_mapping/cloud_accumulated"
-        source:
-          repository_url: "https://github.com/dimensionalOS/dimos"
-          commit: "b4cd9789cc68876adf87ff40a404677f127d69bf"
-          source_path: "dimos/robot/unitree/go2/dds/cli/render.py"
-          source_behavior: "cloud_stamp_odom_interpolation_then_world_voxel_accumulation"
-        physical_suitability: "unverified"
   pointcloud_to_laserscan:
     ros__parameters:
       target_frame: "base"

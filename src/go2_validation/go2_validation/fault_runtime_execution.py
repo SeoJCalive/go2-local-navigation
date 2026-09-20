@@ -59,7 +59,7 @@ def fault_launch_command(
         f"restart_attempt:={'true' if restart_attempt else 'false'}",
         "use_sim_time:=true",
         "execution_mode:=onboard",
-        "continuity_profile:=replay_enforce",
+        "continuity_profile:=validation_enforce",
     )
 
 

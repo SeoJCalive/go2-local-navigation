@@ -150,7 +150,7 @@ def test_given_fault_scenario_when_launch_command_built_then_clock_and_restart_a
     assert "restart_attempt:=true" in command
     assert "use_sim_time:=true" in command
     assert "execution_mode:=onboard" in command
-    assert "continuity_profile:=replay_enforce" in command
+    assert "continuity_profile:=validation_enforce" in command
 
 
 def test_given_fault_launch_when_read_then_runtime_profile_arguments_are_consumed() -> None:
@@ -161,7 +161,7 @@ def test_given_fault_launch_when_read_then_runtime_profile_arguments_are_consume
     assert 'DeclareLaunchArgument("execution_mode", default_value="onboard")' in launch_source
     assert re.search(
         r'DeclareLaunchArgument\(\s*"continuity_profile",\s*'
-        r'default_value="replay_enforce"',
+        r'default_value="validation_enforce"',
         launch_source,
     )
     assert 'LaunchConfiguration("execution_mode")' in launch_source

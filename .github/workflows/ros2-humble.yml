@@ -44,9 +44,6 @@ jobs:
             python3-pip \
             python3-rosdep \
             ros-humble-rosidl-generator-dds-idl
-          python3 -m pip install \
-            --require-hashes \
-            -r requirements/external-replay.txt
           rosdep init 2>/dev/null || true
           rosdep update
           source /opt/ros/humble/setup.bash

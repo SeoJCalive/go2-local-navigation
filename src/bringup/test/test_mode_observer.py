@@ -8,17 +8,17 @@ from bringup.mode_observer import (
 from bringup.preflight_types import CheckStatus
 
 
-def test_offline_mode_does_not_require_live_domain_or_interface() -> None:
-    # Given: domain 63의 mapping 실행에 AGX live 환경값이 없는 관찰값
+def test_fault_mode_does_not_require_live_interface() -> None:
+    # Given: domain 61의 fault 실행에 AGX live 환경값이 없는 관찰값
     environment = ModeEnvironment(
         rmw_implementation="rmw_cyclonedds_cpp",
-        ros_domain_id="63",
+        ros_domain_id="61",
         go2_interface="",
         cyclonedds_uri="",
     )
 
-    # When: offline mapping mode 환경을 판정한다.
-    check = assess_mode_environment(ExecutionMode.MAPPING, environment)
+    # When: fault recovery mode 환경을 판정한다.
+    check = assess_mode_environment(ExecutionMode.FAULT_RECOVERY, environment)
 
     # Then: domain 0이나 eno1 없이도 통과한다.
     assert check.status is CheckStatus.PASS

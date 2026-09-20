@@ -17,7 +17,7 @@ from go2_validation.live_navigation_acceptance import (
 from go2_validation.live_navigation_runtime_observer import (
     LiveNavigationRuntimeObserver,
 )
-from go2_validation.localization_runtime_execution import saved_map_checksum
+from go2_validation.mapping_artifacts import saved_map_checksum
 from go2_validation.offline_process import spin_for, spin_until, stop_owned_process
 
 READINESS_TIMEOUT_SECONDS = 60.0

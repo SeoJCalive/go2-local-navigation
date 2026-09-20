@@ -7,25 +7,6 @@ modes:
     global_tf_owner: none
     use_sim_time: true
     loopback_only: true
-  scan_replay:
-    domain_id: 62
-    clock_owner: rosbag_player
-    global_tf_owner: none
-    use_sim_time: true
-    loopback_only: true
-    sequential_variants: [project_stationary, external_dynamic]
-  mapping:
-    domain_id: 63
-    clock_owner: rosbag_player
-    global_tf_owner: slam_toolbox
-    use_sim_time: true
-    loopback_only: true
-  localization:
-    domain_id: 64
-    clock_owner: rosbag_player
-    global_tf_owner: amcl
-    use_sim_time: true
-    loopback_only: true
   synthetic_navigation:
     domain_id: 65
     clock_owner: fixture

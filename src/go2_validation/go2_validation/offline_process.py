@@ -1,5 +1,5 @@
 
-"""격리 launch와 rosbag process의 bounded wait·graceful teardown을 제공한다."""
+"""격리 launch process의 bounded wait·graceful teardown을 제공한다."""
 import os
 import signal
 import subprocess

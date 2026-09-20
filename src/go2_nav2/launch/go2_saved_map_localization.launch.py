@@ -1,6 +1,6 @@
-"""저장 지도·replay scan·odometry와 단일 AMCL owner를 조합한다.
+"""저장 지도·scan·odometry와 단일 AMCL owner를 조합한다.
 
-이 launch는 Domain과 rosbag lifecycle을 소유하지 않는다. Map Server와 AMCL,
+이 launch는 Domain과 input lifecycle을 소유하지 않는다. Map Server와 AMCL,
 기존 read-only mapping scan 및 odometry adapter만 시작하며 planner, controller,
 Go2 command node는 시작하지 않는다.
 """
@@ -10,6 +10,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -43,6 +44,7 @@ def generate_launch_description() -> LaunchDescription:
     sensor_tf_profile = LaunchConfiguration("sensor_tf_profile")
     scan_projection_profile = LaunchConfiguration("scan_projection_profile")
     map_path = LaunchConfiguration("map")
+    start_inputs = LaunchConfiguration("start_inputs")
     sim_time_parameter = {
         "use_sim_time": ParameterValue(use_sim_time, value_type=bool)
     }
@@ -53,7 +55,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("execution_mode", default_value="onboard"),
             DeclareLaunchArgument(
                 "continuity_profile",
-                default_value="replay_enforce",
+                default_value="onboard_observe",
             ),
             DeclareLaunchArgument(
                 "sensor_tf_profile",
@@ -63,8 +65,10 @@ def generate_launch_description() -> LaunchDescription:
                 "scan_projection_profile",
                 default_value="raw_single",
             ),
+            DeclareLaunchArgument("start_inputs", default_value="true"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(scan_launch),
+                condition=IfCondition(start_inputs),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "execution_mode": execution_mode,
@@ -74,6 +78,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(odometry_launch),
+                condition=IfCondition(start_inputs),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "continuity_profile": continuity_profile,

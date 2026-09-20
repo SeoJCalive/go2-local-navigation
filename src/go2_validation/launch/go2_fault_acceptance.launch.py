@@ -54,7 +54,7 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("execution_mode", default_value="onboard"),
             DeclareLaunchArgument(
                 "continuity_profile",
-                default_value="replay_enforce",
+                default_value="validation_enforce",
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(mapping_launch),

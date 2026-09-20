@@ -35,9 +35,9 @@ def test_given_contract_yaml_when_profiles_are_read_then_default_actions_and_lim
     # When: continuity profile values are read at their machine-consumed location
     registry = document["project"]["continuity_profiles"]
     observe = registry["profiles"]["onboard_observe"]
-    enforce = registry["profiles"]["replay_enforce"]
+    enforce = registry["profiles"]["validation_enforce"]
 
-    # Then: onboard use observes and replay use enforces the same candidate limits.
+    # Then: onboard use observes and validation use enforces the same candidate limits.
     assert registry["default_profile"] == "onboard_observe"
     assert observe["action"] == "observe_only"
     assert enforce["action"] == "enforce"
@@ -75,7 +75,7 @@ def test_given_continuity_faults_when_actions_differ_then_transitions_match_and_
 
     # Given: the same source-valid translation jump under both profiles.
     observe = load_continuity_profile(PROFILE_PATH, "onboard_observe")
-    enforce = load_continuity_profile(PROFILE_PATH, "replay_enforce")
+    enforce = load_continuity_profile(PROFILE_PATH, "validation_enforce")
     jump = replace(
         OBSERVED_SAMPLE,
         timestamp_nanoseconds=1_020_000_000,

@@ -32,10 +32,6 @@ def test_given_stage_ssot_when_loaded_then_preserves_software_before_physical_st
         (14, "final_mount_integration"),
         (15, "limited_physical_motion_validation"),
     ]
-    assert document["replay_provenance"]["required_source_kinds"] == [
-        "project_stationary",
-        "external_dynamic",
-    ]
 
 
 def test_given_stage_documents_when_inspected_then_physical_preparation_starts_at_14() -> None:
@@ -97,9 +93,9 @@ def test_given_fault_mode_when_clock_and_isolation_match_then_runtime_is_accepte
 
 def test_given_duplicate_clock_or_wall_time_when_assessed_then_preflight_rejects() -> None:
     baseline = RuntimeObservation(
-        mode="scan_replay",
-        domain_id=62,
-        declared_clock_owner="rosbag_player",
+        mode="synthetic_navigation",
+        domain_id=65,
+        declared_clock_owner="fixture",
         clock_publisher_count=2,
         use_sim_time=True,
         loopback_only=True,

@@ -5,6 +5,7 @@ from launch import LaunchContext, LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from bringup.static_tf_profiles import load_static_tf_profile
 
@@ -12,6 +13,7 @@ from bringup.static_tf_profiles import load_static_tf_profile
 def _sensor_tf_node(context: LaunchContext, profile_path: str) -> list[Node]:
     profile_id = LaunchConfiguration("sensor_tf_profile").perform(context)
     execution_mode = LaunchConfiguration("execution_mode").perform(context)
+    use_sim_time = LaunchConfiguration("use_sim_time")
     profile = load_static_tf_profile(Path(profile_path), profile_id, execution_mode)
     translation = tuple(str(value) for value in profile.translation_xyz_m)
     quaternion = tuple(str(value) for value in profile.quaternion_xyzw)
@@ -20,6 +22,9 @@ def _sensor_tf_node(context: LaunchContext, profile_path: str) -> list[Node]:
             package="tf2_ros",
             executable="static_transform_publisher",
             name="base_to_utlidar_lidar_static_tf",
+            parameters=[
+                {"use_sim_time": ParameterValue(use_sim_time, value_type=bool)}
+            ],
             arguments=[
                 "--x",
                 translation[0],
@@ -59,11 +64,20 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="project_default",
             ),
             DeclareLaunchArgument("execution_mode", default_value="onboard"),
+            DeclareLaunchArgument("use_sim_time", default_value="false"),
             Node(
                 package="robot_state_publisher",
                 executable="robot_state_publisher",
                 name="robot_state_publisher",
-                parameters=[{"robot_description": robot_description}],
+                parameters=[
+                    {
+                        "robot_description": robot_description,
+                        "use_sim_time": ParameterValue(
+                            LaunchConfiguration("use_sim_time"),
+                            value_type=bool,
+                        ),
+                    }
+                ],
             ),
             OpaqueFunction(
                 function=_sensor_tf_node,

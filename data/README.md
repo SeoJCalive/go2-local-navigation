@@ -56,51 +56,6 @@
 `records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml`을
 따른다. 두 JSON의 `unverified` 상태는 실제 물리 trial이 수행되지 않았음을 뜻한다.
 
-## DimOS 외부 replay custody
-
-`external/dimos_go2_indoor/`는 pinned DimOS fixture의 로컬 전용 보관 경계다. 이
-경로의 archive, 추출 MCAP, canonical bag과 실행 결과는 Git·release·재배포 대상이
-아니다. repository의 Apache-2.0 license와 dataset 권리는 구분하며 현재 dataset
-상태는 `dataset_license_unverified`다.
-
-여기서 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. canonical
-short·full의 원본은 `source/go2_china_office_indoor.mcap`이다. topic·frame·rate와
-pinned DimOS Go2 코드에 근거해 센서 계열을 `go2_built_in_l1_ulidar`로 강하게
-추론하지만 hardware manifest가 없으므로 상태는 `unverified`다. 현재 프로젝트
-로봇과 동일한 물리 calibration이라는 뜻도 아니다.
-
-raw source는 `rt/utlidar/cloud`, `rt/utlidar/imu`, `rt/lowstate`,
-`rt/sportmodestate`, `rt/utlidar/robot_odom`, `rt/frontvideo`, `control_log`,
-`telemetry`의 8개 channel을 가진다. derived canonical short·full bag은 선택된
-`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 가진다.
-
-`source/recording_go2_mid360_2026-05-29_4-45pm-PST_corrected.db`는 같은 custody
-경계에 보관된 Mid-360·Point-LIO fixture지만 canonical short·full 변환에는 사용하지
-않았다. 파일이 같은 디렉터리에 있다는 사실을 데이터 계보로 해석하지 않는다.
-
-- `source/`: hash와 size를 통과해 승격된 archive와 단일 raw MCAP
-- `staging/`: bounded download와 secure extraction의 임시 파일
-- `derived/`: short·full canonical rosbag2 MCAP
-- `runs/`: acquisition·conversion 결과와 bag-info 근거
-
-source identity와 제한값은 `src/go2_validation/config/external_replay_sources.yaml`, 사람이
-확인할 provenance와 권리 경계는 지식 저장소의
-`sources/repositories/related/dimos_go2_replay_source_card.md`를 따른다. 네트워크,
-LFS 또는 최초 여유 공간 부족만 `deferred`이며, hash·size·tar member·CRC·schema·
-CDR·count 불일치는 `conflict`다.
-
-2026-08-27 canonical 변환과 ingress 결과는 다음 경로에 있다.
-
-- `external/dimos_go2_indoor/runs/conversion.json`: source checksum, selected channel,
-  short/full count와 tree checksum
-- `external/dimos_go2_indoor/derived/short`: cloud `1843`, odometry `18026`
-- `external/dimos_go2_indoor/derived/full`: cloud `17776`, odometry `173616`
-- `runs/fault_acceptance/stage11.json`: Domain 61 fault 10개 PASS
-- `runs/mapping_input/stage12-ingress.json`: 정지·external short ingress 모두 PASS
-
-이 자료는 local-only software evidence다. 외부 dataset을 ground truth로 간주하거나
-지도 정확도·실제 장애물 회피·목적지 도달 근거로 사용하지 않는다.
-
 ## Domain 63 SLAM mapping replay
 
 Todo 12 mapping 하위 작업의 최종 local-only 산출물은 다음 경로에 있다.

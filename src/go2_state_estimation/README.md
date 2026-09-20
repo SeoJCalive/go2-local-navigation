@@ -44,7 +44,7 @@ go2_state_estimation/
 | `resource/go2_state_estimation` | ament index가 패키지를 찾는 marker다. |
 | `config/odometry_contract.yaml` | source·project frame, QoS, continuity 후보값과 unresolved warning을 구조화한다. |
 | `go2_state_estimation/__init__.py` | odometry 관찰과 adapter의 Python package 경계를 설명한다. |
-| `go2_state_estimation/continuity_profiles.py` | YAML의 `onboard_observe`·`replay_enforce` profile과 동일 후보 제한값을 typed 불변 값으로 파싱한다. |
+| `go2_state_estimation/continuity_profiles.py` | YAML의 `onboard_observe`·`validation_enforce` profile과 동일 후보 제한값을 typed 불변 값으로 파싱한다. |
 | `go2_state_estimation/odometry_adapter_node.py` | 유효한 source를 `/odom`과 `odom → base`로 전달하고 선택된 profile에 따라 continuity 위반을 관찰하거나 차단한다. |
 | `go2_state_estimation/odometry_contract.py` | frame·timestamp·finite value와 regression·jump·loss·recovery 순수 규칙이다. |
 | `go2_state_estimation/odometry_probe_node.py` | source를 변경하지 않고 frame·covariance·invalid sample을 logger로 관찰한다. |
@@ -63,7 +63,7 @@ go2_state_estimation/
   source frame·timestamp·수치 sample은 출력하지 않는다.
 - continuity 계산과 recovery 상태 기계는 하나다. 일반 실행의 `onboard_observe`는
   source 계약이 유효한 sample의 jump·stale·regression을 기록하면서 출력을 유지하고,
-  외부 replay·fault의 `replay_enforce`는 같은 위반을 차단한다. profile 변경은 launch
+  fault 검증의 `validation_enforce`는 같은 위반을 차단한다. profile 변경은 launch
   parameter로 수행하므로 두 상황을 오갈 때 source 파일을 수정하지 않는다.
 - timestamp gap `0.5 s`, 단일 translation delta `0.5 m`, yaw delta `0.5 rad`,
   연속 valid sample `2`개는 두 profile이 공유하는 engineering candidate다. 실제

@@ -37,20 +37,6 @@ MAP_QOS: Final = QoSProfile(
 LOCAL_TF_OWNER_NODES: Final = frozenset(
     {"/go2_odometry_adapter", "/robot_state_publisher"}
 )
-RUNTIME_NODES: Final = frozenset(
-    {
-        "/base_to_utlidar_lidar_static_tf",
-        "/go2_mapping_cloud_gate",
-        "/go2_mapping_cloud_accumulator",
-        "/go2_odometry_adapter",
-        "/pointcloud_to_laserscan",
-        "/robot_state_publisher",
-        "/rosbag2_player",
-        "/slam_toolbox",
-    }
-)
-
-
 class GraphEndpoint(Protocol):
     """ROS graph endpoint가 노출하는 node identity다."""
 

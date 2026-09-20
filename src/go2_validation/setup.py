@@ -29,37 +29,8 @@ setup(
             "fault_fixture = go2_validation.fault_fixture_node:main",
             "fault_acceptance = go2_validation.fault_acceptance_runner:main",
             (
-                "mapping_input_acceptance = "
-                "go2_validation.mapping_input_acceptance_runner:main"
-            ),
-            "mapping_acceptance = go2_validation.mapping_acceptance_runner:main",
-            (
-                "saved_map_localization_acceptance = "
-                "go2_validation.localization_acceptance_runner:main"
-            ),
-            (
                 "live_navigation_acceptance = "
                 "go2_validation.live_navigation_acceptance_runner:main"
-            ),
-            (
-                "mapping_tf_profile_ab = "
-                "go2_validation.mapping_tf_profile_ab_runner:main"
-            ),
-            (
-                "mapping_scan_profile_ab = "
-                "go2_validation.mapping_scan_profile_ab_runner:main"
-            ),
-            (
-                "mapping_coarse_search_sweep = "
-                "go2_validation.mapping_coarse_search_sweep_runner:main"
-            ),
-            (
-                "external_replay_acquisition = "
-                "go2_validation.external_replay_acquisition_runner:main"
-            ),
-            (
-                "external_replay_convert = "
-                "go2_validation.external_replay_conversion_runner:main"
             ),
             "shadow_fixture = go2_validation.shadow_fixture_node:main",
             (

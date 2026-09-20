@@ -1,4 +1,4 @@
-# Domain 64 저장 지도 replay에서 Map Server와 AMCL만 구동하는 localization 설정이다.
+# 저장 지도와 live 또는 simulation 입력에서 Map Server와 AMCL을 구동하는 설정이다.
 map_server:
   ros__parameters:
     use_sim_time: true

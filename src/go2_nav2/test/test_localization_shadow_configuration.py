@@ -1,4 +1,4 @@
-"""Domain 64 저장 지도 localization runtime 자산 계약을 검증한다."""
+"""저장 지도 localization runtime 자산 계약을 검증한다."""
 
 from pathlib import Path
 from typing import Final
@@ -11,7 +11,7 @@ LAUNCH_PATH: Final = PACKAGE_ROOT / "launch/go2_saved_map_localization.launch.py
 
 
 def test_given_localization_config_when_loaded_then_frames_and_owners_match() -> None:
-    # Given: 저장 지도와 project scan·odometry를 소비할 Domain 64 설정
+    # Given: 저장 지도와 project scan·odometry를 소비할 설정
     configuration = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
     # When: Map Server와 AMCL의 machine-consumed frame 계약을 읽는다.
@@ -43,3 +43,15 @@ def test_given_localization_launch_when_inspected_then_control_path_is_absent() 
     assert 'package="go2_control"' not in launch_source
     assert "/api/sport/request" not in launch_source
     assert "/lowcmd" not in launch_source
+
+
+def test_given_external_localization_inputs_when_launch_is_composed_then_duplicate_inputs_can_be_disabled() -> None:
+    # Given: 외부 simulation이 scan과 odometry 입력을 이미 소유하는 localization 합성 경로
+    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
+
+    # When: saved-map launch의 입력 소유권 선택을 읽는다.
+    # Then: 두 input include만 같은 조건으로 끄고 Map Server와 AMCL은 유지할 수 있다.
+    assert 'DeclareLaunchArgument("start_inputs", default_value="true")' in launch_source
+    assert launch_source.count("condition=IfCondition(start_inputs)") == 2
+    assert 'name="map_server"' in launch_source
+    assert 'name="amcl"' in launch_source

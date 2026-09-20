@@ -5,6 +5,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -36,6 +37,7 @@ def generate_launch_description() -> LaunchDescription:
     use_response_expansion = LaunchConfiguration("use_response_expansion")
     do_loop_closing = LaunchConfiguration("do_loop_closing")
     coarse_search_angle_offset = LaunchConfiguration("coarse_search_angle_offset")
+    start_inputs = LaunchConfiguration("start_inputs")
     sim_time_parameter = {
         "use_sim_time": ParameterValue(use_sim_time, value_type=bool)
     }
@@ -73,12 +75,14 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("use_response_expansion", default_value="true"),
             DeclareLaunchArgument("do_loop_closing", default_value="true"),
             DeclareLaunchArgument("coarse_search_angle_offset", default_value="0.349"),
+            DeclareLaunchArgument("start_inputs", default_value="true"),
             DeclareLaunchArgument(
                 "slam_params_file",
                 default_value=default_parameters,
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(mapping_scan_launch),
+                condition=IfCondition(start_inputs),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "execution_mode": execution_mode,
@@ -88,6 +92,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(odometry_launch),
+                condition=IfCondition(start_inputs),
                 launch_arguments={
                     "use_sim_time": use_sim_time,
                     "continuity_profile": continuity_profile,

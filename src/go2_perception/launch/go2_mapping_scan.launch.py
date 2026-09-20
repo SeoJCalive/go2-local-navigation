@@ -5,9 +5,9 @@
 profile로 validated cloud를 message timestamp의 project ``base`` frame으로 변환한다.
 """
 
+import math
 import os
 from pathlib import Path
-from typing import Final
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchContext, LaunchDescription
@@ -27,9 +27,6 @@ from go2_perception.mapping_scan_profiles import (
     MappingScanProfile,
     load_mapping_scan_profile,
 )
-
-
-RAW_INPUT_REMAP: Final = ("cloud_in", "/go2_mapping/cloud_validated")
 
 
 def _converter_parameters(
@@ -53,47 +50,35 @@ def _projection_nodes(
     execution_mode = LaunchConfiguration("execution_mode").perform(context)
     profile = load_mapping_scan_profile(Path(config_path), profile_id, execution_mode)
     converter_parameters = _converter_parameters(scan_parameters, profile)
+    converter_min_height = LaunchConfiguration("converter_min_height").perform(context)
+    if converter_min_height:
+        try:
+            parsed_min_height = float(converter_min_height)
+        except ValueError as error:
+            raise RuntimeError("converter_min_height must be numeric") from error
+        max_height = converter_parameters["max_height"]
+        if not math.isfinite(parsed_min_height) or not isinstance(max_height, (int, float)):
+            raise RuntimeError("converter height bounds must be finite numbers")
+        if parsed_min_height >= float(max_height):
+            raise RuntimeError("converter_min_height must be below max_height")
+        converter_parameters["min_height"] = parsed_min_height
     use_sim_time = LaunchConfiguration("use_sim_time")
     sim_time_parameter = {
         "use_sim_time": ParameterValue(use_sim_time, value_type=bool)
     }
-    nodes: list[Node] = []
-    if profile.accumulator_enabled:
-        nodes.append(
-            Node(
-                package="go2_perception",
-                executable="mapping_cloud_accumulator",
-                name="go2_mapping_cloud_accumulator",
-                parameters=[
-                    {
-                        "frame_limit": profile.frame_limit,
-                        "emit_every": profile.emit_every,
-                        "input_qos_depth": profile.input_qos_depth,
-                        "retry_queue_capacity": profile.retry_queue_capacity,
-                        "target_frame": profile.accumulator_target_frame,
-                        "output_topic": profile.accumulator_output_topic,
-                    },
-                    sim_time_parameter,
-                ],
-                output="screen",
-            )
-        )
-    input_remap = (
-        RAW_INPUT_REMAP
-        if not profile.accumulator_enabled
-        else ("cloud_in", profile.converter_input_topic)
-    )
-    nodes.append(
+    return [
         Node(
             package="pointcloud_to_laserscan",
             executable="pointcloud_to_laserscan_node",
             name="pointcloud_to_laserscan",
             parameters=[converter_parameters, sim_time_parameter],
-            remappings=[input_remap, ("scan", "/scan")],
+            remappings=[
+                ("cloud_in", profile.converter_input_topic),
+                ("scan", "/scan"),
+            ],
             output="screen",
         )
-    )
-    return nodes
+    ]
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -113,6 +98,7 @@ def generate_launch_description() -> LaunchDescription:
     use_sim_time = LaunchConfiguration("use_sim_time")
     sensor_tf_profile = LaunchConfiguration("sensor_tf_profile")
     execution_mode = LaunchConfiguration("execution_mode")
+    raw_cloud_topic = LaunchConfiguration("raw_cloud_topic")
     sim_time_parameter = {
         "use_sim_time": ParameterValue(use_sim_time, value_type=bool)
     }
@@ -128,11 +114,17 @@ def generate_launch_description() -> LaunchDescription:
                 "scan_projection_profile",
                 default_value="raw_single",
             ),
+            DeclareLaunchArgument(
+                "raw_cloud_topic",
+                default_value="/utlidar/cloud",
+            ),
+            DeclareLaunchArgument("converter_min_height", default_value=""),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(static_tf_launch),
                 launch_arguments={
                     "sensor_tf_profile": sensor_tf_profile,
                     "execution_mode": execution_mode,
+                    "use_sim_time": use_sim_time,
                 }.items(),
             ),
             Node(
@@ -140,6 +132,7 @@ def generate_launch_description() -> LaunchDescription:
                 executable="mapping_cloud_gate",
                 name="go2_mapping_cloud_gate",
                 parameters=[sim_time_parameter],
+                remappings=[("/utlidar/cloud", raw_cloud_topic)],
                 output="screen",
             ),
             OpaqueFunction(

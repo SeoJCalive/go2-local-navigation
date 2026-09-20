@@ -36,8 +36,6 @@ setup(
         "console_scripts": [
             "obstacle_candidates = go2_perception.obstacle_candidate_node:main",
             "mapping_cloud_gate = go2_perception.mapping_cloud_gate_node:main",
-            "mapping_cloud_accumulator = "
-            "go2_perception.mapping_cloud_accumulator_node:main",
         ],
     },
 )

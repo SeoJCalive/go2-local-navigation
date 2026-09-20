@@ -40,7 +40,6 @@ class StaticTfProfileError(Exception):
 
 class ExecutionMode(str, Enum):
     ONBOARD = "onboard"
-    EXTERNAL_REPLAY = "external_replay"
 
 
 def load_static_tf_profile(
@@ -87,13 +86,11 @@ def _parse_execution_mode(value: str) -> ExecutionMode:
 
 
 def _require_scope(scope: str, mode: ExecutionMode) -> None:
-    match scope:
-        case "onboard_and_replay_default":
-            return
-        case "external_replay_only":
-            if mode is not ExecutionMode.EXTERNAL_REPLAY:
+    match scope:  # noqa: MATCH_OK - YAML boundary must reject unknown strings.
+        case "onboard_only":
+            if mode is not ExecutionMode.ONBOARD:
                 raise StaticTfProfileError(
-                    "static_tf_profile_external_replay_required",
+                    "static_tf_profile_onboard_required",
                     mode.value,
                 )
         case _:

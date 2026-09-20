@@ -7,6 +7,7 @@ import yaml
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 CONFIG_PATH: Final = PACKAGE_ROOT / "config" / "nav2_non_actuating.yaml"
 COSTMAP_LAUNCH_PATH: Final = PACKAGE_ROOT / "launch" / "go2_costmap_only.launch.py"
+SLAM_LAUNCH_PATH: Final = PACKAGE_ROOT / "launch" / "go2_slam_mapping.launch.py"
 
 
 def test_given_config_when_loaded_then_frames_and_source_match() -> None:
@@ -50,3 +51,23 @@ def test_given_costmap_only_launch_when_started_then_motion_path_is_absent() -> 
     assert "/go2_nav2/costmap_only_cmd_vel_unused" in launch_source
     assert 'package="nav2_costmap_2d"' not in launch_source
     assert 'package="go2_control"' not in launch_source
+
+
+def test_given_slam_mapping_launch_when_read_then_sensor_inputs_and_slam_are_composed() -> None:
+    source = SLAM_LAUNCH_PATH.read_text(encoding="utf-8")
+
+    assert "go2_mapping_scan.launch.py" in source
+    assert "go2_odometry_adapter.launch.py" in source
+    assert 'package="slam_toolbox"' in source
+    assert 'name="slam_toolbox"' in source
+    assert 'package="go2_control"' not in source
+    assert "/api/sport/request" not in source
+    assert "/lowcmd" not in source
+
+
+def test_given_external_simulation_inputs_when_slam_launch_is_composed_then_duplicates_can_be_disabled() -> None:
+    source = SLAM_LAUNCH_PATH.read_text(encoding="utf-8")
+
+    assert 'DeclareLaunchArgument("start_inputs", default_value="true")' in source
+    assert source.count("condition=IfCondition(start_inputs)") == 2
+    assert 'name="slam_toolbox"' in source

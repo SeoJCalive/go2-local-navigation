@@ -67,10 +67,7 @@ def test_given_recovery_second_sample_when_correlated_then_one_nanosecond_is_sam
 def test_given_rclpy_node_subclasses_when_loaded_then_subscription_registry_is_not_overwritten() -> None:
     # Given: both runtime observers inherit rclpy.node.Node, which owns `_subscriptions`.
     package_root = Path(__file__).parents[1]
-    observer_paths = (
-        package_root / "go2_validation/fault_runtime_observer.py",
-        package_root / "go2_validation/mapping_input_observer.py",
-    )
+    observer_paths = (package_root / "go2_validation/fault_runtime_observer.py",)
 
     # When: assignments to self attributes are inspected structurally.
     assigned_attributes = {
@@ -88,7 +85,7 @@ def test_given_rclpy_node_subclasses_when_loaded_then_subscription_registry_is_n
         for path in observer_paths
     }
 
-    # Then: neither subclass shadows the mutable registry used by destroy_node().
+    # Then: the subclass does not shadow the mutable registry used by destroy_node().
     assert all(
         "_subscriptions" not in attributes
         for attributes in assigned_attributes.values()
