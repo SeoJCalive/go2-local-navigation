@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>go2_mujoco_lidar</name>
+  <version>0.1.0</version>
+  <description>Project-owned MuJoCo ray-cast LiDAR for the official Unitree Go2 model.</description>
+  <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>ament_index_python</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rosgraph_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>unitree_go</depend>
+
+  <exec_depend>bringup</exec_depend>
+  <exec_depend>go2_nav2</exec_depend>
+  <exec_depend>go2_perception</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
