@@ -94,6 +94,74 @@ verification/
 기록한다. 그 결과가 현재 주장 범위를 바꿀 때만 중앙 매트릭스의 근거와 상태를
 갱신한다. 실행 로그나 수치를 중앙 매트릭스에 반복 복사하지 않는다.
 
+## MuJoCo 수동 SLAM 재실행 gate
+
+MuJoCo의 조이스틱 구현은 시작할 때 `joystick_device`의
+`/dev/input/js0`를 한 번 열고 이후 같은 file descriptor에서만 입력을 읽는다.
+실행 중 Bluetooth가 끊겼다가 다시 연결되면 Linux는 새 `js0` 장치를 만들지만,
+MuJoCo는 이를 자동으로 다시 열지 않는다. 이때 MuJoCo process가
+`/dev/input/event*`를 열고 있거나 Bluetooth가 `Connected: yes`여도 로봇 제어
+입력은 동작하지 않을 수 있다.
+
+수동 주행 runtime은 다음 순서와 gate를 모두 통과한 뒤 준비 완료로 판정한다.
+
+1. 기존 MuJoCo·RL controller(`go2_ctrl`)·LiDAR·odometry·SLAM·RViz를 종료하고
+   중복 publisher가 없는지 확인한다.
+2. Xbox controller를 먼저 연결하고 `/dev/input/js0`가 생성된 상태를 확인한다.
+3. 연결 직후 장치 교체를 피하기 위해 `js0`가 연속 확인에서 유지된 뒤 MuJoCo를 시작한다.
+   MuJoCo는 ROS용 `CYCLONEDDS_URI`·`RMW_IMPLEMENTATION`을 상속하지 않는 clean
+   environment에서 `DISPLAY=:0`만 지정해 먼저 실행한다. ROS 환경과 loopback URI는
+   이후 LiDAR·odometry·SLAM·RViz process에만 적용한다.
+4. MuJoCo가 현재 `js0` 자체를 열었는지 다음과 같이 확인한다.
+
+   ```bash
+   mujoco_pid="$(pgrep -n -x unitree_mujoco)"
+   js_fd="$(find "/proc/${mujoco_pid}/fd" -lname '/dev/input/js0' -print -quit)"
+   test -n "${js_fd}"
+   test "$(stat -Lc '%t:%T:%i' /dev/input/js0)" = \
+     "$(stat -Lc '%t:%T:%i' "${js_fd}")"
+   ```
+
+5. MuJoCo와 같은 loopback·Domain 1에서 새 RL controller를 시작하고 로그의
+   `Connected to robot`과 `FSM: Start Passive`를 확인한다. 오래 남아 있던
+   `go2_ctrl` process를 다음 실행에 재사용하지 않는다.
+6. LiDAR·odometry·SLAM·RViz를 시작한 뒤 위 inode 검사를 다시 실행한다.
+7. `/scan`, `/odom`, `/map`, `/wirelesscontroller` publisher가 각각 하나이고,
+   `/lowcmd` publisher와 subscriber가 각각 하나인지 마지막으로 확인한다.
+
+다음 상태는 모두 실패로 판정한다.
+
+- MuJoCo FD가 `/dev/input/js0 (deleted)`를 가리킴
+- 현재 `/dev/input/js0`와 MuJoCo FD의 inode가 다름
+- `/dev/input/event*`만 열려 있고 현재 `js0`가 열리지 않음
+- MuJoCo process가 ROS용 `CYCLONEDDS_URI` 또는 `RMW_IMPLEMENTATION`을 상속함
+
+실행 중 controller 연결이 한 번이라도 끊기면 MuJoCo는 새 `js0`를 자동으로
+재개방하지 않는다. MuJoCo만 다시 시작하면 simulation clock과 pose가 초기화되어
+진행 중인 SLAM과 불일치할 수 있으므로, 현재 지도는 폐기하고 MuJoCo와 RL
+controller를 포함한 전체 수동 SLAM runtime을 깨끗하게 다시 시작한다.
+
+`joystick_type`은 제품명이 아니라 Linux가 노출한 버튼·축 번호를 해석하는
+profile이다. 현재 Bluetooth `Xbox Wireless Controller`는 2026-09-20 AGX 실측에서
+A/B/X/Y `0/1/3/4`, Back/Start `10/11`, 오른쪽 스틱 `axis 2/3`, RT/LT
+`axis 4/5`로 관찰됐으며 MuJoCo의 `SwitchJoystick` 배열과 일치한다. 따라서 이
+장치를 사용하는 수동 실행은 다음 설정으로 고정한다.
+
+```yaml
+use_joystick: 1
+joystick_type: "switch"
+joystick_device: "/dev/input/js0"
+joystick_bits: 16
+```
+
+다른 controller를 사용할 때만 해당 장치의 축·버튼 mapping을 별도로 확인하고
+profile을 바꾼다. 장치 제품명만 보고 `xbox` profile로 바꾸지 않는다. 실제로
+`xbox` profile을 적용했을 때 무입력 상태에서 `/wirelesscontroller.ry`가 약
+`0.99997`로 포화되어 LT·오른쪽 스틱 해석이 잘못되는 것을 확인했다.
+이 네 설정과 장치·inode gate는 실행자가 자동으로 확인하며 매 실행마다 사용자에게
+스틱 조작 확인을 요구하지 않는다. 설정을 통과했는데도 무반응이 보고된 경우에만
+`/wirelesscontroller`의 축·키 변화를 별도 진단한다.
+
 ## 현재 단계
 
 - 9단계 `integrated_non_actuating_preflight`: `completed`
