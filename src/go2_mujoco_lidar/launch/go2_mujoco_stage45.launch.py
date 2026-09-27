@@ -10,7 +10,7 @@ from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJ
 from launch_ros.actions import Node
 
 
-FILTERED_TOPIC = "/simulation/utlidar/cloud_self_filtered"
+PLANAR_TOPIC = "/simulation/utlidar/cloud_planar_selected"
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -64,8 +64,7 @@ def generate_launch_description() -> LaunchDescription:
                     "execution_mode": "onboard",
                     "sensor_tf_profile": "project_default",
                     "scan_projection_profile": "raw_single",
-                    "raw_cloud_topic": FILTERED_TOPIC,
-                    "converter_min_height": "-0.10",
+                    "raw_cloud_topic": PLANAR_TOPIC,
                 }.items(),
             ),
         ]

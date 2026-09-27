@@ -36,10 +36,12 @@ def test_cloud_publishers_are_reliable_when_source_is_read() -> None:
     assert ".reliable()" in source
 
 
-def test_launch_keeps_onboard_mode_and_uses_simulation_height_floor() -> None:
+def test_launch_keeps_onboard_mode_and_uses_planar_selected_cloud() -> None:
     source = (PACKAGE_ROOT / "launch" / "go2_mujoco_stage45.launch.py").read_text(
         encoding="utf-8"
     )
 
     assert '"execution_mode": "onboard"' in source
-    assert '"converter_min_height": "-0.10"' in source
+    assert 'PLANAR_TOPIC = "/simulation/utlidar/cloud_planar_selected"' in source
+    assert '"raw_cloud_topic": PLANAR_TOPIC' in source
+    assert "converter_min_height" not in source

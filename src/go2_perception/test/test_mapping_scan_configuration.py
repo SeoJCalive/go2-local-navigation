@@ -91,5 +91,3 @@ def test_given_mapping_launch_when_read_then_inputs_reach_converter() -> None:
     assert "mapping_cloud_accumulator" not in source
     assert '"execution_mode": execution_mode' in source
     assert '"use_sim_time": use_sim_time' in source
-    assert 'converter_parameters["min_height"] = parsed_min_height' in source
-    assert 'DeclareLaunchArgument("converter_min_height", default_value="")' in source

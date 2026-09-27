@@ -5,7 +5,6 @@
 profile로 validated cloud를 message timestamp의 project ``base`` frame으로 변환한다.
 """
 
-import math
 import os
 from pathlib import Path
 
@@ -50,18 +49,6 @@ def _projection_nodes(
     execution_mode = LaunchConfiguration("execution_mode").perform(context)
     profile = load_mapping_scan_profile(Path(config_path), profile_id, execution_mode)
     converter_parameters = _converter_parameters(scan_parameters, profile)
-    converter_min_height = LaunchConfiguration("converter_min_height").perform(context)
-    if converter_min_height:
-        try:
-            parsed_min_height = float(converter_min_height)
-        except ValueError as error:
-            raise RuntimeError("converter_min_height must be numeric") from error
-        max_height = converter_parameters["max_height"]
-        if not math.isfinite(parsed_min_height) or not isinstance(max_height, (int, float)):
-            raise RuntimeError("converter height bounds must be finite numbers")
-        if parsed_min_height >= float(max_height):
-            raise RuntimeError("converter_min_height must be below max_height")
-        converter_parameters["min_height"] = parsed_min_height
     use_sim_time = LaunchConfiguration("use_sim_time")
     sim_time_parameter = {
         "use_sim_time": ParameterValue(use_sim_time, value_type=bool)
@@ -118,7 +105,6 @@ def generate_launch_description() -> LaunchDescription:
                 "raw_cloud_topic",
                 default_value="/utlidar/cloud",
             ),
-            DeclareLaunchArgument("converter_min_height", default_value=""),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(static_tf_launch),
                 launch_arguments={

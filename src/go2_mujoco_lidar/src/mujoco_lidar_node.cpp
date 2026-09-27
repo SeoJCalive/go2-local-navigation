@@ -25,6 +25,7 @@ namespace
 {
 constexpr char kRawTopic[] = "/utlidar/cloud";
 constexpr char kFilteredTopic[] = "/simulation/utlidar/cloud_self_filtered";
+constexpr char kPlanarTopic[] = "/simulation/utlidar/cloud_planar_selected";
 constexpr char kOdomTopic[] = "/utlidar/robot_odom";
 constexpr char kFrame[] = "utlidar_lidar";
 constexpr char kOdomFrame[] = "odom";
@@ -120,6 +121,8 @@ public:
       kRawTopic, publisher_qos);
     filtered_publisher_ = create_publisher<sensor_msgs::msg::PointCloud2>(
       kFilteredTopic, publisher_qos);
+    planar_publisher_ = create_publisher<sensor_msgs::msg::PointCloud2>(
+      kPlanarTopic, publisher_qos);
     odometry_publisher_ = create_publisher<nav_msgs::msg::Odometry>(
       kOdomTopic, publisher_qos);
     clock_publisher_ = create_publisher<rosgraph_msgs::msg::Clock>("/clock", rclcpp::ClockQoS());
@@ -176,6 +179,7 @@ private:
     try {
       model_.update_state(imu_position, quaternion, motors);
       const auto hits = model_.cast();
+      const auto planar_hits = select_planar_hits(hits, model_.planar_ray_indices());
       std::size_t self_hits = 0;
       for (const auto & hit : hits) {
         self_hits += hit.robot_self ? 1U : 0U;
@@ -184,11 +188,12 @@ private:
         sport_state_->stamp.sec, sport_state_->stamp.nanosec, RCL_ROS_TIME);
       raw_publisher_->publish(make_cloud(stamp, hits, false));
       filtered_publisher_->publish(make_cloud(stamp, hits, true));
+      planar_publisher_->publish(make_cloud(stamp, planar_hits, false));
       odometry_publisher_->publish(make_odometry(stamp, *sport_state_));
       if (!first_scan_logged_) {
         RCLCPP_INFO(
-          get_logger(), "first scan: raw=%zu self=%zu filtered=%zu",
-          hits.size(), self_hits, hits.size() - self_hits);
+          get_logger(), "first scan: raw=%zu self=%zu filtered=%zu planar=%zu",
+          hits.size(), self_hits, hits.size() - self_hits, planar_hits.size());
         first_scan_logged_ = true;
       }
     } catch (const std::exception & error) {
@@ -203,6 +208,7 @@ private:
   unitree_go::msg::SportModeState::ConstSharedPtr sport_state_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr planar_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_;
   rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock_publisher_;
   rclcpp::Subscription<unitree_go::msg::LowState>::SharedPtr low_state_subscription_;

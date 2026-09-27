@@ -18,10 +18,15 @@
   velocity는 같은 `SportModeState.imu_state`에서 온다. `LowState`는 관절각에만 사용한다.
 - base의 자손 body에 맞은 점만 자기반사로 판정해
   `/simulation/utlidar/cloud_self_filtered`에서 제외한다.
-- launch가 filtered cloud를 기존 mapping gate와 공식 `pointcloud_to_laserscan`에
-  연결해 `/scan`을 만든다. MuJoCo 다중 수직 레이어가 바닥에 닿아 만드는 동심원형
-  투영을 배제하기 위해 simulation launch에서만 converter 최소 높이를 `-0.10 m`로
-  올린다. 실물 기본 launch와 공통 YAML의 `-0.25 m` 기본값은 변경하지 않는다.
+- 기존 ray를 base 좌표계로 회전해 각 base 방위각에서 절대 수직각이 가장 작은 ray
+  하나를 초기화 시 선택한다. 선택 ray의 기존 충돌점만
+  `/simulation/utlidar/cloud_planar_selected`에 발행하며 miss나 자기반사에는 다른
+  layer로 대체하지 않는다. MuJoCo model metadata에서 world body 소속 plane으로
+  판정된 floor hit도 planar 출력에서만 miss 처리하며, raw·self-filtered cloud와
+  simulator 충돌 geometry는 바꾸지 않는다.
+- launch가 planar-selected cloud를 기존 mapping gate와 공식
+  `pointcloud_to_laserscan`에 연결해 `/scan`을 만든다. 실물 기본 launch와 공통 YAML은
+  변경하지 않는다.
 
 센서 원점이 전방 하우징 collision 안에 있으므로 raycast에서는 sensor가 속한
 `base_link` body 자체를 제외한다. 이는 MuJoCo rangefinder의 동일 body 제외 의미와

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -45,6 +46,62 @@ std::array<double, 4> normalized(std::array<double, 4> quaternion)
   }
   return quaternion;
 }
+}
+
+std::vector<int> select_planar_ray_indices(
+  const std::vector<std::array<double, 3>> & base_directions,
+  int horizontal_samples)
+{
+  if (horizontal_samples < 1) {
+    throw std::invalid_argument("horizontal_samples must be positive");
+  }
+  std::vector<int> selected(horizontal_samples, -1);
+  std::vector<double> best_elevation(horizontal_samples, std::numeric_limits<double>::infinity());
+  for (std::size_t ray = 0; ray < base_directions.size(); ++ray) {
+    const auto & direction = base_directions[ray];
+    const double azimuth = std::atan2(direction[1], direction[0]);
+    const double planar_length = std::hypot(direction[0], direction[1]);
+    const double elevation = std::abs(std::atan2(direction[2], planar_length));
+    const int bin = std::min(
+      horizontal_samples - 1,
+      static_cast<int>((azimuth + kPi) * horizontal_samples / (2.0 * kPi)));
+    constexpr double tie_tolerance = 1.0e-12;
+    if (elevation + tie_tolerance < best_elevation[bin] ||
+      (std::abs(elevation - best_elevation[bin]) <= tie_tolerance &&
+      (selected[bin] < 0 || static_cast<int>(ray) < selected[bin])))
+    {
+      selected[bin] = static_cast<int>(ray);
+      best_elevation[bin] = elevation;
+    }
+  }
+  return selected;
+}
+
+std::vector<RayHit> select_planar_hits(
+  const std::vector<RayHit> & hits,
+  const std::vector<int> & selected_ray_indices)
+{
+  int maximum_index = -1;
+  for (const int index : selected_ray_indices) {
+    maximum_index = std::max(maximum_index, index);
+  }
+  std::vector<bool> selected(static_cast<std::size_t>(maximum_index + 1), false);
+  for (const int index : selected_ray_indices) {
+    if (index >= 0) {
+      selected[static_cast<std::size_t>(index)] = true;
+    }
+  }
+  std::vector<RayHit> output;
+  output.reserve(selected_ray_indices.size());
+  for (const auto & hit : hits) {
+    if (!hit.robot_self && !hit.world_floor && hit.ray_index >= 0 &&
+      static_cast<std::size_t>(hit.ray_index) < selected.size() &&
+      selected[static_cast<std::size_t>(hit.ray_index)])
+    {
+      output.push_back(hit);
+    }
+  }
+  return output;
 }
 
 void LidarModel::ModelDeleter::operator()(mjModel * value) const {mj_deleteModel(value);}
@@ -90,6 +147,7 @@ LidarModel::LidarModel(
     motor_qpos_addresses_[index] = model_->jnt_qposadr[joint_id];
   }
   build_sensor_directions();
+  build_planar_ray_indices();
 }
 
 void LidarModel::build_sensor_directions()
@@ -106,6 +164,26 @@ void LidarModel::build_sensor_directions()
       sensor_directions_.push_back(std::sin(elevation));
     }
   }
+}
+
+void LidarModel::build_planar_ray_indices()
+{
+  const std::array<double, 4> mount_quaternion{
+    std::cos(kLidarPitch / 2.0), 0.0, std::sin(kLidarPitch / 2.0), 0.0};
+  std::vector<std::array<double, 3>> base_directions;
+  base_directions.reserve(horizontal_samples_ * vertical_samples_);
+  for (std::size_t ray = 0; ray < sensor_directions_.size() / 3; ++ray) {
+    base_directions.push_back(rotate(
+      mount_quaternion,
+      {sensor_directions_[ray * 3], sensor_directions_[ray * 3 + 1],
+        sensor_directions_[ray * 3 + 2]}));
+  }
+  planar_ray_indices_ = select_planar_ray_indices(base_directions, horizontal_samples_);
+}
+
+const std::vector<int> & LidarModel::planar_ray_indices() const
+{
+  return planar_ray_indices_;
 }
 
 void LidarModel::update_state(
@@ -134,6 +212,11 @@ bool LidarModel::is_robot_body(int body_id) const
     }
   }
   return false;
+}
+
+bool LidarModel::is_world_floor_geom(int geom_id) const
+{
+  return model_->geom_bodyid[geom_id] == 0 && model_->geom_type[geom_id] == mjGEOM_PLANE;
 }
 
 std::vector<RayHit> LidarModel::cast() const
@@ -175,7 +258,8 @@ std::vector<RayHit> LidarModel::cast() const
       static_cast<float>(sensor_directions_[ray * 3] * distances[ray]),
       static_cast<float>(sensor_directions_[ray * 3 + 1] * distances[ray]),
       static_cast<float>(sensor_directions_[ray * 3 + 2] * distances[ray]),
-      geom_ids[ray], body_id, is_robot_body(body_id)});
+      geom_ids[ray], body_id, is_robot_body(body_id),
+      is_world_floor_geom(geom_ids[ray]), ray});
   }
   return hits;
 }

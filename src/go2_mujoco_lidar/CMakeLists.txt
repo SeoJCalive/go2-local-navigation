@@ -59,6 +59,13 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/scene/go2_indoor.xml"
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  add_executable(planar_selection_test
+    test/test_planar_selection.cpp
+    src/lidar_model.cpp
+  )
+  target_include_directories(planar_selection_test PRIVATE include "${MUJOCO_INCLUDE_DIR}")
+  target_link_libraries(planar_selection_test "${MUJOCO_LIBRARY}")
+  add_test(NAME planar_selection_test COMMAND planar_selection_test)
   ament_add_pytest_test(stage45_integration_contract test/test_stage45_integration_contract.py)
   ament_add_pytest_test(stage6_slam_contract test/test_stage6_slam_contract.py)
   ament_add_pytest_test(stage62_upright_hold_contract test/test_stage62_upright_hold_contract.py)
