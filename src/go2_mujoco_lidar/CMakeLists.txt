@@ -88,6 +88,7 @@ if(BUILD_TESTING)
   target_link_libraries(planar_selection_broken_input "${MUJOCO_LIBRARY}")
   ament_add_pytest_test(stage45_integration_contract test/test_stage45_integration_contract.py)
   ament_add_pytest_test(acceptance_processes test/test_acceptance_processes.py)
+  ament_add_pytest_test(route_clearance test/test_route_clearance.py)
   ament_add_pytest_test(sim_shutdown test/test_sim_shutdown.py)
   ament_add_pytest_test(sim_session_contract test/test_sim_session.py)
   ament_add_pytest_test(raycast_error_budget test/test_raycast_error_budget.py

@@ -2,7 +2,10 @@
 // The -s/-i/-n contract lets the session inspect world/domain through /proc.
 // truth.csv records base freejoint qpos independently of ROS sensor conversion.
 // A dedicated reset request file triggers mj_resetData without node restarts.
+// contacts.csv records every robot/world non-plane contact at each
+// physics step, including contacts between the 20 Hz truth samples.
 #include "unitree_sdk2_bridge.h"
+#include "simulation_step.hpp"
 
 #include <boost/program_options.hpp>
 #include <chrono>
@@ -61,11 +64,14 @@ int main(int argc, char **argv)
   const auto output = std::filesystem::path(args["output"].as<std::string>());
   std::ofstream truth(output / "truth.csv");
   truth << "epoch,sim_time,x,y,z,qw,qx,qy,qz\n" << std::setprecision(17);
+  std::ofstream contacts(output / "contacts.csv");
+  contacts << "epoch,sim_time,robot_geom,world_geom,distance\n" << std::setprecision(17);
   {
     Go2Bridge bridge(model, data);
     auto started = std::chrono::steady_clock::now();
     int epoch = 0;
     long steps = 0;
+    std::uint64_t epoch_steps = 0;
     while (!stopped) {
       if (std::filesystem::exists(output / "reset.request")) {
         std::filesystem::remove(output / "reset.request");
@@ -73,10 +79,23 @@ int main(int argc, char **argv)
         mj_forward(model, data);
         started = std::chrono::steady_clock::now();
         ++epoch;
+        epoch_steps = 0;
         std::cout << "SIM_RESET epoch=" << epoch << std::endl;
       }
-      mj_step(model, data);
+      step_epoch(model, data, epoch_steps);
       bridge.run();
+      for (int i = 0; i < data->ncon; ++i) {
+        const auto &contact = data->contact[i];
+        const int a = contact.geom[0], b = contact.geom[1];
+        const bool a_world = model->geom_bodyid[a] == 0;
+        const bool b_world = model->geom_bodyid[b] == 0;
+        if (a_world == b_world) continue;
+        const int obstacle = a_world ? a : b, robot = a_world ? b : a;
+        if (model->geom_type[obstacle] == mjGEOM_PLANE) continue;
+        contacts << epoch << ',' << data->time << ',' << robot << ','
+                 << mj_id2name(model, mjOBJ_GEOM, obstacle) << ','
+                 << contact.dist << std::endl;
+      }
       if (++steps % 25 == 0) {
         truth << epoch << ',' << data->time;
         for (int i = 0; i < 7; ++i) truth << ',' << data->qpos[i];

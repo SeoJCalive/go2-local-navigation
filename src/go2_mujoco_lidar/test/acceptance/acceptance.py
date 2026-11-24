@@ -329,9 +329,20 @@ def main():
         result["preexisting_unchanged"] = all(current.get(pid) == row for pid,row in baseline.items())
         result["owned_pids"] = sorted(manager.identities)
         result["owned_remaining"] = manager.remaining()
+        with (output / "commands.csv").open("w") as file:
+            writer_csv = csv.writer(file)
+            writer_csv.writerow(["stamp_ns", "vx", "wz"])
+            writer_csv.writerows(commands)
+        contact_file = output / "contacts.csv"
+        result["nonfloor_contacts"] = (
+            sum(1 for _ in csv.DictReader(contact_file.open()))
+            if contact_file.exists() else None)
         result["sigkill_logs"] = [
             path.name for path in output.glob("*.log")
             if "escalating to 'SIGKILL'" in path.read_text(errors="replace")]
+        result["sigterm_logs"] = [
+            path.name for path in output.glob("*.log")
+            if "escalating to 'SIGTERM'" in path.read_text(errors="replace")]
         localization_log = output / "localization.log"
         shutdown_log = localization_log.read_text(errors="replace") if localization_log.exists() else ""
         completed = [
@@ -343,6 +354,8 @@ def main():
         result["samples"] = {key:len(value) for key,value in samples.items()}
         result["criteria"] = {
             "mapping": bool(result.get("route_completed")),
+            "mapping_no_stalls": result.get("mapping_stalls") == 0,
+            "zero_nonfloor_contacts": result["nonfloor_contacts"] == 0,
             "save": bool(result.get("saved")),
             "goals_succeeded": len(result["goals"]) == len(goals) and all(
                 row["status"] == 4 for row in result["goals"]),
@@ -352,6 +365,8 @@ def main():
             "zero_residue": not result["owned_remaining"] and not cleanup_errors,
             "no_sigkill": not result["sigkill_logs"] and not any(
                 int(signal.SIGKILL) in stop["signals"] for stop in manager.stops),
+            "no_escalation": not result["sigterm_logs"] and not result["sigkill_logs"] and all(
+                set(stop["signals"]) <= {int(signal.SIGINT)} for stop in manager.stops),
             "managed_shutdown": not result["shutdown_errors"] and set(result["shutdown_states"]) == {
                 "planner_server", "controller_server", "behavior_server", "bt_navigator",
                 "map_server", "amcl",
@@ -374,14 +389,25 @@ def map_route(output, start, stop, until, advance, text, truth, buffer, node,
         runner = start("route", [executable("go2_nav2_mujoco_bridge", "waypoint_runner"),
             "--ros-args", "-p", "waypoints_x:="+str([float(x) for x,y in route]),
             "-p", "waypoints_y:="+str([float(y) for x,y in route]),
-            "-p", "timeout:=600.0", "-p", "stall_timeout:=10.0", "-p", "slowdown_distance:=0.2"])
+            "-p", "timeout:=600.0", "-p", "stall_timeout:=10.0"])
+        started = time.monotonic()
+        result["mapping_start_sim_time"] = truth()["sim_time"]
+        result["route"] = route
         print("MAPPING_ROUTE_STARTED", flush=True)
         until(lambda: any(s in text("route") for s in
                           ("status=completed", "status=timeout", "status=stalled")),
               620, [sim, ctrl, mapping, bridge, runner])
         route_log = text("route")
         result["route_completed"] = "status=completed" in route_log
+        result["mapping_wall_sec"] = time.monotonic() - started
+        result["mapping_end_sim_time"] = truth()["sim_time"]
+        result["mapping_stalls"] = route_log.count("status=stalled")
+        result["mapping_contacts"] = sum(
+            1 for _ in csv.DictReader((output / "contacts.csv").open()))
         stop(runner)
+        checkpoint()
+        if not result["route_completed"]:
+            raise RuntimeError("mapping route did not complete")
         last_stamp = samples["odom"][-1][:2]
         until(lambda: samples["odom"][-1][:2] > last_stamp,
               10, [sim, ctrl, mapping, bridge])

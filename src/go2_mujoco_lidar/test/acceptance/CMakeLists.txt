@@ -21,6 +21,14 @@ target_link_libraries(acceptance_simulator PRIVATE
   mujoco unitree_sdk2 yaml-cpp Boost::program_options fmt pthread)
 set_target_properties(acceptance_simulator PROPERTIES
   BUILD_RPATH "${MJ}/lib;/opt/unitree_robotics/lib")
+enable_testing()
+add_executable(acceptance_clock_test clock_test.cpp)
+target_include_directories(acceptance_clock_test PRIVATE "${MJ}/include")
+target_link_directories(acceptance_clock_test PRIVATE "${MJ}/lib")
+target_link_libraries(acceptance_clock_test PRIVATE mujoco)
+set_target_properties(acceptance_clock_test PROPERTIES BUILD_RPATH "${MJ}/lib")
+add_test(NAME acceptance_clock_test COMMAND acceptance_clock_test
+  "${CMAKE_CURRENT_SOURCE_DIR}/clock_fixture.xml")
 add_executable(acceptance_controller
   rl_discovery.cpp "${RL}/build/CMakeFiles/go2_ctrl.dir/main.cpp.o")
 target_include_directories(acceptance_controller PRIVATE "${SDK_ROOT}/include"

@@ -6,6 +6,10 @@ localization → JSON에 지정한 N개 world goal → 입력 epoch reset을 재
 `≤0.3 m`, reset 뒤 새 cloud/odom·역행 stamp·같은 localization/bridge PID,
 기존 process identity 보존과 owned session 잔류 0이다.
 여섯 lifecycle node의 FINALIZED와 SIGKILL 미사용도 별도로 통과해야 한다.
+F02에서는 전체 13점 mapping의 stall 0, 매 physics step의 비바닥 robot/world
+접촉 0과 runner/launch 모두 TERM/KILL escalation 0도 판정한다.
+실측 하한·경로 여유·긴 epoch clock과 연속 3회 결과는
+[F02 기록](../../F02_MAPPING.md)을 따른다.
 기본 goals는 W04/W06과 같은 5개다. 지도 전체 정확도, 실물 동작 또는 reset 뒤
 AMCL 재초기화와 goal 재개를 판정하지 않는다.
 
@@ -13,7 +17,8 @@ AMCL 재초기화와 goal 재개를 판정하지 않는다.
 `test_sim_shutdown.py`는 simulator 없이 OS·ROS service·Launch 종료 경계를 검사한다.
 runtime ROS/SLAM/Nav2 설치,
 W01 simulator 패치, 기존 RL policy/object build와 `cleanup/domain-guard` bridge가
-필요하다. bridge source는 수정하지 않는다. 모든 build는 새 `/tmp` 경로를 쓰며,
+필요하다. bridge는 현재 waypoint 수정 branch를 전용 prefix에 빌드한다.
+모든 build는 새 `/tmp` 경로를 쓰며,
 실행 output은 `--output`으로 지정한다.
 
 AGX 프로젝트 루트에서 ROS/Unitree 환경과 W01의 `MUJOCO_ROOT`,
@@ -28,6 +33,7 @@ export A="$PWD/src/go2_mujoco_lidar/test/acceptance"
 cmake -S "$A" -B /tmp/w07-acceptance-build -DCMAKE_BUILD_TYPE=Release \
   -DRL_ROOT="$RL_ROOT" -DSDK_ROOT="$SDK_ROOT"
 cmake --build /tmp/w07-acceptance-build -j4
+ctest --test-dir /tmp/w07-acceptance-build --output-on-failure
 # bridge도 기본 install 대신 전용 prefix에 빌드한다.
 colcon --log-base /tmp/w07-bridge-log build --base-paths "$BRIDGE_ROOT/src" \
   --build-base /tmp/w07-bridge-build --install-base /tmp/w07-bridge-install
@@ -54,6 +60,15 @@ Domain 0과 병렬 진단용 Domain 42는 거부한다. simulator·RL은 ROS lib
 RL 설정의 3초 기립과 joystick pulse는 simulation-time 조건으로 기다린다.
 action/lifecycle/route/TF/입력 복구는 해당 event와 bounded wall timeout으로 기다린다.
 
+기본 `route.json`은 북쪽·남쪽·동쪽·서쪽을 왕복하는 원래 13점 coverage다.
+동쪽 세 점만 `(5,-0.4) → (6.7,-0.4) → (5,-0.4)`로 옮겨 island를 피한다.
+중앙 8점 비교는 `--route "$A/route_central8.json"`으로 선택한다.
+`route_clearance.py --world <MJCF> --route "$A/route.json"`은 현재 world의
+box/cylinder와 반지름 0.42 m footprint를 대조한다. 0.01 m 이하 간격의 표본에
+반 간격을 더 빼 연속 직선 경로의 보수적 여유 하한을 보고한다.
+이 값은 계획 중심선 기준이다. 실제 tracking 오차와 다리 움직임은
+`contacts.csv`의 매 step 관측으로 별도 검증한다.
+
 결과의 `criteria`는 항목별 boolean, `passed`는 종합 판정이다. `goals`는 action
 status·world/map goal·qpos·XY 오차, `reset`은 역행 전후 stamp와 입력 수,
 `shutdowns`는 session별 종료 시간·실제 보낸 signal·잔류를 담는다.
@@ -62,6 +77,9 @@ status·world/map goal·qpos·XY 오차, `reset`은 역행 전후 stamp와 입�
 FINALIZED 확인이 빠지거나 lifecycle 종료 오류가 있으면 종합 판정은 실패다.
 `preexisting.json`은 기존 Domain 1/42 PID/start tick/argv다. map YAML/PGM/sidecar, truth.csv, ROS/native
 로그와 TF publisher identity도 같은 output에 남는다.
+`mapping_wall_sec`, `map_shape`, `mapping_stalls`, `mapping_contacts`는 mapping
+구간의 결과다. `nonfloor_contacts`는 reset을 포함한 전체 실행의 접촉 수이며,
+`commands.csv`는 독립 ROS subscriber가 받은 속도 명령이다.
 
 W06 종료 실패의 원인은 하네스가 `ros2 run` parent를 기다리는 동안 observer를
 spin하지 않아 10초 TF cache가 낡아진 것과 parent 종료만 확인해 child를 놓친 것이다.
