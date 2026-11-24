@@ -1,6 +1,5 @@
 """Domain 65 child lifecycle, bounded settle, observer와 verdict를 소유한다."""
 
-import os
 import subprocess
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -10,9 +9,6 @@ from typing import Final
 import rclpy
 from bringup.preflight_host import (
     scan_residual_processes,
-)
-from bringup.preflight_host import (
-    stop_owned_process as stop_process_group,
 )
 
 from go2_validation.offline_process import spin_until, stop_owned_process
@@ -62,6 +58,7 @@ class _ChildExecution:
     fixture_exit_code: int
     launch_exit_code: int
     log_paths: tuple[Path, ...]
+    session_ids: tuple[int, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +103,7 @@ def run_shadow_scenario(
                 fixture_exit_code=child.fixture_exit_code,
                 launch_exit_code=child.launch_exit_code,
                 residual_nodes=observer.residual_nodes(),
-                residual_processes=scan_residual_processes(os.getpid()),
+                residual_processes=scan_residual_processes(child.session_ids),
             )
         )
         return ShadowRunResult(
@@ -184,10 +181,11 @@ def _execute_children(
         if launch_process is not None:
             launch_exit_code = stop_owned_process(launch_process)
         if fixture_process is not None:
-            fixture_exit_code = stop_process_group(fixture_process)
+            fixture_exit_code = stop_owned_process(fixture_process)
     return _ChildExecution(
         terminal=terminal,
         fixture_exit_code=fixture_exit_code,
         launch_exit_code=launch_exit_code,
         log_paths=(fixture_log, launch_log),
+        session_ids=(fixture_process.pid, launch_process.pid),
     )

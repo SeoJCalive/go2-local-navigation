@@ -10,18 +10,6 @@ from rclpy.qos import (
 )
 
 
-RAW_CLOUD_QOS: Final = QoSProfile(
-    reliability=ReliabilityPolicy.RELIABLE,
-    history=HistoryPolicy.KEEP_LAST,
-    depth=10,
-    durability=DurabilityPolicy.VOLATILE,
-)
-RAW_ODOMETRY_QOS: Final = QoSProfile(
-    reliability=ReliabilityPolicy.RELIABLE,
-    history=HistoryPolicy.KEEP_LAST,
-    depth=1000,
-    durability=DurabilityPolicy.VOLATILE,
-)
 STREAM_QOS: Final = QoSProfile(
     reliability=ReliabilityPolicy.BEST_EFFORT,
     history=HistoryPolicy.KEEP_LAST,

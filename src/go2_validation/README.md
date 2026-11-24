@@ -7,6 +7,12 @@ command publish, motion 또는 physical execution을 소유하지 않는다.
 mapping/localization bag replay의 취득·변환·player·runner·A/B·sweep 계층은
 제거됐다. 실제 Go2가 사용하는 mapping/localization launch 자산은 `go2_nav2`에 남아 있다.
 
+W06은 미사용 typing helper와 raw QoS 상수, Gazebo message 의존성을 제거했다.
+환경의 명시 CycloneDDS XML 판정은 `bringup.dds_environment`를 사용하며, 종료와
+잔류 process 검사는 `bringup.preflight_host`의 owned POSIX session 경계 하나를 쓴다.
+실물·fault·합성 runner는 계속 설치된다. synthetic map·실패 BT·shadow 설정은 이
+runner와 live no-goal observer의 실제 caller가 있으므로 보존한다.
+
 ## 설치되는 실행 파일
 
 - `integrated_preflight`

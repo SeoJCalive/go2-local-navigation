@@ -53,7 +53,8 @@ ros2 launch go2_mujoco_lidar go2_mujoco_stage6_slam.launch.py
 ```
 
 두 상태 토픽을 모두 받기 전에는 cloud를 발행하지 않는다. 기본 raster는
-360×8, 10 Hz, 0.25~5.0 m이며 기존 `/scan`은 0.5° 720-bin 계약을 유지한다.
+720×8, 수직 ±15°, 10 Hz, 0.25~5.0 m다. 모든 sim launch는 같은 기본값을 쓰며
+planar-selected cloud에서 `/scan`의 0.5° 720-bin 계약을 유지한다.
 
 입력 시간이 역행하면 pending pair와 소비 이력을 비우고 두 stream의 새 epoch를
 기다린다. reset마다 경고 한 번을 남긴다. 1초 동안 새 matched step이 없으면
@@ -79,8 +80,7 @@ export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # ROS/Unitree 및 선택한 local_navigation install을 source한 셸에서 실행한다.
 # SIM_PID는 사용자가 시작한 unitree_mujoco -s <MJCF> -i 1 -n lo의 실제 PID다.
 ros2 launch go2_mujoco_lidar go2_sim_bringup.launch.py \
-  simulator_pid:="$SIM_PID" mapping:=true \
-  horizontal_samples:=720 vertical_samples:=1 vertical_min:=0.0 vertical_max:=0.0
+  simulator_pid:="$SIM_PID" mapping:=true
 ```
 
 - world의 단일 원본은 `/proc/$SIM_PID/cmdline`의 `-s`다. 상대 경로는 simulator
@@ -104,7 +104,7 @@ ros2 launch go2_mujoco_lidar go2_sim_bringup.launch.py \
 - mapping 중 physics reset 뒤에는 이 launch 전체를 재시작한다. W02의 입력 epoch
   복구가 SLAM 지도 epoch 복구를 보장하지 않는다.
 
-기존 stage45·stage6·stage62 진입점과 raster 기본값 `360×8`은 유지한다.
+기존 stage45·stage6·stage62 진입점도 raster 기본값 `720×8`·수직 ±15°를 쓴다.
 stage45와 이를 포함하는 launch에는 같은 domain/loopback guard와
 `allow_unsafe_simulation`·`raycast_error_limit` argument가 추가됐다.
 통합 진입점을 쓰면 기존 runbook의 ROS 터미널 3(LiDAR/scan), 4(odom), 5(SLAM)를
@@ -138,10 +138,9 @@ source install/setup.bash
 ros2 launch go2_mujoco_lidar go2_mujoco_stage62_slam.launch.py
 ```
 
-수평 ray 기본값은 기존 동작을 보존하는 360이다. 0.5° 간격의 720-bin `/scan`과
-직접 맞추는 품질 비교에서는 `horizontal_samples:=720`을 명시한다.
-수직 layer 기본값도 기존 8개·±15°를 유지한다. 수직 합성 여부를 분리하는 정지
-진단에서는 `vertical_samples:=1 vertical_min:=0.0 vertical_max:=0.0`을 함께 명시한다.
+수평 ray 720개, 수직 layer 8개·±15°가 sim 기본값이다. 이는 9/28 good-map의
+sensor-frame raster이며, base-frame에서 수직각이 가장 작은 ray를 방위별로 고른다.
+sensor-frame 단일 layer와 같은 geometry가 아니다.
 
 `environment_only:=true`는 private LiDAR model의 로봇 geometry를 ray 대상에서만
 제외하는 simulation-only A/B 모드다. 원본 MJCF, 시뮬레이터 충돌 모델과 기본값

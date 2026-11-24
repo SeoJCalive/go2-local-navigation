@@ -1,6 +1,5 @@
 """Domain 0 live navigation의 launch·관찰·teardown 경계를 소유한다."""
 
-import os
 import subprocess
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -113,7 +112,7 @@ def run_live_navigation(
         observer.observe_graph()
         observation = observer.observation(
             launch_exit_code,
-            scan_residual_processes(os.getpid()),
+            scan_residual_processes((launch_process.pid,)),
         )
         return LiveNavigationExecution(
             result=assess_live_navigation(observation),

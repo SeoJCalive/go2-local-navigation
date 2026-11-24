@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Final
 
 import yaml
+from bringup.dds_environment import cyclonedds_network_matches
 
 
 SOURCE_MODE_CONFIGURATION_PATH: Final = (
@@ -161,7 +162,13 @@ def main(args: list[str] | None = None) -> None:
             declared_clock_owner=str(clock_owner),
             clock_publisher_count=len(node.get_publishers_info_by_topic("/clock")),
             use_sim_time=bool(use_sim_time),
-            loopback_only='name="lo"' in os.environ.get("CYCLONEDDS_URI", ""),
+            loopback_only=(
+                os.environ.get("ROS_LOCALHOST_ONLY") == "1"
+                or cyclonedds_network_matches(
+                    os.environ.get("CYCLONEDDS_URI", ""), "lo",
+                    int(os.environ.get("ROS_DOMAIN_ID", "0")),
+                )
+            ),
         )
         result = assess_runtime_observation(observation)
         _write_result(Path(str(output_value)), observation, result)

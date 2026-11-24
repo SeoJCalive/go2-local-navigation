@@ -61,12 +61,12 @@ def test_given_horizontal_resolution_when_selected_then_it_reaches_the_lidar_nod
     upright = LAUNCH_SOURCE.read_text(encoding="utf-8")
     slam = SLAM_LAUNCH_SOURCE.read_text(encoding="utf-8")
 
-    assert 'DeclareLaunchArgument("horizontal_samples", default_value="360")' in stage45
+    assert 'DeclareLaunchArgument("horizontal_samples", default_value="720")' in stage45
     assert 'horizontal_samples = LaunchConfiguration("horizontal_samples")' in stage45
     assert '"horizontal_samples": horizontal_samples' in stage45
-    assert 'DeclareLaunchArgument("horizontal_samples", default_value="360")' in upright
+    assert 'DeclareLaunchArgument("horizontal_samples", default_value="720")' in upright
     assert '"horizontal_samples": horizontal_samples' in upright
-    assert 'DeclareLaunchArgument("horizontal_samples", default_value="360")' in slam
+    assert 'DeclareLaunchArgument("horizontal_samples", default_value="720")' in slam
     assert '"horizontal_samples": horizontal_samples' in slam
 
 

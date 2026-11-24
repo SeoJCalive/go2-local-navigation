@@ -8,7 +8,6 @@ publish를 수행하지 않으며, 자동 산출물은 project `data/runs/prefli
 from dataclasses import asdict
 from datetime import datetime
 import json
-import os
 import subprocess
 from time import monotonic, time
 
@@ -90,8 +89,8 @@ def _execute(node: Node, configuration: RunConfiguration) -> int:
             )
         except subprocess.TimeoutExpired:
             launch_timed_out = True
-            launch_return_code = stop_owned_process(launch_process)
         finally:
+            launch_return_code = stop_owned_process(launch_process)
             stop_owned_process(tegrastats_process)
     discovery_deadline = monotonic() + POSTFLIGHT_DISCOVERY_SECONDS
     while rclpy.ok() and monotonic() < discovery_deadline:
@@ -108,7 +107,9 @@ def _execute(node: Node, configuration: RunConfiguration) -> int:
         launch_return_code=launch_return_code,
         launch_timed_out=launch_timed_out,
         residual_nodes=residual_nodes,
-        residual_processes=scan_residual_processes(os.getpid()),
+        residual_processes=scan_residual_processes(
+            (launch_process.pid, tegrastats_process.pid),
+        ),
         sport_request_publishers=project_publisher_count(
             tuple(node.get_publishers_info_by_topic("/api/sport/request")),
             EXPECTED_NODES,

@@ -5,6 +5,12 @@
 각각 별도 process다. 모드 전환은 simulator를 reset하지 않고 ROS 세션만 재시작한다.
 physics를 reset했다면 simulator/RL/ROS 세션 모두 새로 시작한다.
 
+sim LiDAR의 기본값은 9/28 checkpoint와 같은 `720×8`, 수직 `±15°`다.
+모든 sim launch와 직접 node 실행이 같은 raster를 사용한다. `/scan`은 기존
+base-frame planar-selected cloud를 사용하며 sensor-frame 단일 수평 layer가 아니다.
+일반 실행에서는 raster override를 생략한다. W06 호출 조사와 회귀 근거는
+[W06_CLEANUP.md](W06_CLEANUP.md)에 보존한다.
+
 ## 회전 명령과 정책 범위
 
 `nav2_mujoco.yaml`은 Humble Nav2 1.1.20의 RotationShimController로 경로 초기
@@ -113,16 +119,18 @@ navigation lifecycle을 시작한다. 90 wall seconds 내 수락/시작이 없�
 - Nav2의 sim 설정은 `config/nav2_mujoco.yaml` 한 곳이다. AMCL 설정은 기존
   `saved_map_localization.yaml`을 재사용하되 자동 원점 pose를 launch에서 끈다.
 
-## W06 이관 검토 대상
+## W06 호출 조사 후 유지한 경로
 
-- 기존 `go2_nav2_shadow.launch.py`, `nav2_shadow.yaml`, synthetic maps/실패 BT:
-  software fixture 영역으로 이동할 후보이며 sim 설정의 복제본으로 쓰지 않는다.
+- `go2_nav2_shadow.launch.py`, `nav2_shadow.yaml`, synthetic maps/실패 BT:
+  `nav2_shadow_acceptance`와 실제 입력 no-goal observer의 caller가 있어 유지한다.
+  sim 설정의 복제본으로 쓰지 않는다.
 - 기존 `go2_nav2_live_observer.launch.py`, `go2_saved_map_localization.launch.py`,
-  `go2_slam_mapping.launch.py`: legacy/실물·검증 caller 조사 후 분리할 후보다.
+  `go2_slam_mapping.launch.py`: 실물·검증 runner, 통합 sim bringup 또는 bridge caller가
+  있어 유지한다. 패키지 이동은 W04에서 처리한다.
 - `nav2_non_actuating.yaml`과 controller preview/costmap-only launch: 실물 또는
   비동작 시험 목적을 유지하며 W05에서 삭제하지 않는다.
-- stage45/6/62 launch와 bridge의 `nav2_mujoco.yaml`/Nav2 launch: 새 세션으로
-  caller migration 완료 후 중복 소유권을 제거할 후보다. bridge는 W05에서 읽기 전용이다.
+- stage45/6/62 launch: 통합 sim bringup, nested stage launch, bridge runbook의 caller가
+  있어 유지한다. bridge의 `nav2_mujoco.yaml`/Nav2 launch는 W06에서도 수정하지 않는다.
 
 ## 2026-11-24 AGX 검증 결과
 

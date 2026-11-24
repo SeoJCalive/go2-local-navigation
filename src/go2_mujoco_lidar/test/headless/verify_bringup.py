@@ -151,8 +151,7 @@ def main():
             assert marker in refusal.stdout, refusal.stdout
             refusals[name] = {"exit": refusal.returncode, "message": marker}
         launch = start("bringup", base + [
-            "mapping:=true", "horizontal_samples:=720", "vertical_samples:=1",
-            "vertical_min:=0.0", "vertical_max:=0.0",
+            "mapping:=true",
         ])
         deadline = time.monotonic() + 45
         while time.monotonic() < deadline:

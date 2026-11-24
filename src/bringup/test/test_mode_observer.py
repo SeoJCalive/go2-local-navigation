@@ -46,7 +46,9 @@ def test_live_mode_accepts_agx_runtime_environment() -> None:
         rmw_implementation="rmw_cyclonedds_cpp",
         ros_domain_id="0",
         go2_interface="eno1",
-        cyclonedds_uri='<NetworkInterface name="eno1" />',
+        cyclonedds_uri='<CycloneDDS><Domain><General><Interfaces>'
+        '<NetworkInterface name="eno1" />'
+        '</Interfaces></General></Domain></CycloneDDS>',
     )
 
     # When: live shadow mode 환경을 판정한다.

@@ -88,3 +88,31 @@ def test_non_loopback_physics_refused(tmp_path):
         arg.encode() for arg in ["unitree_mujoco", "-s", "x", "-i", "41", "-n", "eth0"]))
     with pytest.raises(RuntimeError, match="-n lo"):
         SESSION.simulator_world(123, "", 41, proc_root=tmp_path)
+
+
+@pytest.mark.parametrize("filename", [
+    "go2_sim_navigation.launch.py", "go2_sim_bringup.launch.py",
+    "go2_mujoco_stage45.launch.py", "go2_mujoco_stage62_upright_hold.launch.py",
+    "go2_mujoco_stage62_slam.launch.py",
+])
+def test_all_sim_launch_defaults_use_checkpoint_raster(filename):
+    """Execute launch declarations; all entry points agree on the selected raster."""
+    from launch.actions import DeclareLaunchArgument
+    from launch import LaunchContext
+
+    path = MODULE_PATH.parents[1] / "launch" / filename
+    spec = importlib.util.spec_from_file_location("raster_launch", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    context = LaunchContext()
+    defaults = {
+        action.name: "".join(value.perform(context) for value in action.default_value)
+        for action in module.generate_launch_description().entities
+        if isinstance(action, DeclareLaunchArgument) and action.default_value is not None
+    }
+    assert {key: float(defaults[key]) for key in (
+        "horizontal_samples", "vertical_samples", "vertical_min", "vertical_max",
+    )} == {
+        "horizontal_samples": 720, "vertical_samples": 8,
+        "vertical_min": -0.2617993877991494, "vertical_max": 0.2617993877991494,
+    }

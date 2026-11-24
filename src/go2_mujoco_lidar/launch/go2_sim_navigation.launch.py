@@ -105,8 +105,8 @@ def generate_launch_description():
         DeclareLaunchArgument("initial_pose", default_value=""),
         DeclareLaunchArgument("tf2_prefix", default_value=os.environ.get("GO2_TF2_PREFIX", "")),
         DeclareLaunchArgument("horizontal_samples", default_value="720"),
-        DeclareLaunchArgument("vertical_samples", default_value="1"),
-        DeclareLaunchArgument("vertical_min", default_value="0.0"),
-        DeclareLaunchArgument("vertical_max", default_value="0.0"),
+        DeclareLaunchArgument("vertical_samples", default_value="8"),
+        DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
+        DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),
         OpaqueFunction(function=_start),
     ])

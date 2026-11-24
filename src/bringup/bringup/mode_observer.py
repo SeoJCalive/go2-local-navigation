@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Final
 
+from bringup.dds_environment import cyclonedds_network_matches
 from bringup.preflight_types import CheckResult, CheckStatus
 
 
@@ -50,18 +51,6 @@ NO_GLOBAL_TF: Final = GlobalTfOwnerContract(
     owner_node=None,
     owner_count=0,
 )
-MAP_SLAM_TF: Final = GlobalTfOwnerContract(
-    parent_frame="map",
-    child_frame="odom",
-    owner_node="/slam_toolbox",
-    owner_count=1,
-)
-MAP_AMCL_TF: Final = GlobalTfOwnerContract(
-    parent_frame="map",
-    child_frame="odom",
-    owner_node="/amcl",
-    owner_count=1,
-)
 MAP_FIXTURE_TF: Final = GlobalTfOwnerContract(
     parent_frame="map",
     child_frame="odom",
@@ -96,7 +85,9 @@ def assess_mode_environment(
     live_network_matches = (
         environment.rmw_implementation == "rmw_cyclonedds_cpp"
         and environment.go2_interface == "eno1"
-        and 'name="eno1"' in environment.cyclonedds_uri
+        and cyclonedds_network_matches(
+            environment.cyclonedds_uri, "eno1", int(contract.ros_domain_id),
+        )
     )
     passed = domain_matches and (
         live_network_matches if contract.requires_live_network else True

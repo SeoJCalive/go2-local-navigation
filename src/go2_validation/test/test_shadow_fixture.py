@@ -38,6 +38,7 @@ def test_given_domain65_fixture_when_constructed_then_node_clock_is_not_shadowed
 ) -> None:
     # Given: loopback DDS에서 실제 rclpy Node를 생성할 수 있는 격리 환경
     monkeypatch.setenv("ROS_DOMAIN_ID", "65")
+    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "0")
     monkeypatch.setenv(
         "CYCLONEDDS_URI",
         "<CycloneDDS><Domain><General><Interfaces>"

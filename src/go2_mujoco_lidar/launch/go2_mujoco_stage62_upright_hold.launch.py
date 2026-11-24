@@ -1,3 +1,9 @@
+"""진단용 Domain 1 upright hold와 720×8·±15° planar LiDAR 입력을 시작한다.
+
+설치 indoor world를 raycast에 사용한다. physics는 같은 world로 따로 시작해야 하며
+controller는 stand pose만 유지한다. RL 주행용 sim 세션과 함께 실행하지 않는다.
+"""
+
 import os
 from pathlib import Path
 
@@ -24,7 +30,7 @@ def generate_launch_description() -> LaunchDescription:
                 "model_path",
                 default_value=str(package_share / "scene" / "go2_indoor.xml"),
             ),
-            DeclareLaunchArgument("horizontal_samples", default_value="360"),
+            DeclareLaunchArgument("horizontal_samples", default_value="720"),
             DeclareLaunchArgument("vertical_samples", default_value="8"),
             DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
             DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),

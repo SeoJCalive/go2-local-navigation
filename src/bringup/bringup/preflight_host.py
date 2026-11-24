@@ -1,4 +1,10 @@
-"""AGX host의 thermal trip·kernel event·잔류 process를 관찰한다."""
+"""
+AGX 자원을 관찰하고 runner가 만든 POSIX session만 종료·감사한다.
+
+호출자는 start_new_session=True로 만든 Popen PID를 session ID로 전달한다.
+launch parent에 SIGINT를 한 번 보내고, 종료 뒤 남은 같은 session의 child에만
+TERM/KILL을 적용한다. 다른 ROS 실행의 이름이나 command marker로 소유권을 추정하지 않는다.
+"""
 
 import os
 import re
@@ -6,6 +12,7 @@ import signal
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Final
 
 from bringup.preflight_resources import KernelObservation
@@ -13,27 +20,6 @@ from bringup.preflight_resources import KernelObservation
 KERNEL_FAILURE_PATTERN: Final = re.compile(
     r"out of memory|oom-kill|thermal.*thrott|thrott.*thermal",
     re.IGNORECASE,
-)
-PROCESS_MARKERS: Final = (
-    "async_slam_toolbox_node",
-    "base_to_utlidar_lidar_static_tf",
-    "behavior_server",
-    "bt_navigator",
-    "controller_server",
-    "go2_integrated_preflight_observer",
-    "go2_fault_fixture",
-    "go2_mapping_cloud_gate",
-    "go2_motion_adapter",
-    "go2_obstacle_candidates",
-    "go2_odometry_adapter",
-    "lifecycle_manager_navigation",
-    "lifecycle_manager_controller",
-    "map_server",
-    "planner_server",
-    "robot_state_publisher",
-    "pointcloud_to_laserscan_node",
-    "static_transform_publisher",
-    "synthetic_navigation_fixture",
 )
 
 
@@ -95,43 +81,46 @@ def collect_kernel_observation(start_epoch_seconds: float) -> KernelObservation:
     return KernelObservation(available=True, forced_failure_events=events)
 
 
-def scan_residual_processes(excluded_pid: int) -> tuple[str, ...]:
-    """현재 runner를 제외하고 project process marker가 남았는지 확인한다."""
+def scan_residual_processes(
+    session_ids: tuple[int, ...], proc_root: Path = Path("/proc"),
+) -> tuple[str, ...]:
+    """소유한 session에 남은 실행 중 process만 반환한다; zombie는 제외한다."""
     residual: list[str] = []
-    for cmdline_path in Path("/proc").glob("[0-9]*/cmdline"):
+    for cmdline_path in proc_root.glob("[0-9]*/cmdline"):
         pid = int(cmdline_path.parent.name)
-        if pid == excluded_pid:
-            continue
         try:
+            fields = cmdline_path.with_name("stat").read_text().rsplit(")", 1)[1].split()
+            if int(fields[3]) not in session_ids or fields[0] == "Z":
+                continue
             command = cmdline_path.read_bytes().replace(b"\x00", b" ").decode(
                 "utf-8", errors="replace"
             )
         except (FileNotFoundError, PermissionError, ProcessLookupError):
             continue
-        marker = next(
-            (item for item in PROCESS_MARKERS if item in command),
-            None,
-        )
-        if marker is not None:
-            residual.append(f"{pid}:{marker}")
+        residual.append(f"{pid}:{command.strip()}")
     return tuple(sorted(residual))
 
 
 def stop_owned_process(process: subprocess.Popen[str]) -> int:
-    """runner가 시작한 process group을 SIGINT, 필요 시 SIGTERM으로 종료한다."""
-    return_code = process.poll()
-    if return_code is not None:
-        return return_code
-    try:
-        os.killpg(process.pid, signal.SIGINT)
-    except ProcessLookupError:
-        return process.wait()
-    try:
-        return process.wait(timeout=15)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGTERM)
-    try:
-        return process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        return process.wait()
+    """Parent-only SIGINT와 bounded group escalation으로 orphan child까지 정리한다."""
+    if process.poll() is None:
+        try:
+            process.send_signal(signal.SIGINT)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            pass
+    for action, timeout in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+        if not scan_residual_processes((process.pid,)):
+            break
+        try:
+            os.killpg(process.pid, action)
+        except ProcessLookupError:
+            break
+        deadline = monotonic() + timeout
+        while scan_residual_processes((process.pid,)) and monotonic() < deadline:
+            sleep(0.05)
+        process.poll()
+    return process.wait()

@@ -2,6 +2,7 @@
 
 publisher 시작 전 sim domain/loopback을 검사한다. legacy model_path interface는
 유지한다. 실제 simulator world 일치 확인과 odom/SLAM 조합은 go2_sim_bringup을 쓴다.
+기본 raster는 9/28 checkpoint의 720×8·수직 ±15°이며 scan은 planar selection이다.
 """
 
 import os
@@ -47,7 +48,7 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(
         [
             DeclareLaunchArgument("model_path", default_value=default_model),
-            DeclareLaunchArgument("horizontal_samples", default_value="360"),
+            DeclareLaunchArgument("horizontal_samples", default_value="720"),
             DeclareLaunchArgument("vertical_samples", default_value="8"),
             DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
             DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),

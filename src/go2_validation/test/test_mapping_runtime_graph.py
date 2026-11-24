@@ -16,7 +16,8 @@ class _GraphNode:
 def test_given_mapping_graph_when_projected_then_local_tf_owner_is_excluded() -> None:
     # Given: the prior observer graph and QoS ownership surface.
     from go2_validation.mapping_runtime_graph import (
-        RAW_ODOMETRY_QOS,
+        MAP_QOS,
+        STREAM_QOS,
         global_tf_owner_nodes,
         node_paths,
     )
@@ -24,7 +25,8 @@ def test_given_mapping_graph_when_projected_then_local_tf_owner_is_excluded() ->
     # When: graph helpers inspect the same endpoint identities.
     node = _GraphNode()
 
-    # Then: mapping owner and subscription depth behavior survive the extraction.
+    # Then: the active observer subscriptions retain their map/stream QoS.
     assert node_paths(node) == {"/slam_toolbox", "/mapping/observer"}
     assert global_tf_owner_nodes(node) == {"/slam_toolbox"}
-    assert RAW_ODOMETRY_QOS.depth == 1000
+    assert MAP_QOS.depth == 1
+    assert STREAM_QOS.depth == 100

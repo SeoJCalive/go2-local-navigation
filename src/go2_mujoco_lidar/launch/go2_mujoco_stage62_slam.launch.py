@@ -1,3 +1,9 @@
+"""진단용 upright 입력·odometry와 단일 SLAM을 조합한다.
+
+720×8·±15° raster를 하위 launch로 전달하며 scan은 planar-selected cloud를 쓴다.
+physics 시작·종료는 소유하지 않는다; RL 주행에는 go2_sim_navigation을 사용한다.
+"""
+
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -18,7 +24,7 @@ def generate_launch_description() -> LaunchDescription:
     environment_only = LaunchConfiguration("environment_only")
     return LaunchDescription(
         [
-            DeclareLaunchArgument("horizontal_samples", default_value="360"),
+            DeclareLaunchArgument("horizontal_samples", default_value="720"),
             DeclareLaunchArgument("vertical_samples", default_value="8"),
             DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
             DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),

@@ -8,8 +8,7 @@ simulator가 이미 읽은 model의 메모리 hash를 뜻하지 않는다.
 
 import hashlib
 from pathlib import Path
-from urllib.parse import unquote, urlparse
-from xml.etree import ElementTree
+from bringup.dds_environment import cyclonedds_network_matches
 
 
 def simulation_domain(environment, allow_unsafe=False):
@@ -21,22 +20,9 @@ def simulation_domain(environment, allow_unsafe=False):
     # Preserve the existing Domain-1 runbook: it uses an explicit Cyclone lo XML
     # with ROS_LOCALHOST_ONLY=0. Read that file, never infer isolation from its name.
     if not localhost and environment.get("RMW_IMPLEMENTATION") == "rmw_cyclonedds_cpp":
-        uri = urlparse(environment.get("CYCLONEDDS_URI", ""))
-        if uri.scheme == "file" and uri.netloc in ("", "localhost"):
-            document = ElementTree.parse(unquote(uri.path))
-            domains = [
-                item for item in document.findall(".//{*}Domain")
-                if item.get("id", "any") in ("any", str(domain))
-            ]
-            interfaces = [
-                item for section in domains for item in section.findall(".//{*}NetworkInterface")
-            ]
-            peers = [item for section in domains for item in section.findall(".//{*}Peer")]
-            localhost = (
-                bool(interfaces)
-                and all(item.get("name") == "lo" for item in interfaces)
-                and all(item.get("Address") in ("127.0.0.1", "::1") for item in peers)
-            )
+        localhost = cyclonedds_network_matches(
+            environment.get("CYCLONEDDS_URI", ""), "lo", domain,
+        )
     if not allow_unsafe and (domain == 0 or not localhost):
         raise RuntimeError(
             "simulation refused: use non-zero ROS_DOMAIN_ID and ROS_LOCALHOST_ONLY=1 "

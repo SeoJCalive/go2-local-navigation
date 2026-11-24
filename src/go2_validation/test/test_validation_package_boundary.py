@@ -26,7 +26,9 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
     assert (VALIDATION_ROOT / "go2_validation/__init__.py").is_file()
     assert (VALIDATION_ROOT / "launch/go2_fault_acceptance.launch.py").is_file()
     assert (VALIDATION_ROOT / "launch/go2_integrated_preflight.launch.py").is_file()
-    assert _children(NAV2_ROOT / "go2_nav2") == {"__init__.py"}
+    assert _children(NAV2_ROOT / "go2_nav2") == {
+        "__init__.py", "sim_session.py", "sim_session_guard.py", "tf2_exec.py",
+    }
     assert _children(NAV2_ROOT / "launch") == {
         "go2_costmap_only.launch.py",
         "go2_controller_preview.launch.py",
@@ -41,6 +43,7 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
         "navigation_contract.yaml",
         "saved_map_localization.yaml",
         "slam_mapping.yaml",
+        "nav2_mujoco.yaml",
     }
     assert _children(NAV2_ROOT / "test") == {
         "test_navigation_configuration.py",
@@ -48,6 +51,8 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
         "test_live_navigation_observer_configuration.py",
         "test_nav2_shadow_runtime_configuration.py",
         "test_shadow_assets.py",
+        "test_sim_session.py",
+        "test_mujoco_rotation.py",
     }
 
 
@@ -58,7 +63,8 @@ def test_given_package_metadata_when_read_then_validation_executables_have_one_o
     assert all(f'"{executable} = ' in validation_setup for executable in EXECUTABLES)
     assert validation_setup.count("go2_validation.") == 7
     assert all(executable not in navigation_setup for executable in EXECUTABLES)
-    assert "console_scripts" not in navigation_setup
+    assert '"sim_session_guard = go2_nav2.sim_session_guard:main"' in navigation_setup
+    assert "go2_validation." not in navigation_setup
 
 
 def test_given_validation_package_when_replay_is_retired_then_no_rosbag_surface_remains() -> None:

@@ -13,6 +13,13 @@ stack 조합과 host lifecycle은 `go2_validation` runner가 소유한다.
 fault scenario schema, 실행 mode별 domain 계약과 global TF owner 판정도 이
 패키지의 공통 계약으로 관리한다.
 
+W06에서 static TF parser의 validation report 타입 import를 제거했다.
+`dds_environment.py`는 inline/file URI의 활성 domain XML을 실제로 읽는 공통 network
+판정이며 sim guard와 validation observer가 함께 쓴다. `preflight_host.py`의 종료는
+parent-only SIGINT 후 owned session의 잔류 child에 TERM/KILL을 적용한다.
+잔류 검사에는 `start_new_session=True`로 시작한 PID만 session ID로 전달하며,
+다른 실행의 ROS node 이름·command marker는 process 소유권 근거로 사용하지 않는다.
+
 ## 현재 범위
 
 - `/utlidar/cloud`, `/utlidar/imu`, `/lf/lowstate`의 관찰 정보 보존

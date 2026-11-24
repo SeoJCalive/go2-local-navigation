@@ -7,6 +7,7 @@ CycloneDDS URI와 simulated-time 선택을 순수하게 검사해 실패 reason 
 import os
 from dataclasses import dataclass
 from typing import Final
+from bringup.dds_environment import cyclonedds_network_matches
 
 SHADOW_DOMAIN_ID: Final = 65
 SHADOW_RMW: Final = "rmw_cyclonedds_cpp"
@@ -48,9 +49,14 @@ def assess_shadow_environment(environment: ShadowEnvironment) -> str | None:
         return "shadow_rmw_mismatch"
     if environment.go2_interface != SHADOW_INTERFACE:
         return "shadow_interface_mismatch"
-    if 'name="lo"' not in environment.cyclonedds_uri:
+    if not cyclonedds_network_matches(
+        environment.cyclonedds_uri, "lo", environment.ros_domain_id,
+    ):
         return "shadow_cyclonedds_interface_mismatch"
-    if 'multicast="false"' not in environment.cyclonedds_uri:
+    if not cyclonedds_network_matches(
+        environment.cyclonedds_uri, "lo", environment.ros_domain_id,
+        require_multicast_disabled=True,
+    ):
         return "shadow_multicast_must_be_disabled"
     if not environment.use_sim_time:
         return "shadow_sim_time_required"

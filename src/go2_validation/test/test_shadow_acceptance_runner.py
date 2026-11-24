@@ -94,7 +94,9 @@ def test_given_non_loopback_or_wall_time_when_environment_assessed_then_domain65
         65,
         "rmw_cyclonedds_cpp",
         "lo",
-        '<NetworkInterface name="lo" multicast="false" />',
+        '<CycloneDDS><Domain><General><Interfaces>'
+        '<NetworkInterface name="lo" multicast="false" />'
+        '</Interfaces></General></Domain></CycloneDDS>',
         True,
     )
 

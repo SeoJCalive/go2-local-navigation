@@ -1,7 +1,6 @@
 
 """한 fault fixture launch attempt와 그 child lifecycle만 소유한다."""
 from dataclasses import dataclass
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -116,7 +115,7 @@ def run_fault_attempt(
         events=observer.observed_events(),
         global_tf_owner_count=observer.global_tf_owner_count,
         residual_nodes=observer.residual_nodes(),
-        residual_processes=scan_residual_processes(os.getpid()),
+        residual_processes=scan_residual_processes((process.pid,)),
         command_publisher_max=observer.command_publisher_max,
         control_node_seen=observer.control_node_seen,
         log_path=log_path,

@@ -13,8 +13,6 @@ from pathlib import Path
 
 import yaml
 
-from bringup.preflight_result import JsonDocument, JsonValue
-
 
 @dataclass(frozen=True, slots=True)
 class StaticTfProfile:
@@ -97,19 +95,19 @@ def _require_scope(scope: str, mode: ExecutionMode) -> None:
             raise StaticTfProfileError("unknown_static_tf_profile_scope", scope)
 
 
-def _required_mapping(value: JsonValue, field_name: str) -> JsonDocument:
+def _required_mapping(value: object, field_name: str) -> dict:
     if not isinstance(value, dict):
         raise StaticTfProfileError("static_tf_profile_mapping_invalid", field_name)
     return value
 
 
-def _required_string(value: JsonValue, field_name: str) -> str:
+def _required_string(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value:
         raise StaticTfProfileError("static_tf_profile_string_invalid", field_name)
     return value
 
 
-def _required_vector(value: JsonValue, length: int, field_name: str) -> tuple[float, ...]:
+def _required_vector(value: object, length: int, field_name: str) -> tuple[float, ...]:
     if not isinstance(value, list) or len(value) != length:
         raise StaticTfProfileError("static_tf_profile_vector_invalid", field_name)
     parsed: list[float] = []

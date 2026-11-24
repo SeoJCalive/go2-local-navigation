@@ -4,6 +4,7 @@
 // Consecutive state/raycast failures exhaust a positive error budget and escape
 // the executor to main's non-zero exit; a successful scan clears that budget.
 // This node has no physical command interface.
+// Default raster: 720 x 8, +/-15 degrees; scan consumes base-planar selection.
 #include "go2_mujoco_lidar/lidar_model.hpp"
 #include "go2_mujoco_lidar/step_pairing.hpp"
 
@@ -105,7 +106,7 @@ public:
   : Node("go2_mujoco_lidar"),
     model_(
       declare_parameter<std::string>("model_path"),
-      declare_parameter<int>("horizontal_samples", 360),
+      declare_parameter<int>("horizontal_samples", 720),
       declare_parameter<int>("vertical_samples", 8),
       declare_parameter<double>("vertical_min", -0.2617993877991494),
       declare_parameter<double>("vertical_max", 0.2617993877991494),

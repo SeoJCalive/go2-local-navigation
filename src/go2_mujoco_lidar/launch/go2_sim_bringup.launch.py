@@ -78,7 +78,7 @@ def generate_launch_description():
         DeclareLaunchArgument("allow_unsafe_simulation", default_value="false",
                               choices=["true", "false"]),
         DeclareLaunchArgument("raycast_error_limit", default_value="3"),
-        DeclareLaunchArgument("horizontal_samples", default_value="360"),
+        DeclareLaunchArgument("horizontal_samples", default_value="720"),
         DeclareLaunchArgument("vertical_samples", default_value="8"),
         DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
         DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),
