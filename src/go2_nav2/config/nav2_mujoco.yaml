@@ -75,6 +75,9 @@ controller_server:
 bt_navigator:
   ros__parameters:
     use_sim_time: true
+    # Humble's implicit 20 ms RPC wait is shorter than a 100 ms control cycle.
+    # Allow that cycle plus scheduling margin for action acknowledgement/result.
+    default_server_timeout: 500
     global_frame: "map"
     robot_base_frame: "base"
     odom_topic: "/odom"
