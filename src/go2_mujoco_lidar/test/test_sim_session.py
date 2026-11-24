@@ -1,7 +1,8 @@
-"""환경 행렬과 별도 /proc fixture로 sim boundary 및 MJCF 선택을 검사한다."""
+"""환경·/proc fixture의 sim boundary와 실제 설치 map-save CLI 실행을 검사한다."""
 
 import importlib.util
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -10,6 +11,17 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "go2_mujoco_lidar/sim_sessio
 SPEC = importlib.util.spec_from_file_location("sim_session", MODULE_PATH)
 SESSION = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SESSION)
+
+
+def test_installed_map_save_cli_runs_without_ros_startup():
+    """Both copy and symlink installs must expose an executable CLI."""
+    from ament_index_python.packages import get_package_prefix
+    executable = (
+        Path(get_package_prefix("go2_mujoco_lidar"))
+        / "lib/go2_mujoco_lidar/sim_save_map")
+    completed = subprocess.run(
+        [str(executable), "--help"], capture_output=True, timeout=5.0)
+    assert completed.returncode == 0, completed.stderr
 
 
 @pytest.mark.parametrize("domain,localhost,allowed", [
