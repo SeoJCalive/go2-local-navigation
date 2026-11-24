@@ -30,15 +30,29 @@ controller_server:
       xy_goal_tolerance: 0.15
       yaw_goal_tolerance: 0.20
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
+      # Humble 1.1.20 shim: path/goal heading uses a constant signed velocity.
+      # D01 qpos: +/-0.5 commands yield -0.362/+0.374 rad/s, both responsive.
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "dwb_core::DWBLocalPlanner"
+      angular_dist_threshold: 0.35
+      angular_disengage_threshold: 0.10
+      forward_sampling_distance: 0.30
+      rotate_to_heading_angular_vel: 0.5
+      rotate_to_goal_heading: true
+      # At 10 Hz, allow the full +/-0.5 command even from opposite +/-1 odom.
+      # This is command slew, not a change to the policy's physical acceleration.
+      max_angular_accel: 20.0
+      simulate_ahead_time: 1.0
       min_vel_x: 0.0
       max_vel_x: 0.25
       max_vel_y: 0.0
       min_vel_y: 0.0
       max_vel_theta: 1.0
-      min_speed_xy: 0.0
+      # XYThetaIterator rejects only when BOTH speeds are below their minima.
+      # Positive XY minimum is necessary to exclude weak in-place yaw samples.
+      min_speed_xy: 0.05
       max_speed_xy: 0.25
-      min_speed_theta: 0.0
+      min_speed_theta: 0.5
       acc_lim_x: 0.5
       acc_lim_y: 0.0
       acc_lim_theta: 1.0

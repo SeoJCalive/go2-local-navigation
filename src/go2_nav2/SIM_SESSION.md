@@ -5,6 +5,27 @@
 각각 별도 process다. 모드 전환은 simulator를 reset하지 않고 ROS 세션만 재시작한다.
 physics를 reset했다면 simulator/RL/ROS 세션 모두 새로 시작한다.
 
+## 회전 명령과 정책 범위
+
+`nav2_mujoco.yaml`은 Humble Nav2 1.1.20의 RotationShimController로 경로 초기
+방향과 최종 방향을 맞춘다. shim은 signed `0.5 rad/s`를 내며 goal checker가
+`0.15 m / 0.20 rad`에서 종료한다. 10 Hz에서 명령상 한 주기 회전량은
+`0.05 rad`로 yaw 허용오차보다 작다. 경로 방향 진입/이탈 기준은 `0.35/0.10 rad`다.
+shim의 command slew `20 rad/s²`는 반대 방향 odom `1 rad/s`에서도 한 주기 안에
+`0.5 rad/s`를 요청하도록 한다. 실제 정책 가속도나 DWB rollout 가속도를 바꾸지 않는다.
+
+D01 freejoint qpos 실측에서 제자리 `-0.5/+0.5` 입력의 응답은
+`-0.362/+0.374 rad/s`다. 음의 `-0.3`은 `-0.014`에 그쳐 양방향 하한은
+`0.5`로 선택했다. 기존 progress `0.20 rad / 10 s`는 유지한다.
+최저 실측 회전율로도 0.20 rad에 약 0.56초가 필요하다.
+DWB `XYThetaIterator::isValidSpeed`는 XY와 theta 최저 조건을 AND로 결합하므로
+`min_speed_theta`만 올리는 대신 `min_speed_xy=0.05`도 함께 지정한다.
+이는 느린/제자리 DWB 회전 후보에도 하한을 적용한다.
+
+bridge는 Velocity_Down의 `v0.1.8_fast_flat_40k/params/deploy.yaml`에 맞춰
+vx `[-2,4]`, vy `[-1,1]`, yaw `[-2,2]`를 정규화한다. 다른 policy 선택은
+이 범위 계약을 다시 확인해야 한다. 위 수치는 MuJoCo 전용이며 실물 성능 근거가 아니다.
+
 ## 환경과 시작 순서
 
 1. clean shell에서 자신이 관리하는 simulator를 `-s WORLD -i DOMAIN -n lo`로 시작한다.
