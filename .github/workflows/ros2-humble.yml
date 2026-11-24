@@ -1,3 +1,6 @@
+# 목적: 고정 외부 simulator/메시지를 준비하고 ROS workspace를 build/test한다.
+# 입력은 이 저장소의 source와 third_party pin이며, 결과는 colcon test-result로 보고한다.
+# simulator GUI는 시작하지 않는다. MuJoCo C++ 테스트는 publisher를 생성하지 않는다.
 name: ROS 2 Humble CI
 
 on:
@@ -40,6 +43,9 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+            git ca-certificates curl cmake make g++ \
+            libyaml-cpp-dev libspdlog-dev libboost-program-options-dev \
+            libglfw3-dev libeigen3-dev libfmt-dev \
             python3-colcon-common-extensions \
             python3-pip \
             python3-rosdep \
@@ -54,6 +60,13 @@ jobs:
             --as-root apt:false \
             --reinstall \
             -y
+
+      - name: Prepare pinned MuJoCo and patched simulator
+        run: |
+          sim_deps="${RUNNER_TEMP}/go2-sim-deps"
+          bash third_party/unitree_mujoco/setup.sh "$sim_deps"
+          echo "MUJOCO_ROOT=$sim_deps/mujoco-3.3.6" >> "$GITHUB_ENV"
+          echo "UNITREE_MUJOCO_ROOT=$sim_deps/unitree_mujoco" >> "$GITHUB_ENV"
 
       - name: Build workspace
         run: |

@@ -37,6 +37,9 @@
 `MUJOCO_ROOT`는 `include/`와 `lib/`가 있는 MuJoCo 배포 경로이고,
 `UNITREE_MUJOCO_ROOT`는 공식 저장소 루트다.
 
+새 환경에서는 [고정 simulator·MuJoCo 설치 절차](../../third_party/unitree_mujoco/README.md)로
+필수 상태 패치를 적용한 뒤 두 환경변수를 지정한다.
+
 ```bash
 export MUJOCO_ROOT=/path/to/unitree_mujoco/simulate/mujoco
 export UNITREE_MUJOCO_ROOT=/path/to/unitree_mujoco
