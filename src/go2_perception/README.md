@@ -5,6 +5,10 @@ obstacle candidate PointCloud2로 보고하는 읽기 전용 경계다. candidat
 장애물 분류도 free-space 증명도 아니다. 별도의 mapping ingress는 malformed·empty·
 NaN-only·stale cloud를 차단한 뒤 공식 `pointcloud_to_laserscan` node에 전달한다.
 
+mapping gate는 `use_sim_time=true`일 때 `go2_state_estimation.simulation_epoch`의
+공유 clock-jump helper를 사용해 역행 시 timestamp baseline을 비운다. 일반 입력의
+timestamp regression 차단은 유지하며 SLAM/AMCL 지도 reset은 수행하지 않는다.
+
 ## 입력과 출력 경계
 
 - 입력: `/utlidar/cloud` (`sensor_msgs/msg/PointCloud2`), `RELIABLE`,

@@ -4,6 +4,10 @@
 수용한 frame mapping이 적용된 경우 `/odom`과 `odom → base` dynamic TF를 제공한다.
 source probe는 계속 읽기 전용이며, adapter는 유효한 source sample만 출력한다.
 
+`use_sim_time=true`에서는 `simulation_epoch.py`의 공유 ROS clock backward-jump
+handler로 timestamp·continuity baseline을 비운다. mapping cloud gate도 같은 helper를
+사용한다. 새 epoch의 입력은 node 재시작 없이 처리하며 SLAM/AMCL 지도는 관리하지 않는다.
+
 현재 source child frame은 `base_link`로 관찰됐고 프로젝트 canonical target frame은
 `base`다. 이 패키지는 `base_link → base`를 프로젝트 통합 mapping으로 수용한다.
 이는 공식 onboard frame 정의나 독립 물리 calibration의 확정이 아니며, adapter는

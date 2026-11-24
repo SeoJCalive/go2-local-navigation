@@ -9,6 +9,7 @@
 
   <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>go2_state_estimation</exec_depend>
   <exec_depend>pointcloud_to_laserscan</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

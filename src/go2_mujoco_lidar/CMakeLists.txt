@@ -1,3 +1,4 @@
+# Build MuJoCo sensor runtime and independent state/planar checks; install ROS assets.
 cmake_minimum_required(VERSION 3.16)
 project(go2_mujoco_lidar)
 
@@ -59,6 +60,10 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/scene/go2_indoor.xml"
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  add_executable(state_contract_test test/test_state_contract.cpp src/lidar_model.cpp)
+  target_include_directories(state_contract_test PRIVATE include "${MUJOCO_INCLUDE_DIR}")
+  target_link_libraries(state_contract_test "${MUJOCO_LIBRARY}")
+  add_test(NAME state_contract_test COMMAND state_contract_test)
   add_executable(planar_selection_test
     test/test_planar_selection.cpp
     src/lidar_model.cpp
@@ -67,7 +72,8 @@ if(BUILD_TESTING)
   target_link_libraries(planar_selection_test "${MUJOCO_LIBRARY}")
   add_test(NAME planar_selection_test COMMAND planar_selection_test)
   ament_add_pytest_test(stage45_integration_contract test/test_stage45_integration_contract.py)
-  ament_add_pytest_test(stage6_slam_contract test/test_stage6_slam_contract.py)
+  ament_add_pytest_test(stage6_slam_contract test/test_stage6_slam_contract.py
+    ENV "GO2_LIDAR_EXECUTABLE=$<TARGET_FILE:mujoco_lidar_node>")
   ament_add_pytest_test(stage62_upright_hold_contract test/test_stage62_upright_hold_contract.py)
 endif()
 

@@ -1,3 +1,6 @@
+// Read the IMU/base offset only from the MJCF imu site. Convert Sport world
+// site pose/velocity and body gyro to base pose/body twist. Raycasting uses
+// that same base pose and the matched LowState joints in a private model.
 #include "go2_mujoco_lidar/lidar_model.hpp"
 
 #include <algorithm>
@@ -13,7 +16,6 @@ namespace go2_mujoco_lidar
 namespace
 {
 constexpr double kPi = 3.14159265358979323846;
-constexpr std::array<double, 3> kImuOffset{-0.02557, 0.0, 0.04232};
 constexpr std::array<double, 3> kLidarTranslation{0.28945, 0.0, -0.046825};
 constexpr double kLidarPitch = 2.8782;
 
@@ -38,14 +40,46 @@ std::array<double, 4> normalized(std::array<double, 4> quaternion)
   const double norm = std::sqrt(
     quaternion[0] * quaternion[0] + quaternion[1] * quaternion[1] +
     quaternion[2] * quaternion[2] + quaternion[3] * quaternion[3]);
-  if (norm < 1.0e-9) {
-    throw std::runtime_error("base quaternion is zero");
+  if (!std::isfinite(norm) || norm < 1.0e-9) {
+    throw std::runtime_error("base quaternion is nonfinite or zero");
   }
   for (double & value : quaternion) {
     value /= norm;
   }
   return quaternion;
 }
+}
+
+BaseState base_state_from_imu(
+  const std::array<double, 3> & position,
+  const std::array<double, 4> & quaternion,
+  const std::array<double, 3> & world_velocity,
+  const std::array<double, 3> & body_gyro,
+  const std::array<double, 3> & imu_offset)
+{
+  for (const auto & vector : {position, world_velocity, body_gyro}) {
+    for (const auto value : vector) {
+      if (!std::isfinite(value)) {
+        throw std::runtime_error("nonfinite IMU position, velocity or gyro");
+      }
+    }
+  }
+  BaseState state{};
+  state.quaternion = normalized(quaternion);
+  const auto rotated_offset = rotate(state.quaternion, imu_offset);
+  const std::array<double, 4> inverse{
+    state.quaternion[0], -state.quaternion[1], -state.quaternion[2], -state.quaternion[3]};
+  const auto site_body_velocity = rotate(inverse, world_velocity);
+  const std::array<double, 3> rotational_velocity{
+    body_gyro[1] * imu_offset[2] - body_gyro[2] * imu_offset[1],
+    body_gyro[2] * imu_offset[0] - body_gyro[0] * imu_offset[2],
+    body_gyro[0] * imu_offset[1] - body_gyro[1] * imu_offset[0]};
+  for (int axis = 0; axis < 3; ++axis) {
+    state.position[axis] = position[axis] - rotated_offset[axis];
+    state.linear_velocity[axis] = site_body_velocity[axis] - rotational_velocity[axis];
+  }
+  state.angular_velocity = body_gyro;
+  return state;
 }
 
 std::vector<int> select_planar_ray_indices(
@@ -133,6 +167,17 @@ LidarModel::LidarModel(
   if (base_body_id_ < 0 || model_->nq < 19) {
     throw std::runtime_error("official Go2 freejoint model contract is missing");
   }
+  const int imu_site = mj_name2id(model_.get(), mjOBJ_SITE, "imu");
+  if (imu_site < 0 || model_->site_bodyid[imu_site] != base_body_id_) {
+    throw std::runtime_error("imu site must belong to base_link");
+  }
+  for (int axis = 0; axis < 3; ++axis) {
+    imu_offset_[axis] = model_->site_pos[imu_site * 3 + axis];
+  }
+  // The pinned Go2 sensors use the base axes. Do not silently accept another mount.
+  if (model_->site_quat[imu_site * 4] != 1.0) {
+    throw std::runtime_error("imu site axes must align with base_link");
+  }
   if (environment_only_) {
     ray_geom_groups_[0] = 1;
     for (int geom_id = 0; geom_id < model_->ngeom; ++geom_id) {
@@ -187,18 +232,18 @@ const std::vector<int> & LidarModel::planar_ray_indices() const
 }
 
 void LidarModel::update_state(
-  const std::array<double, 3> & imu_position,
-  const std::array<double, 4> & base_quaternion_wxyz,
+  const BaseState & state,
   const std::array<double, 12> & motor_positions)
 {
-  const auto quaternion = normalized(base_quaternion_wxyz);
-  const auto rotated_imu_offset = rotate(quaternion, kImuOffset);
   for (int axis = 0; axis < 3; ++axis) {
-    data_->qpos[axis] = imu_position[axis] - rotated_imu_offset[axis];
-    data_->qpos[axis + 3] = quaternion[axis];
+    data_->qpos[axis] = state.position[axis];
+    data_->qpos[axis + 3] = state.quaternion[axis];
   }
-  data_->qpos[6] = quaternion[3];
+  data_->qpos[6] = state.quaternion[3];
   for (std::size_t index = 0; index < motor_positions.size(); ++index) {
+    if (!std::isfinite(motor_positions[index])) {
+      throw std::runtime_error("nonfinite motor position");
+    }
     data_->qpos[motor_qpos_addresses_[index]] = motor_positions[index];
   }
   mj_forward(model_.get(), data_.get());

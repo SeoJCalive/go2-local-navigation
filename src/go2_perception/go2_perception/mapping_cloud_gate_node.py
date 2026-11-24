@@ -1,4 +1,7 @@
-"""Forward validated PointCloud2 input to the mapping-only output topic."""
+"""유효 cloud를 mapping에 전달하고 sim clock 역행 시 timestamp baseline을 비운다.
+
+공유 simulation_epoch helper는 use_sim_time일 때만 동작한다. 지도는 관리하지 않는다.
+"""
 
 from struct import error as StructError
 from typing import Final
@@ -11,6 +14,7 @@ from sensor_msgs_py import point_cloud2
 
 from go2_perception.mapping_cloud_contract import MappingCloudSample, assess_mapping_cloud
 from go2_perception.obstacle_candidate_node import POINT_CLOUD_QOS
+from go2_state_estimation.simulation_epoch import watch_simulation_epoch
 
 
 INPUT_TOPIC: Final = "/utlidar/cloud"
@@ -24,8 +28,12 @@ class MappingCloudGateNode(Node):
     def __init__(self) -> None:
         super().__init__("go2_mapping_cloud_gate")
         self._previous_stamp_nanoseconds: int | None = None
+        self._simulation_epoch_handler = watch_simulation_epoch(self, self._reset_epoch)
         self._publisher = self.create_publisher(PointCloud2, OUTPUT_TOPIC, POINT_CLOUD_QOS)
         self.create_subscription(PointCloud2, INPUT_TOPIC, self._on_cloud, POINT_CLOUD_QOS)
+
+    def _reset_epoch(self) -> None:
+        self._previous_stamp_nanoseconds = None
 
     def _on_cloud(self, message: PointCloud2) -> None:
         stamp_nanoseconds = (

@@ -1,4 +1,6 @@
 #pragma once
+// MJCF raycast and IMU-site -> base state boundary. Raycast and odometry
+// share the transformed base pose; twist uses the base axes and origin.
 
 #include <mujoco/mujoco.h>
 
@@ -10,6 +12,21 @@
 
 namespace go2_mujoco_lidar
 {
+
+struct BaseState
+{
+  std::array<double, 3> position;
+  std::array<double, 4> quaternion;
+  std::array<double, 3> linear_velocity;
+  std::array<double, 3> angular_velocity;
+};
+
+BaseState base_state_from_imu(
+  const std::array<double, 3> & position,
+  const std::array<double, 4> & quaternion,
+  const std::array<double, 3> & world_velocity,
+  const std::array<double, 3> & body_gyro,
+  const std::array<double, 3> & imu_offset);
 
 struct RayHit
 {
@@ -40,9 +57,9 @@ public:
     bool environment_only);
 
   void update_state(
-    const std::array<double, 3> & imu_position,
-    const std::array<double, 4> & base_quaternion_wxyz,
+    const BaseState & state,
     const std::array<double, 12> & motor_positions);
+  const std::array<double, 3> & imu_offset() const {return imu_offset_;}
   std::vector<RayHit> cast() const;
   const std::vector<int> & planar_ray_indices() const;
 
@@ -58,6 +75,7 @@ private:
   std::unique_ptr<mjModel, ModelDeleter> model_;
   std::unique_ptr<mjData, DataDeleter> data_;
   std::array<int, 12> motor_qpos_addresses_{};
+  std::array<double, 3> imu_offset_{};
   std::vector<mjtNum> sensor_directions_;
   std::vector<int> planar_ray_indices_;
   std::array<mjtByte, mjNGROUP> ray_geom_groups_{};

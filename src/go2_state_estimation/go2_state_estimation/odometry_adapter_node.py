@@ -3,6 +3,8 @@ Read the Unitree odometry source and expose the project odom interface.
 
 Only the project-accepted ``base_link`` to ``base`` mapping is applied. The
 node publishes ``/odom`` and ``odom -> base`` TF; it does not command Go2.
+With use_sim_time, the shared backward-clock handler clears timestamp and
+continuity baselines; it does not manage SLAM/AMCL maps.
 """
 
 from pathlib import Path
@@ -31,6 +33,7 @@ from go2_state_estimation.continuity_profiles import (
     ContinuityProfileError,
     load_continuity_profile,
 )
+from go2_state_estimation.simulation_epoch import watch_simulation_epoch
 
 
 SOURCE_ODOMETRY_TOPIC: Final = "/utlidar/robot_odom"
@@ -63,6 +66,7 @@ class OdometryAdapterNode(Node):
         self._rejected_sample_count = 0
         self._continuity_violation_count = 0
         self._seen_warning_codes: set[str] = set()
+        self._simulation_epoch_handler = watch_simulation_epoch(self, self._reset_epoch)
         self._odom_publisher = self.create_publisher(
             Odometry,
             PROJECT_ODOMETRY_TOPIC,
@@ -95,6 +99,11 @@ class OdometryAdapterNode(Node):
     def continuity_violation_count(self) -> int:
         """Return source-valid continuity failures and recovery-pending observations."""
         return self._continuity_violation_count
+
+    def _reset_epoch(self) -> None:
+        self._previous_timestamp_nanoseconds = None
+        self._continuity_state = ContinuityState()
+        self._loss_reported = False
 
     def _load_continuity_profile(self) -> ContinuityProfile:
         profile_id = self.declare_parameter(

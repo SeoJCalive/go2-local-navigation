@@ -101,6 +101,9 @@ class _RecordingNode:
     def declare_parameter(self, _name: str, default_value: str) -> SimpleNamespace:
         return SimpleNamespace(value=default_value)
 
+    def get_parameter(self, _name: str) -> SimpleNamespace:
+        return SimpleNamespace(value=False)
+
     def get_logger(self) -> _FakeLogger:
         return _FakeLogger([])
 

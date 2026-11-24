@@ -1,4 +1,9 @@
+// Join simulation-only DDS state at identical stamps, then convert to base
+// pose/body twist. The wall timer consumes each fresh pair once for cloud/odom;
+// Sport input drives /clock. Reset clears the epoch; steady time detects stalls.
+// This node has no physical command interface.
 #include "go2_mujoco_lidar/lidar_model.hpp"
+#include "go2_mujoco_lidar/step_pairing.hpp"
 
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -68,25 +73,25 @@ sensor_msgs::msg::PointCloud2 make_cloud(
 
 nav_msgs::msg::Odometry make_odometry(
   const rclcpp::Time & stamp,
-  const unitree_go::msg::SportModeState & sport_state)
+  const BaseState & state)
 {
   nav_msgs::msg::Odometry odometry;
   odometry.header.stamp = stamp;
   odometry.header.frame_id = kOdomFrame;
   odometry.child_frame_id = kBaseFrame;
-  odometry.pose.pose.position.x = sport_state.position[0];
-  odometry.pose.pose.position.y = sport_state.position[1];
-  odometry.pose.pose.position.z = sport_state.position[2];
-  odometry.pose.pose.orientation.w = sport_state.imu_state.quaternion[0];
-  odometry.pose.pose.orientation.x = sport_state.imu_state.quaternion[1];
-  odometry.pose.pose.orientation.y = sport_state.imu_state.quaternion[2];
-  odometry.pose.pose.orientation.z = sport_state.imu_state.quaternion[3];
-  odometry.twist.twist.linear.x = sport_state.velocity[0];
-  odometry.twist.twist.linear.y = sport_state.velocity[1];
-  odometry.twist.twist.linear.z = sport_state.velocity[2];
-  odometry.twist.twist.angular.x = sport_state.imu_state.gyroscope[0];
-  odometry.twist.twist.angular.y = sport_state.imu_state.gyroscope[1];
-  odometry.twist.twist.angular.z = sport_state.imu_state.gyroscope[2];
+  odometry.pose.pose.position.x = state.position[0];
+  odometry.pose.pose.position.y = state.position[1];
+  odometry.pose.pose.position.z = state.position[2];
+  odometry.pose.pose.orientation.w = state.quaternion[0];
+  odometry.pose.pose.orientation.x = state.quaternion[1];
+  odometry.pose.pose.orientation.y = state.quaternion[2];
+  odometry.pose.pose.orientation.z = state.quaternion[3];
+  odometry.twist.twist.linear.x = state.linear_velocity[0];
+  odometry.twist.twist.linear.y = state.linear_velocity[1];
+  odometry.twist.twist.linear.z = state.linear_velocity[2];
+  odometry.twist.twist.angular.x = state.angular_velocity[0];
+  odometry.twist.twist.angular.y = state.angular_velocity[1];
+  odometry.twist.twist.angular.z = state.angular_velocity[2];
   return odometry;
 }
 }
@@ -107,13 +112,8 @@ public:
       declare_parameter<bool>("environment_only", false))
   {
     const double publish_rate = declare_parameter<double>("publish_rate", 10.0);
-    maximum_state_skew_milliseconds_ =
-      declare_parameter<std::int64_t>("maximum_state_skew_milliseconds", 2);
     if (publish_rate <= 0.0) {
       throw std::invalid_argument("publish_rate must be positive");
-    }
-    if (maximum_state_skew_milliseconds_ < 0) {
-      throw std::invalid_argument("maximum_state_skew_milliseconds must be non-negative");
     }
     const auto subscription_qos = rclcpp::SensorDataQoS();
     const auto publisher_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
@@ -129,15 +129,24 @@ public:
     low_state_subscription_ = create_subscription<unitree_go::msg::LowState>(
       declare_parameter<std::string>("low_state_topic", "/lowstate"), subscription_qos,
       [this](unitree_go::msg::LowState::ConstSharedPtr message) {
-        low_state_ = std::move(message);
+        const auto stamp = static_cast<std::int64_t>(message->tick) * 1000000;
+        if (pairing_.add_low(stamp, std::move(message))) {
+          log_reset();
+        }
       });
     sport_state_subscription_ = create_subscription<unitree_go::msg::SportModeState>(
       declare_parameter<std::string>("sport_state_topic", "/sportmodestate"), subscription_qos,
       [this](unitree_go::msg::SportModeState::ConstSharedPtr message) {
-        sport_state_ = std::move(message);
+        const auto stamp = static_cast<std::int64_t>(message->stamp.sec) * 1000000000 +
+          message->stamp.nanosec;
+        const auto sec = message->stamp.sec;
+        const auto nanosec = message->stamp.nanosec;
+        if (pairing_.add_sport(stamp, std::move(message))) {
+          log_reset();
+        }
         rosgraph_msgs::msg::Clock clock;
-        clock.clock.sec = sport_state_->stamp.sec;
-        clock.clock.nanosec = sport_state_->stamp.nanosec;
+        clock.clock.sec = sec;
+        clock.clock.nanosec = nanosec;
         clock_publisher_->publish(clock);
       });
     timer_ = create_wall_timer(
@@ -147,37 +156,54 @@ public:
   }
 
 private:
+  void log_reset()
+  {
+    RCLCPP_WARN(get_logger(), "simulation time moved backwards; resetting paired state epoch");
+    last_fresh_input_ = std::chrono::steady_clock::now();
+    stale_logged_ = false;
+  }
+
   void publish_scan()
   {
-    if (!low_state_ || !sport_state_) {
+    const auto pair = pairing_.take();
+    if (!pair) {
+      if (!stale_logged_ &&
+        std::chrono::steady_clock::now() - last_fresh_input_ > std::chrono::seconds(1))
+      {
+        RCLCPP_WARN(
+          get_logger(), "no fresh matched simulation step for 1 s; output stopped "
+          "(matched=%zu buffer_dropped=%zu)",
+          pairing_.matched(), pairing_.dropped());
+        stale_logged_ = true;
+      }
       return;
     }
-    const std::int64_t sport_milliseconds =
-      static_cast<std::int64_t>(sport_state_->stamp.sec) * 1000 +
-      static_cast<std::int64_t>(sport_state_->stamp.nanosec) / 1000000;
-    const auto state_skew_milliseconds = std::llabs(
-      sport_milliseconds - static_cast<std::int64_t>(low_state_->tick));
-    if (state_skew_milliseconds > maximum_state_skew_milliseconds_) {
-      RCLCPP_WARN_THROTTLE(
-        get_logger(), *get_clock(), 1000,
-        "state timestamps differ by %ld ms; dropping LiDAR frame",
-        static_cast<long>(state_skew_milliseconds));
-      return;
+    last_fresh_input_ = std::chrono::steady_clock::now();
+    if (stale_logged_) {
+      RCLCPP_INFO(get_logger(), "fresh matched simulation input recovered");
+      stale_logged_ = false;
     }
+    const auto & sport_state = *pair->sport;
     std::array<double, 3> imu_position{};
     std::array<double, 4> quaternion{};
+    std::array<double, 3> world_velocity{};
+    std::array<double, 3> body_gyro{};
     std::array<double, 12> motors{};
     for (std::size_t index = 0; index < imu_position.size(); ++index) {
-      imu_position[index] = sport_state_->position[index];
+      imu_position[index] = sport_state.position[index];
+      world_velocity[index] = sport_state.velocity[index];
+      body_gyro[index] = sport_state.imu_state.gyroscope[index];
     }
     for (std::size_t index = 0; index < quaternion.size(); ++index) {
-      quaternion[index] = sport_state_->imu_state.quaternion[index];
+      quaternion[index] = sport_state.imu_state.quaternion[index];
     }
     for (std::size_t index = 0; index < motors.size(); ++index) {
-      motors[index] = low_state_->motor_state[index].q;
+      motors[index] = pair->low->motor_state[index].q;
     }
     try {
-      model_.update_state(imu_position, quaternion, motors);
+      const auto state = base_state_from_imu(
+        imu_position, quaternion, world_velocity, body_gyro, model_.imu_offset());
+      model_.update_state(state, motors);
       const auto hits = model_.cast();
       const auto planar_hits = select_planar_hits(hits, model_.planar_ray_indices());
       std::size_t self_hits = 0;
@@ -185,11 +211,11 @@ private:
         self_hits += hit.robot_self ? 1U : 0U;
       }
       const rclcpp::Time stamp(
-        sport_state_->stamp.sec, sport_state_->stamp.nanosec, RCL_ROS_TIME);
+        sport_state.stamp.sec, sport_state.stamp.nanosec, RCL_ROS_TIME);
       raw_publisher_->publish(make_cloud(stamp, hits, false));
       filtered_publisher_->publish(make_cloud(stamp, hits, true));
       planar_publisher_->publish(make_cloud(stamp, planar_hits, false));
-      odometry_publisher_->publish(make_odometry(stamp, *sport_state_));
+      odometry_publisher_->publish(make_odometry(stamp, state));
       if (!first_scan_logged_) {
         RCLCPP_INFO(
           get_logger(), "first scan: raw=%zu self=%zu filtered=%zu planar=%zu",
@@ -203,9 +229,9 @@ private:
 
   LidarModel model_;
   bool first_scan_logged_{false};
-  std::int64_t maximum_state_skew_milliseconds_{2};
-  unitree_go::msg::LowState::ConstSharedPtr low_state_;
-  unitree_go::msg::SportModeState::ConstSharedPtr sport_state_;
+  bool stale_logged_{false};
+  std::chrono::steady_clock::time_point last_fresh_input_{std::chrono::steady_clock::now()};
+  StepPairing<unitree_go::msg::LowState, unitree_go::msg::SportModeState> pairing_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr raw_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr planar_publisher_;

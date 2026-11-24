@@ -7,15 +7,19 @@
 ## 처리 흐름
 
 - `mujoco_lidar_node`가 공식 `scene_terrain.xml`을 읽는다.
-- 같은 MuJoCo step에서 채워진 `SportModeState`의 위치·IMU quaternion과
-  `LowState.tick`으로 시점이 확인된 12개 관절각을 MJCF의 freejoint와 이름 기반 joint
-  주소에 반영한다. 시점 차이가 기본 2 ms를 넘으면 해당 frame을 폐기한다.
+- `SportModeState.stamp`와 `LowState.tick × 1 ms`가 정확히 같은 입력만 결합한다.
+  최대 128개 미완성 timestamp와 최신 완성 pair 하나를 보관한다. wall timer는
+  완성 pair를 한 번만 소비하므로 누락·중복·입력 정지 때 cached 출력을 반복하지 않는다.
+- MJCF `imu` site의 base 기준 위치를 offset의 단일 원본으로 사용한다.
+  `p_base = p_imu - R r`, `v_base_body = Rᵀ v_imu_world - ω_body × r`로
+  한 번 변환한 base pose를 raycast와 odometry 양쪽에 적용한다.
 - 프로젝트가 수용한 `base -> utlidar_lidar` 좌표에서 `mj_multiRay`를 실행한다.
 - raw hit를 `/utlidar/cloud`에 보존하고, 각 점에 `hit_geom_id`와 `hit_body_id`를
   기록한다.
 - 같은 simulation-time stamp로 `/clock`, cloud와 `/utlidar/robot_odom`을 발행한다. frame은
-  `odom -> base_link`이고, pose·linear velocity는 `SportModeState`, orientation·angular
-  velocity는 같은 `SportModeState.imu_state`에서 온다. `LowState`는 관절각에만 사용한다.
+  `odom -> base_link`이고 pose는 base 원점의 world 좌표, twist는 base 원점/축이다.
+  orientation·angular velocity는 같은 `SportModeState.imu_state`에서 온다.
+  `LowState`는 관절각에만 사용한다. `/clock`은 Sport callback에서 갱신한다.
 - base의 자손 body에 맞은 점만 자기반사로 판정해
   `/simulation/utlidar/cloud_self_filtered`에서 제외한다.
 - 기존 ray를 base 좌표계로 회전해 각 base 방위각에서 절대 수직각이 가장 작은 ray
@@ -50,6 +54,13 @@ ros2 launch go2_mujoco_lidar go2_mujoco_stage6_slam.launch.py
 
 두 상태 토픽을 모두 받기 전에는 cloud를 발행하지 않는다. 기본 raster는
 360×8, 10 Hz, 0.25~5.0 m이며 기존 `/scan`은 0.5° 720-bin 계약을 유지한다.
+
+입력 시간이 역행하면 pending pair와 소비 이력을 비우고 두 stream의 새 epoch를
+기다린다. reset마다 경고 한 번을 남긴다. 1초 동안 새 matched step이 없으면
+steady clock 기준 경고 한 번을 남기고, 재수신 시 복구를 기록한다.
+use_sim_time인 mapping gate와 odometry adapter도 공유 clock-jump helper로 baseline을
+초기화하므로 node 재시작 없이 cloud와 odom이 복구된다. SLAM/AMCL 지도 reset과
+이전 지도에서 navigation을 재개하는 정책은 이 입력 복구 계약에 포함하지 않는다.
 
 `go2_mujoco_stage6_slam.launch.py`는 Stage 4/5가 `/scan`을, bringup adapter가
 `/odom`을 각각 한 번씩 소유하도록 유지하고, `start_inputs=false`·`use_sim_time=true`로
