@@ -3,7 +3,7 @@
 start_new_session으로 소유 경계를 만든다. parent가 먼저 종료해도 session의
 child를 확인하고 group TERM/KILL을 적용한다. Linux subreaper로 고아 child도
 직접 회수한다. 종료 대기 중 pump는 ROS observer callback을 계속 처리한다.
-기존 Domain 1 프로세스 snapshot은 읽기 전용이며 signal 대상에 포함하지 않는다.
+기존 Domain 1/42 프로세스 snapshot은 읽기 전용이며 signal 대상에 포함하지 않는다.
 """
 
 import ctypes
@@ -35,13 +35,20 @@ def snapshot():
 
 
 def existing_stack(project):
-    """기존 Domain 1 app의 PID/start tick/argv를 보존한다."""
+    """기존 Domain 1/42 app의 PID/start tick/argv를 보존한다."""
     result = {}
     for pid, row in snapshot().items():
         argv = row["argv"]
-        if any(value.startswith(str(project / "install") + "/") for value in argv) or (
+        try:
+            environment = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            environment = []
+        protected_domain = any(
+            value in {b"ROS_DOMAIN_ID=1", b"ROS_DOMAIN_ID=42"} for value in environment)
+        if protected_domain or any(value.startswith(str(project / "install") + "/") for value in argv) or (
             Path(argv[0]).name in {"unitree_mujoco", "go2_ctrl"}
-            and any(argv[index:index + 2] in (["-i", "1"], ["-d", "1"])
+            and any(argv[index:index + 2] in (
+                ["-i", "1"], ["-d", "1"], ["-i", "42"], ["-d", "42"])
                     for index in range(len(argv) - 1))
         ) or any("/go2_nav2_mujoco_bridge/install/" in value for value in argv):
             result[str(pid)] = {"start_ticks": row["start_ticks"], "argv": argv}
@@ -73,9 +80,11 @@ class OwnedProcesses:
 
     def stop(self, process):
         began = time.monotonic()
+        sent = []
         self.observe()
         if process.poll() is None:
             process.send_signal(signal.SIGINT)
+            sent.append(int(signal.SIGINT))
         phases = [(None, 15), (signal.SIGTERM, 10), (signal.SIGKILL, 5)]
         for action, timeout in phases:
             current = snapshot()
@@ -86,6 +95,7 @@ class OwnedProcesses:
             if action is not None:
                 try:
                     os.killpg(process.pid, action)
+                    sent.append(int(action))
                 except ProcessLookupError:
                     pass
             deadline = time.monotonic() + timeout
@@ -106,7 +116,7 @@ class OwnedProcesses:
         remaining = {pid: row for pid, row in snapshot().items()
                      if row["session"] == process.pid}
         self.stops.append({"pid": process.pid, "wall_sec": time.monotonic() - began,
-                           "remaining": sorted(remaining)})
+                           "remaining": sorted(remaining), "signals": sent})
         if remaining:
             raise RuntimeError(f"owned session {process.pid} survived: {remaining}")
         return process.returncode

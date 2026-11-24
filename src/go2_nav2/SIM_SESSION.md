@@ -4,6 +4,10 @@ W04에서 내부 입력은 `go2_inputs`, static TF와 공통 DDS 판정은 `desc
 실물 후보는 `optional/real_robot`, 개발 검증은 `tools/go2_validation`으로 이동했다.
 이 문서의 공개 sim 명령·Nav2 설정 경로·topic·frame·기본값은 유지한다.
 현재 package layout과 bridge migration은 [W04_BOUNDARIES.md](W04_BOUNDARIES.md)를 따른다.
+W07부터 전용 simulator/RL/bridge를 시작하는 반복 수용 시험은
+[추적 하네스](../go2_mujoco_lidar/test/acceptance/README.md)를 사용한다.
+아래 W05 시점의 bridge Domain 41 거부 기록은 당시 binary에 대한 관찰이다.
+W07 수용 시험은 `cleanup/domain-guard` bridge를 별도 `/tmp` prefix에 빌드한다.
 
 시뮬레이션의 sensors·SLAM/AMCL·Nav2를 한 진입점에서 시작하고 저장 지도를
 명시적으로 다시 선택할 때 사용한다. simulator, RL controller와 FIFO bridge는
@@ -104,6 +108,33 @@ spawn에 재사용할 값이 아니다. `INITIAL_POSE_SENT_ONCE`는 active AMCL�
 yaw 0.5 rad window를 검사해 `INITIAL_POSE_ACCEPTED`를 기록한다. 이 window는
 초기화 수락 조건이며 localization 정확도 합격 기준이 아니다. 수락된 후에만
 navigation lifecycle을 시작한다. 90 wall seconds 내 수락/시작이 없으면 실패한다.
+
+## 종료 순서
+
+localization의 costmap은 TF timeout에 ROS 시간을 사용하므로 `/clock` 입력보다
+먼저 deactivate/cleanup되어야 한다. W07 자동 runner는 launch PID에만 SIGINT를
+보낸다. 제품 launch의 cooperative Shutdown hook이 Nav2 → localization 순서로
+SHUTDOWN하고 여섯 GetState FINALIZED를 확인한 뒤 입력의 종료를 진행한다.
+
+직접 terminal에서 실행한 세션은 같은 ROS/DDS 환경의 별도 shell에서 아래처럼
+먼저 lifecycle을 종료하고, 반환된 여섯 state가 4(FINALIZED)임을 확인한 뒤
+원래 terminal의 Ctrl+C로 process를 종료한다. terminal이 전체 foreground group에
+바로 보내는 SIGINT는 이미 모든 child에 전달되므로 launch hook의 순서와 다르다.
+
+```bash
+python3 - <<'PY'
+from go2_nav2.sim_session_guard import shutdown_managed_nodes
+print(shutdown_managed_nodes([
+    ("navigation", ["planner_server", "controller_server", "behavior_server", "bt_navigator"]),
+    ("localization", ["map_server", "amcl"]),
+]))
+PY
+```
+
+이미 모두 FINALIZED인 group은 SHUTDOWN을 다시 보내지 않는다.
+Humble manager는 첫 SHUTDOWN 뒤 내부 lifecycle clients를 제거한다.
+manager의 success만으로 종료를 판정하지 않고 각 node의 실제 state를 확인한다.
+mapping은 기존처럼 종료하고 모든 owned PID가 사라진 뒤 다음 mode를 시작한다.
 
 ## 소유권과 provenance
 

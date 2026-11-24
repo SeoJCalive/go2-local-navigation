@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- RMW selects lo with ROS_LOCALHOST_ONLY; native drivers select lo explicitly.
+     Change Domain id together with --domain for a different isolated run. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="41">
+    <General><AllowMulticast>false</AllowMulticast></General>
+    <Discovery>
+      <Tag>go2-w07-acceptance</Tag>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+      <Peers><Peer Address="127.0.0.1" /></Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

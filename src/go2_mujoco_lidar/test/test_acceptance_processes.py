@@ -7,17 +7,18 @@ import signal
 import subprocess
 import sys
 import time
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent / "acceptance"))
 from owned_processes import OwnedProcesses
 
 
-def test_parent_exit_keeps_pumping_and_reaps_only_owned_session():
+@pytest.mark.parametrize("ignore_term", [False, True])
+def test_parent_exit_keeps_pumping_and_reaps_only_owned_session(ignore_term):
     ticks = []
 
     def pump():
         ticks.append(time.monotonic())
-        select.select([], [], [], 0.01)
 
     manager = OwnedProcesses(pump)
     other = subprocess.Popen([sys.executable, "-c", "import signal; signal.pause()"],
@@ -25,9 +26,12 @@ def test_parent_exit_keeps_pumping_and_reaps_only_owned_session():
     process = manager.start([
         sys.executable, "-u", "-c",
         "import os, signal, sys;"
+        "r,w=os.pipe();"
         "child=os.fork();"
-        "print(child, flush=True) if child else None;"
+        f"signal.signal(signal.SIGTERM, {'signal.SIG_IGN' if ignore_term else 'signal.SIG_DFL'}) if not child else None;"
+        "os.write(w,b'1') if not child else os.read(r,1);"
         "signal.signal(signal.SIGINT, lambda *_: sys.exit(7));"
+        "print(child, flush=True) if child else None;"
         "signal.pause()",
     ], stdout=subprocess.PIPE, text=True)
     try:
@@ -38,6 +42,8 @@ def test_parent_exit_keeps_pumping_and_reaps_only_owned_session():
         manager.stop(process)
         assert ticks
         assert process.returncode == 7
+        assert signal.SIGTERM in manager.stops[-1]["signals"]
+        assert (signal.SIGKILL in manager.stops[-1]["signals"]) is ignore_term
         assert not manager.remaining()
         assert not Path(f"/proc/{child}").exists()
         assert other.poll() is None
