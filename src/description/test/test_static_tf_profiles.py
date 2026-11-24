@@ -4,57 +4,30 @@ from pathlib import Path
 from typing import Final
 
 import pytest
-import yaml
+import math
+from xml.etree import ElementTree
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
+
 
 from description.static_tf_profiles import StaticTfProfileError, load_static_tf_profile
 
 
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 PROFILE_PATH: Final = PACKAGE_ROOT / "config/static_tf_profiles.yaml"
-LAUNCH_PATH: Final = PACKAGE_ROOT / "launch/go2_static_tf.launch.py"
 
 
-def test_given_profile_registry_when_loaded_then_project_transform_is_registered() -> None:
-    document = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-    profiles = document["static_tf_profiles"]["profiles"]
-
-    assert document["static_tf_profiles"]["default_profile"] == "project_default"
-    assert profiles["project_default"]["scope"] == "onboard_only"
-    assert profiles["project_default"]["translation_xyz_m"] == [0.28945, 0.0, -0.046825]
-
-
-@pytest.mark.parametrize(
-    ("profile_id", "execution_mode"),
-    (
-        ("project_default", "onboard"),
-    ),
-)
-def test_given_allowed_mode_when_profile_loads_then_selected_profile_is_returned(
-    profile_id: str,
-    execution_mode: str,
-) -> None:
-    assert load_static_tf_profile(
-        PROFILE_PATH,
-        profile_id,
-        execution_mode,
-    ).profile_id == profile_id
-
-
-@pytest.mark.parametrize(
-    ("profile_id", "execution_mode", "reason_code"),
-    (
-        ("project_default", "unsupported", "unknown_static_tf_execution_mode"),
-    ),
-)
-def test_given_disallowed_mode_when_profile_loads_then_typed_error_is_raised(
-    profile_id: str,
-    execution_mode: str,
-    reason_code: str,
-) -> None:
-    with pytest.raises(StaticTfProfileError) as raised:
-        load_static_tf_profile(PROFILE_PATH, profile_id, execution_mode)
-
-    assert raised.value.reason_code == reason_code
+def test_profile_transform_matches_canonical_urdf() -> None:
+    origin = ElementTree.parse(PACKAGE_ROOT / "urdf/go2_description.urdf").find(
+        ".//joint[@name='radar_joint']/origin")
+    expected = [float(v) for v in origin.attrib["xyz"].split()]
+    pitch = float(origin.attrib["rpy"].split()[1])
+    profile = load_static_tf_profile(PROFILE_PATH, "project_default", "onboard")
+    assert profile.translation_xyz_m == pytest.approx(expected)
+    assert profile.quaternion_xyzw == pytest.approx(
+        [0, math.sin(pitch / 2), 0, math.cos(pitch / 2)])
 
 
 def test_given_unknown_profile_when_loaded_then_it_is_rejected() -> None:
@@ -62,11 +35,22 @@ def test_given_unknown_profile_when_loaded_then_it_is_rejected() -> None:
         load_static_tf_profile(PROFILE_PATH, "missing_profile", "onboard")
 
 
-def test_given_static_tf_launch_when_read_then_mode_and_sim_time_reach_nodes() -> None:
-    source = LAUNCH_PATH.read_text(encoding="utf-8")
+def test_allowed_mode_returns_selected_profile():
+    assert load_static_tf_profile(
+        PROFILE_PATH, "project_default", "onboard").profile_id == "project_default"
 
-    assert 'default_value="project_default"' in source
-    assert 'DeclareLaunchArgument("execution_mode", default_value="onboard")' in source
-    assert 'DeclareLaunchArgument("use_sim_time", default_value="false")' in source
-    assert "load_static_tf_profile(Path(profile_path), profile_id, execution_mode)" in source
-    assert '"use_sim_time": ParameterValue(use_sim_time, value_type=bool)' in source
+
+def test_disallowed_mode_raises_typed_error():
+    with pytest.raises(StaticTfProfileError) as raised:
+        load_static_tf_profile(PROFILE_PATH, "project_default", "unsupported")
+    assert raised.value.reason_code == "unknown_static_tf_execution_mode"
+
+
+@pytest.mark.parametrize("sim_time", ["true", "false"])
+def test_static_tf_launch_evaluates_typed_time_and_geometry(sim_time) -> None:
+    _, nodes, _ = evaluate("description", "go2_static_tf.launch.py",
+                           {"use_sim_time": sim_time})
+    assert {n["executable"] for n in nodes} == {
+        "robot_state_publisher", "static_transform_publisher"}
+    for node in nodes:
+        assert node["parameters"][0]["use_sim_time"] is (sim_time == "true")

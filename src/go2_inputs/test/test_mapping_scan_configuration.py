@@ -5,6 +5,11 @@ from typing import Final
 
 import pytest
 import yaml
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
+
 
 from go2_inputs.mapping_scan_profiles import (
     MappingScanProfileError,
@@ -14,7 +19,6 @@ from go2_inputs.mapping_scan_profiles import (
 
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 CONFIG_PATH: Final = PACKAGE_ROOT / "config/mapping_scan.yaml"
-LAUNCH_PATH: Final = PACKAGE_ROOT / "launch/go2_mapping_scan.launch.py"
 
 
 def test_given_mapping_scan_config_when_loaded_then_cloud_is_converted_to_base_scan() -> None:
@@ -80,14 +84,13 @@ def test_given_invalid_converter_override_when_loaded_then_parser_rejects_it(
     assert raised.value.reason_code == "mapping_scan_profile_integer_invalid"
 
 
-def test_given_mapping_launch_when_read_then_inputs_reach_converter() -> None:
-    source = LAUNCH_PATH.read_text(encoding="utf-8")
-
-    assert 'executable="mapping_cloud_gate"' in source
-    assert 'executable="pointcloud_to_laserscan_node"' in source
-    assert '("cloud_in", profile.converter_input_topic)' in source
-    assert '("scan", "/scan")' in source
-    assert '"raw_cloud_topic",' in source
-    assert "mapping_cloud_accumulator" not in source
-    assert '"execution_mode": execution_mode' in source
-    assert '"use_sim_time": use_sim_time' in source
+def test_mapping_launch_evaluates_typed_time_and_converter() -> None:
+    _, nodes, includes = evaluate("go2_inputs", "go2_mapping_scan.launch.py",
+                                  {"use_sim_time": "false"})
+    assert {n["executable"] for n in nodes} == {
+        "mapping_cloud_gate", "pointcloud_to_laserscan_node"}
+    assert len(includes) == 1
+    for node in nodes:
+        assert any(group.get("use_sim_time") is False for group in node["parameters"])
+    converter = next(n for n in nodes if n["executable"] == "pointcloud_to_laserscan_node")
+    assert converter["parameters"][0]["target_frame"] == "base"

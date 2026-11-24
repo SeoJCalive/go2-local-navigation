@@ -5,10 +5,14 @@ from typing import Final
 from xml.etree import ElementTree
 
 import yaml
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
+
 
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 CONFIG_PATH: Final = PACKAGE_ROOT / "config" / "nav2_shadow.yaml"
-LAUNCH_PATH: Final = PACKAGE_ROOT / "launch" / "go2_nav2_shadow.launch.py"
 MISSING_PLANNER_BT_PATH: Final = (
     PACKAGE_ROOT / "behavior_trees" / "navigate_to_pose_shadow_missing_planner.xml"
 )
@@ -39,31 +43,27 @@ def test_given_shadow_configuration_when_loaded_then_simulated_nav2_uses_shadow_
     assert behaviors["behavior_plugins"] == ["spin", "backup", "wait"]
 
 
-def test_given_shadow_launch_when_inspected_then_only_shadow_cmd_vel_is_exposed() -> None:
-    # Given: Domain 65의 loopback-only launch source
-    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
+def test_shadow_launch_contains_only_navigation_owners():
+    _, nodes, _ = evaluate("go2_nav2", "go2_nav2_shadow.launch.py")
+    assert {n["package"] for n in nodes} == {
+        "nav2_map_server", "nav2_planner", "nav2_controller", "nav2_bt_navigator",
+        "nav2_behaviors", "nav2_lifecycle_manager"}
+    for node in nodes:
+        if node["package"] in {"nav2_controller", "nav2_behaviors"}:
+            remaps = node["action"]._Node__remappings
+            from launch.utilities import perform_substitutions
+            from launch import LaunchContext
+            context = LaunchContext()
+            resolved = [(perform_substitutions(context, a), perform_substitutions(context, b))
+                        for a, b in remaps]
+            assert ("cmd_vel", "/go2_nav2/shadow_cmd_vel") in resolved
 
-    # When: runtime child와 velocity remapping을 확인한다.
-    # Then: Nav2 속도는 isolated topic으로만 가며 control package와 physical topic은 없다.
-    assert '"cmd_vel", "/go2_nav2/shadow_cmd_vel"' in launch_source
-    assert 'package="nav2_planner"' in launch_source
-    assert 'package="nav2_controller"' in launch_source
-    assert 'package="nav2_bt_navigator"' in launch_source
-    assert 'package="go2_control"' not in launch_source
-    assert "/api/sport/request" not in launch_source
-    assert "/lowcmd" not in launch_source
 
-
-def test_given_shadow_launch_when_inspected_then_behavior_server_is_lifecycle_managed() -> None:
-    # Given: Domain 65 Nav2 lifecycle composition source
-    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
-
-    # When: runtime package ownership and lifecycle names are inspected.
-    # Then: behavior server joins the same bounded Nav2 lifecycle.
-    assert 'package="nav2_behaviors"' in launch_source
-    assert 'executable="behavior_server"' in launch_source
-    assert 'name="behavior_server"' in launch_source
-    assert '"behavior_server"' in launch_source
+def test_behavior_server_is_in_actual_lifecycle_parameters():
+    _, nodes, _ = evaluate("go2_nav2", "go2_nav2_shadow.launch.py")
+    manager = next(n for n in nodes if n["package"] == "nav2_lifecycle_manager")
+    assert "behavior_server" in manager["parameters"][-1]["node_names"]
+    assert any(n["executable"] == "behavior_server" for n in nodes)
 
 
 def test_given_missing_planner_bt_when_parsed_then_it_selects_only_missing_planner() -> None:

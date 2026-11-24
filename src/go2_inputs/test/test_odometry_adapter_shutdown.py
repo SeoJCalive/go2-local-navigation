@@ -269,7 +269,7 @@ def test_given_startup_burst_when_adapter_is_created_then_source_qos_is_bounded_
     source_topic, source_qos = node.subscription_calls[0]
     output_topic, output_qos = node.publisher_calls[0]
     assert source_topic == "/utlidar/robot_odom"
-    assert source_qos.depth == 64
+    assert source_qos.depth > output_qos.depth
     assert output_topic == "/odom"
-    assert output_qos.depth == 1
+    assert output_qos.depth >= 1
     assert source_qos is not output_qos

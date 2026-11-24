@@ -4,10 +4,14 @@ from pathlib import Path
 from typing import Final
 
 import yaml
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
+
 
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 CONFIG_PATH: Final = PACKAGE_ROOT / "config/saved_map_localization.yaml"
-LAUNCH_PATH: Final = PACKAGE_ROOT / "launch/go2_saved_map_localization.launch.py"
 
 
 def test_given_localization_config_when_loaded_then_frames_and_owners_match() -> None:
@@ -28,30 +32,15 @@ def test_given_localization_config_when_loaded_then_frames_and_owners_match() ->
     assert amcl["tf_broadcast"] is True
 
 
-def test_given_localization_launch_when_inspected_then_control_path_is_absent() -> None:
-    # Given: saved-map localization만 조합해야 하는 runtime launch
-    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
-
-    # When: launch의 package owner와 인자를 조사한다.
-    # Then: map/AMCL/input owner는 있고 planner·controller·control owner는 없다.
-    assert 'package="nav2_map_server"' in launch_source
-    assert 'package="nav2_amcl"' in launch_source
-    assert 'name="map_server"' in launch_source
-    assert 'name="amcl"' in launch_source
-    assert 'DeclareLaunchArgument("map"' in launch_source
-    assert 'package="nav2_controller"' not in launch_source
-    assert 'package="go2_control"' not in launch_source
-    assert "/api/sport/request" not in launch_source
-    assert "/lowcmd" not in launch_source
+def test_localization_launch_has_only_input_and_localization_owners():
+    _, nodes, includes = evaluate("go2_nav2", "go2_saved_map_localization.launch.py")
+    assert {n["package"] for n in nodes} == {
+        "nav2_map_server", "nav2_amcl", "nav2_lifecycle_manager"}
+    assert len(includes) == 2
 
 
-def test_given_external_localization_inputs_when_launch_is_composed_then_duplicate_inputs_can_be_disabled() -> None:
-    # Given: 외부 simulation이 scan과 odometry 입력을 이미 소유하는 localization 합성 경로
-    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
-
-    # When: saved-map launch의 입력 소유권 선택을 읽는다.
-    # Then: 두 input include만 같은 조건으로 끄고 Map Server와 AMCL은 유지할 수 있다.
-    assert 'DeclareLaunchArgument("start_inputs", default_value="true")' in launch_source
-    assert launch_source.count("condition=IfCondition(start_inputs)") == 2
-    assert 'name="map_server"' in launch_source
-    assert 'name="amcl"' in launch_source
+def test_external_localization_disables_both_inputs():
+    _, nodes, includes = evaluate("go2_nav2", "go2_saved_map_localization.launch.py",
+                                  {"start_inputs": "false"})
+    assert not includes
+    assert {n["executable"] for n in nodes} == {"map_server", "amcl", "lifecycle_manager"}

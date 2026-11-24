@@ -1,8 +1,6 @@
 from dataclasses import replace
-from pathlib import Path
-from typing import Final
 
-from go2_inputs.continuity_profiles import load_continuity_profile
+from go2_inputs.continuity_profiles import ContinuityAction, ContinuityProfile
 from go2_inputs.odometry_contract import (
     ADAPTER_STATUS_BLOCKED,
     ADAPTER_STATUS_PROJECT_ACCEPTED,
@@ -26,8 +24,9 @@ OBSERVED_SAMPLE = OdometrySample(
     pose_covariance=(0.0,) * 36,
     twist_covariance=(0.0,) * 36,
 )
-PROFILE_PATH: Final = Path(__file__).parents[1] / "config" / "odometry_contract.yaml"
-ENFORCE_PROFILE = load_continuity_profile(PROFILE_PATH, "validation_enforce")
+# Caller-supplied test input, independent of the installed candidate limits.
+ENFORCE_PROFILE = ContinuityProfile(
+    "test", ContinuityAction.ENFORCE, 400_000_000, 1.0, 0.25, 2)
 
 
 def test_given_observed_source_when_validated_then_keeps_child_and_blocks_adapter() -> None:

@@ -10,8 +10,11 @@ from typing import Final
 from xml.etree import ElementTree
 
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
 PACKAGE_ROOT: Final = Path(__file__).resolve().parents[1]
-STAGE6_LAUNCH: Final = PACKAGE_ROOT / "launch" / "go2_mujoco_stage6_slam.launch.py"
 
 
 def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometry_is_published(
@@ -116,16 +119,10 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
         rclpy.shutdown()
 
 
-def test_given_stage6_when_started_then_existing_inputs_and_one_slam_owner_are_composed() -> None:
-    """Stage 4/5 owns scan, the adapter owns /odom, and SLAM owns map to odom."""
-    source = STAGE6_LAUNCH.read_text(encoding="utf-8")
-
-    assert '"go2_mujoco_stage45.launch.py"' in source
-    assert '"go2_odometry_adapter.launch.py"' in source
-    assert '"go2_slam_mapping.launch.py"' in source
-    assert '"start_inputs": "false"' in source
-    assert '"use_sim_time": "true"' in source
-    assert "go2_mapping_scan.launch.py" not in source
-    assert "go2_static_tf.launch.py" not in source
-    assert 'package="slam_toolbox"' not in source
-    assert "Node(" not in source
+def test_stage6_composes_external_inputs_and_single_slam():
+    _, nodes, includes = evaluate("go2_mujoco_lidar", "go2_mujoco_stage6_slam.launch.py")
+    assert not nodes
+    assert len(includes) == 3
+    slam = next(item for item in includes if "go2_slam_mapping" in str(item["path"]))
+    assert slam["arguments"]["start_inputs"] == "false"
+    assert slam["arguments"]["use_sim_time"] == "true"

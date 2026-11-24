@@ -1,16 +1,14 @@
+"""Evaluate installed Stage45 composition with an isolated domain."""
 from pathlib import Path
-from typing import Final
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
 
-
-PACKAGE_ROOT: Final = Path(__file__).resolve().parents[1]
-
-
-def test_launch_keeps_onboard_mode_and_uses_planar_selected_cloud() -> None:
-    source = (PACKAGE_ROOT / "launch" / "go2_mujoco_stage45.launch.py").read_text(
-        encoding="utf-8"
-    )
-
-    assert '"execution_mode": "onboard"' in source
-    assert 'PLANAR_TOPIC = "/simulation/utlidar/cloud_planar_selected"' in source
-    assert '"raw_cloud_topic": PLANAR_TOPIC' in source
-    assert "converter_min_height" not in source
+def test_stage45_composes_one_sensor_and_planar_mapping_input(monkeypatch):
+    monkeypatch.setenv("ROS_DOMAIN_ID", "41")
+    monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
+    _, nodes, includes = evaluate("go2_mujoco_lidar", "go2_mujoco_stage45.launch.py")
+    assert [n["executable"] for n in nodes] == ["mujoco_lidar_node"]
+    assert len(includes) == 1
+    assert includes[0]["arguments"]["raw_cloud_topic"] == (
+        "/simulation/utlidar/cloud_planar_selected")

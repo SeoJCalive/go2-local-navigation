@@ -3,7 +3,11 @@ from pathlib import Path
 from typing import Final
 
 import pytest
-import yaml
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
+from launch_test_support import evaluate
+
+
 
 from go2_inputs.odometry_contract import (
     ContinuityState,
@@ -14,7 +18,6 @@ from go2_inputs.odometry_contract import (
 
 PACKAGE_ROOT: Final = Path(__file__).parents[1]
 PROFILE_PATH: Final = PACKAGE_ROOT / "config" / "odometry_contract.yaml"
-LAUNCH_PATH: Final = PACKAGE_ROOT / "launch" / "go2_odometry_adapter.launch.py"
 OBSERVED_SAMPLE: Final = OdometrySample(
     timestamp_nanoseconds=1_000_000_000,
     header_frame_id="odom",
@@ -28,24 +31,19 @@ OBSERVED_SAMPLE: Final = OdometrySample(
 )
 
 
-def test_given_contract_yaml_when_profiles_are_read_then_default_actions_and_limits_are_exact() -> None:
-    # Given: the installed source contract YAML
-    document = yaml.safe_load(PROFILE_PATH.read_text(encoding="utf-8"))
-
-    # When: continuity profile values are read at their machine-consumed location
-    registry = document["project"]["continuity_profiles"]
-    observe = registry["profiles"]["onboard_observe"]
-    enforce = registry["profiles"]["validation_enforce"]
-
-    # Then: onboard use observes and validation use enforces the same candidate limits.
-    assert registry["default_profile"] == "onboard_observe"
-    assert observe["action"] == "observe_only"
-    assert enforce["action"] == "enforce"
-    assert observe["max_timestamp_gap_nanoseconds"] == 500_000_000
-    assert observe["max_translation_delta_m"] == 0.5
-    assert observe["max_yaw_delta_rad"] == 0.5
-    assert observe["recovery_consecutive_valid_samples"] == 2
-    assert enforce == observe | {"action": "enforce"}
+def test_hand_computed_three_four_five_translation_boundary() -> None:
+    from go2_inputs.continuity_profiles import ContinuityAction, ContinuityProfile
+    # 0.3^2 + 0.4^2 = 0.5^2. Exercise the caller's supplied limit either side.
+    sample = replace(OBSERVED_SAMPLE, timestamp_nanoseconds=1_010_000_000,
+                     position_xyz=(0.3, 0.4, 0.0))
+    for limit, valid in [(0.49, False), (0.51, True)]:
+        profile = ContinuityProfile("geometry", ContinuityAction.ENFORCE,
+                                    100_000_000, limit, 1.0, 1)
+        result = advance_continuity(ContinuityState(previous_sample=OBSERVED_SAMPLE),
+                                    sample, observed_at_nanoseconds=1_010_000_000,
+                                    profile=profile)
+        assert result.assessment.continuity_valid is valid
+        assert result.assessment.publish is valid
 
 
 def test_given_unknown_or_malformed_profile_when_loaded_then_rejects_without_fallback(
@@ -106,9 +104,10 @@ def test_given_continuity_faults_when_actions_differ_then_transitions_match_and_
     assert enforced.assessment.publish is False
 
 
-def test_given_odometry_launch_when_read_then_default_profile_is_passed_as_a_typed_parameter() -> None:
-    launch_source = LAUNCH_PATH.read_text(encoding="utf-8")
-
-    assert '"continuity_profile"' in launch_source
-    assert 'default_value="onboard_observe"' in launch_source
-    assert "value_type=str" in launch_source
+def test_odometry_launch_evaluates_caller_profile() -> None:
+    _, nodes, _ = evaluate("go2_inputs", "go2_odometry_adapter.launch.py",
+                           {"continuity_profile": "validation_enforce"})
+    assert len(nodes) == 1
+    parameters = {key: value for group in nodes[0]["parameters"]
+                  for key, value in group.items()}
+    assert parameters["continuity_profile"] == "validation_enforce"

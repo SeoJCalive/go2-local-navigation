@@ -62,6 +62,7 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/scene/go2_indoor.xml"
   DESTINATION share/${PROJECT_NAME}/scene)
 
 if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(tf2_msgs REQUIRED)
   find_package(CycloneDDS REQUIRED)
@@ -72,14 +73,21 @@ if(BUILD_TESTING)
   target_include_directories(state_contract_test PRIVATE include "${MUJOCO_INCLUDE_DIR}")
   target_link_libraries(state_contract_test "${MUJOCO_LIBRARY}")
   add_test(NAME state_contract_test COMMAND state_contract_test)
-  add_executable(planar_selection_test
+  ament_add_gtest(planar_selection_test
     test/test_planar_selection.cpp
     src/lidar_model.cpp
   )
   target_include_directories(planar_selection_test PRIVATE include "${MUJOCO_INCLUDE_DIR}")
   target_link_libraries(planar_selection_test "${MUJOCO_LIBRARY}")
-  add_test(NAME planar_selection_test COMMAND planar_selection_test)
+  # Manual negative proof: same oracle, deliberately altered elevation input.
+  # It is not registered with CTest and is never part of the passing suite.
+  ament_add_gtest_executable(planar_selection_broken_input
+    test/test_planar_selection.cpp src/lidar_model.cpp)
+  target_compile_definitions(planar_selection_broken_input PRIVATE W07_BROKEN_INPUT)
+  target_include_directories(planar_selection_broken_input PRIVATE include "${MUJOCO_INCLUDE_DIR}")
+  target_link_libraries(planar_selection_broken_input "${MUJOCO_LIBRARY}")
   ament_add_pytest_test(stage45_integration_contract test/test_stage45_integration_contract.py)
+  ament_add_pytest_test(acceptance_processes test/test_acceptance_processes.py)
   ament_add_pytest_test(sim_session_contract test/test_sim_session.py)
   ament_add_pytest_test(raycast_error_budget test/test_raycast_error_budget.py
     ENV "GO2_LIDAR_EXECUTABLE=$<TARGET_FILE:mujoco_lidar_node>")

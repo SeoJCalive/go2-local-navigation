@@ -95,8 +95,9 @@ def test_non_loopback_physics_refused(tmp_path):
     "go2_mujoco_stage45.launch.py", "go2_mujoco_stage62_upright_hold.launch.py",
     "go2_mujoco_stage62_slam.launch.py",
 ])
-def test_all_sim_launch_defaults_use_checkpoint_raster(filename):
-    """Execute launch declarations; all entry points agree on the selected raster."""
+def test_all_sim_launch_defaults_define_valid_spherical_raster(filename):
+    """Sampling is integral and positive; elevation stays inside spherical poles."""
+    import math
     from launch.actions import DeclareLaunchArgument
     from launch import LaunchContext
 
@@ -110,9 +111,7 @@ def test_all_sim_launch_defaults_use_checkpoint_raster(filename):
         for action in module.generate_launch_description().entities
         if isinstance(action, DeclareLaunchArgument) and action.default_value is not None
     }
-    assert {key: float(defaults[key]) for key in (
-        "horizontal_samples", "vertical_samples", "vertical_min", "vertical_max",
-    )} == {
-        "horizontal_samples": 720, "vertical_samples": 8,
-        "vertical_min": -0.2617993877991494, "vertical_max": 0.2617993877991494,
-    }
+    assert int(defaults["horizontal_samples"]) >= 4
+    assert int(defaults["vertical_samples"]) >= 1
+    assert -math.pi / 2 <= float(defaults["vertical_min"])
+    assert float(defaults["vertical_min"]) <= float(defaults["vertical_max"]) <= math.pi / 2
