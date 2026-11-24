@@ -1,5 +1,26 @@
 # W02 headless 상태 통합 시험
 
+W05 지도 세션 시험은 아래 `verify_navigation_session.py`를 사용한다.
+W03의 같은 Domain 41·전용 discovery tag와 정지 source를 재사용하며 주행 시험은 아니다.
+실행 순서와 외부 bridge의 Domain 1 제한은
+[Nav2 세션 문서](../../../go2_nav2/SIM_SESSION.md)에 있다.
+
+```bash
+# /tmp/w05-install과 bridge install을 source하되 새 W05 overlay가 마지막이어야 한다.
+# UNITREE_MUJOCO_ROOT, MUJOCO_ROOT, Domain/localhost/DDS는 W03 예와 같다.
+bash third_party/tf2/setup.sh /tmp/w05
+python3 src/go2_mujoco_lidar/test/headless/verify_navigation_session.py \
+  --output "$PWD/.omo/evidence/w05-navigation-session"
+```
+
+이 시험은 설치된 bridge의 Domain 41 거부를 실제로 기록한 뒤 mapping, 지도 저장,
+중복 모드 시작 거부, mapping 종료 후 localization, active AMCL에 초기 pose 1회,
+AMCL 수락 및 Nav2 6개 lifecycle active를 확인한다. edge별 DDS publisher identity는
+W03의 C++ observer로 확인하고 native child 6개의 실제 tf2 mapping을 보존한다.
+기존 simulator/RL/default-install/bridge stack의 PID·start tick·argv는 전후 비교하며
+시험이 시작한 PID만 종료한다. 새 실행은 기존 저장 지도 파일을 덮어쓰지 않으므로
+재시험에는 새 output directory를 지정한다.
+
 MuJoCo의 실제 qpos와 DDS를 거친 cloud/odom을 비교할 때 사용한다.
 GUI용 main 대신 작은 driver에서 W01에 고정된 `Go2Bridge::run()`과 `mj_step()`을
 호출한다. simulator checkout과 header patch는 [W01 pin](../../../../third_party/unitree_mujoco/README.md)을

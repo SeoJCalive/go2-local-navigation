@@ -1,5 +1,9 @@
 # `go2_nav2`
 
+MuJoCo의 현재 세션 진입점과 Nav2 설정 소유권은
+[SIM_SESSION.md](SIM_SESSION.md)를 따른다. 아래 비동작/합성 asset 설명은 legacy
+경로에도 적용된다. 현재 sim Nav2의 단일 설정은 `config/nav2_mujoco.yaml`이다.
+
 `go2_nav2`는 비동작 Nav2 runtime asset만 소유한다. local costmap, controller
 preview, SLAM mapping, saved-map localization, Domain 0 no-goal observer와 합성 전체
 Nav2 launch·설정·map·BT가 대상이다. 이 asset은 모두 실험 후보이며 production

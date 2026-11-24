@@ -57,6 +57,7 @@ ament_target_dependencies(go2_mujoco_upright_hold rclcpp unitree_go)
 install(TARGETS mujoco_lidar_node go2_mujoco_upright_hold
   DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/sim_save_map DESTINATION lib/${PROJECT_NAME})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/scene/go2_indoor.xml"
   DESTINATION share/${PROJECT_NAME}/scene)
 
