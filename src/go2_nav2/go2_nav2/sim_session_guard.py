@@ -4,19 +4,81 @@ AMCL의 새 map-frame pose가 요청 근처에 도착해야 navigation lifecycle
 이 확인은 초기화 수락 관찰이며 ground truth 위치 정확도 증명이 아니다.
 시작 제한 시간과 소유권 위반은 예외로 종료해 W03 launch가 전체 ROS 세션을 정리한다.
 simulator/RL/bridge의 종료 소유권은 이 node에 없다.
+shutdown_managed_nodes는 launch의 종료 hook에서 별도 wall-time ROS context로
+Nav2 manager를 순서대로 shutdown하고 각 node의 FINALIZED 상태를 확인한다.
+clock/TF 입력은 이 확인이 끝날 때까지 살아 있어야 한다.
 """
 
 import math
 import time
 
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from lifecycle_msgs.msg import State
 from lifecycle_msgs.srv import GetState
 from nav2_msgs.srv import ManageLifecycleNodes
 import rclpy
 from rclpy.clock import Clock, ClockType
+from rclpy.context import Context
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 
 from go2_nav2.sim_session import pose_accepted
+
+
+def shutdown_managed_nodes(managers, timeout_sec=8.0):
+    """Stop ordered (manager kind, node names) groups before clock/TF signals.
+
+    ManageLifecycleNodes.success alone is insufficient: Humble's manager can
+    return true after a failed transition. GetState FINALIZED is the oracle.
+    One wall deadline bounds discovery and responses even after sim-time reset.
+    """
+    context = Context()
+    rclpy.init(args=[], context=context, signal_handler_options=SignalHandlerOptions.NO)
+    node = rclpy.create_node("go2_sim_session_shutdown", context=context)
+    executor = SingleThreadedExecutor(context=context)
+    executor.add_node(node)
+    deadline = time.monotonic() + timeout_sec
+    states = {}
+
+    def response(service, name, request):
+        client = node.create_client(service, name)
+        while not client.service_is_ready():
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"shutdown service unavailable: {name}")
+            executor.spin_once(timeout_sec=max(0.0, min(0.05, deadline-time.monotonic())))
+        future = client.call_async(request)
+        while not future.done():
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"shutdown response missing: {name}")
+            executor.spin_once(timeout_sec=max(0.0, min(0.05, deadline-time.monotonic())))
+        return future.result()
+
+    try:
+        for kind, names in managers:
+            current = {
+                name: response(GetState, f"/{name}/get_state", GetState.Request()).current_state.id
+                for name in names}
+            if all(state == State.PRIMARY_STATE_FINALIZED for state in current.values()):
+                # Humble destroys a manager's clients on SHUTDOWN; do not issue
+                # another transition for an already finalized group.
+                states.update(current)
+                continue
+            request = ManageLifecycleNodes.Request()
+            request.command = ManageLifecycleNodes.Request.SHUTDOWN
+            if not response(
+                    ManageLifecycleNodes, f"/lifecycle_manager_{kind}/manage_nodes", request).success:
+                raise RuntimeError(f"lifecycle shutdown rejected: {kind}")
+            for name in names:
+                state = response(GetState, f"/{name}/get_state", GetState.Request()).current_state.id
+                states[name] = state
+                if state != State.PRIMARY_STATE_FINALIZED:
+                    raise RuntimeError(f"{name} not finalized after shutdown: state={state}")
+        return states
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        context.shutdown()
 
 
 class SessionGuard(Node):
