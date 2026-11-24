@@ -8,7 +8,7 @@ simulator가 이미 읽은 model의 메모리 hash를 뜻하지 않는다.
 
 import hashlib
 from pathlib import Path
-from bringup.dds_environment import cyclonedds_network_matches
+from description.dds_environment import cyclonedds_network_matches
 
 
 def simulation_domain(environment, allow_unsafe=False):

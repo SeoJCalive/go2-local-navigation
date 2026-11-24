@@ -1,5 +1,10 @@
 # go2_mujoco_lidar
 
+W04에서 scan·odometry 입력의 소유자는 `go2_inputs`, static TF·DDS 환경 판정의
+소유자는 `description`으로 바뀌었다. 아래 공개 sim 명령과 기본값은 유지한다.
+runtime은 실물 후보와 `go2_validation`에 의존하지 않는다.
+현재 4개 core 구조와 호출 이관은 [W04 기록](../go2_nav2/W04_BOUNDARIES.md)을 따른다.
+
 이 패키지는 공식 `unitree_mujoco`의 Go2 MJCF를 수정하지 않고, simulator가 ROS2로
 내보내는 `/lowstate`와 `/sportmodestate`를 별도 MuJoCo model에 반영해 LiDAR ray를
 계산할 때 사용한다. 실제 Go2 센서 드라이버를 대체하지 않는 simulation 전용 확장이다.

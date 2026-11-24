@@ -54,7 +54,7 @@ jobs:
           rosdep update
           source /opt/ros/humble/setup.bash
           rosdep install \
-            --from-paths src \
+            --from-paths src optional/real_robot tools/go2_validation \
             --ignore-src \
             --rosdistro humble \
             --as-root apt:false \
@@ -71,7 +71,9 @@ jobs:
       - name: Build workspace
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --symlink-install --event-handlers console_direct+
+          python3 tools/check_package_dependencies.py
+          colcon build --base-paths src optional/real_robot tools/go2_validation \
+            --symlink-install --event-handlers console_direct+
 
       - name: Verify Unitree message imports
         run: |

@@ -14,9 +14,9 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description() -> LaunchDescription:
     """Domain과 network는 runner가 소유하고 mapping process만 시작한다."""
-    bringup_share = get_package_share_directory("bringup")
+    bringup_share = get_package_share_directory("go2_inputs")
     nav2_share = get_package_share_directory("go2_nav2")
-    perception_share = get_package_share_directory("go2_perception")
+    perception_share = get_package_share_directory("go2_inputs")
     mapping_scan_launch = os.path.join(
         perception_share,
         "launch",

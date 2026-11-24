@@ -76,9 +76,9 @@ def main():
     stopped_at = None
     try:
         start("gate", [sys.executable, "-c",
-                      "from go2_perception.mapping_cloud_gate_node import main; main()"] + ros_args)
+                      "from go2_inputs.mapping_cloud_gate_node import main; main()"] + ros_args)
         start("adapter", [sys.executable, "-c",
-                         "from go2_state_estimation.odometry_adapter_node import main; main()"] + ros_args)
+                         "from go2_inputs.odometry_adapter_node import main; main()"] + ros_args)
         start("lidar", [args.lidar] + ros_args + [
             "-p", f"model_path:={args.model}", "-p", "horizontal_samples:=64",
             "-p", "vertical_samples:=1", "-p", "vertical_min:=0.0",

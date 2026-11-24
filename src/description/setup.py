@@ -1,3 +1,5 @@
+"""Install canonical model, static TF launch/profiles and shared DDS parser."""
+
 from glob import glob
 import os
 
@@ -16,12 +18,13 @@ setup(
         ]),
         (os.path.join("share", package_name), ["package.xml"]),
         (os.path.join("share", package_name, "config"), glob("config/*.yaml")),
+        (os.path.join("share", package_name, "launch"), glob("launch/*.py")),
         (
             os.path.join("share", package_name, "urdf"),
             glob("urdf/*.urdf") + glob("urdf/*.md"),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "PyYAML"],
     zip_safe=True,
     maintainer="Go2 project maintainers",
     maintainer_email="bi-agx1@invalid.example",

@@ -11,7 +11,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description() -> LaunchDescription:
     """Keep the Stage 4/5 scan and adapter odometry owners outside SLAM."""
     package_share = get_package_share_directory("go2_mujoco_lidar")
-    bringup_share = get_package_share_directory("bringup")
+    bringup_share = get_package_share_directory("go2_inputs")
     nav2_share = get_package_share_directory("go2_nav2")
     stage45_launch = os.path.join(
         package_share,

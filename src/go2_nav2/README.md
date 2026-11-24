@@ -1,5 +1,13 @@
 # `go2_nav2`
 
+W04 현재 역할은 공통 SLAM·saved-map AMCL·Nav2 runtime asset과 session guard다.
+직접 workspace 의존성은 `go2_inputs` 하나이며 실물 Sport·obstacle·validation을
+설치하지 않는다. `go2_controller_preview.launch.py`, `go2_costmap_only.launch.py`와
+`nav2_non_actuating.yaml`은 `optional/real_robot/bringup`으로 이동했다.
+shadow/live no-goal launch·map·정상/실패 BT는 W06에서 확인한 caller 때문에 유지한다.
+현재 sim 절차는 [SIM_SESSION.md](SIM_SESSION.md), 전체 구조는
+[W04_BOUNDARIES.md](W04_BOUNDARIES.md)를 따른다. 아래 stage 설명은 기존 검증 맥락이다.
+
 MuJoCo의 현재 세션 진입점과 Nav2 설정 소유권은
 [SIM_SESSION.md](SIM_SESSION.md)를 따른다. 아래 비동작/합성 asset 설명은 legacy
 경로에도 적용된다. 현재 sim Nav2의 단일 설정은 `config/nav2_mujoco.yaml`이다.

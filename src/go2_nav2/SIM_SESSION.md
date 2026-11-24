@@ -1,5 +1,10 @@
 # MuJoCo mapping → saved-map localization 세션
 
+W04에서 내부 입력은 `go2_inputs`, static TF와 공통 DDS 판정은 `description`,
+실물 후보는 `optional/real_robot`, 개발 검증은 `tools/go2_validation`으로 이동했다.
+이 문서의 공개 sim 명령·Nav2 설정 경로·topic·frame·기본값은 유지한다.
+현재 package layout과 bridge migration은 [W04_BOUNDARIES.md](W04_BOUNDARIES.md)를 따른다.
+
 시뮬레이션의 sensors·SLAM/AMCL·Nav2를 한 진입점에서 시작하고 저장 지도를
 명시적으로 다시 선택할 때 사용한다. simulator, RL controller와 FIFO bridge는
 각각 별도 process다. 모드 전환은 simulator를 reset하지 않고 ROS 세션만 재시작한다.
@@ -44,8 +49,8 @@ vx `[-2,4]`, vy `[-1,1]`, yaw `[-2,2]`를 정규화한다. 다른 policy 선택�
 5. mapping 주행 완료 후 지도 저장 CLI를 실행한다. ROS 세션을 Ctrl+C로 종료하고
    모든 owned ROS PID가 사라진 뒤 localization 모드를 시작한다.
 
-기존 bridge e3fe4a7은 Domain 1만 허용한다. **Domain 41의 이 절차에서 4단계는
-현재 실행 불가**다. guard를 우회하거나 기존 Domain 1로 옮기지 않는다.
+W05 당시 bridge e3fe4a7은 Domain 1만 허용했다. **그 버전에서 Domain 41의 4단계는
+실행 불가**다. guard를 우회하거나 기존 Domain 1로 옮기지 않는다.
 bridge의 후속 변경은 nonzero domain/실제 lo-only XML 검증 및 waypoint_runner의
 같은 제한 해제다. bridge repo의 설정/launch 소유권 migration도 후속 작업이다.
 이 프로젝트의 새 진입점은 Domain 0을 거부하며 실제 로봇 명령을 만들지 않는다.

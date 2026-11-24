@@ -7,11 +7,10 @@
   <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
   <license>Apache-2.0</license>
 
+  <buildtool_depend>ament_python</buildtool_depend>
+
   <exec_depend>ament_index_python</exec_depend>
-  <exec_depend>bringup</exec_depend>
-  <exec_depend>go2_control</exec_depend>
-  <exec_depend>go2_perception</exec_depend>
-  <exec_depend>go2_state_estimation</exec_depend>
+  <exec_depend>go2_inputs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
@@ -31,6 +30,7 @@
   <exec_depend>nav2_rotation_shim_controller</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
 
   <test_depend>python3-pytest</test_depend>
   <test_depend>python3-yaml</test_depend>

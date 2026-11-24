@@ -33,7 +33,7 @@ setup(
             glob("behavior_trees/*.xml"),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "PyYAML"],
     zip_safe=True,
     maintainer="Go2 project maintainers",
     maintainer_email="bi-agx1@invalid.example",

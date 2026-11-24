@@ -15,7 +15,7 @@ from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description() -> LaunchDescription:
     package_share = get_package_share_directory("go2_mujoco_lidar")
-    bringup_share = get_package_share_directory("bringup")
+    bringup_share = get_package_share_directory("go2_inputs")
     nav2_share = get_package_share_directory("go2_nav2")
     horizontal_samples = LaunchConfiguration("horizontal_samples")
     vertical_samples = LaunchConfiguration("vertical_samples")

@@ -1,0 +1,16 @@
+static_tf_profiles:
+  schema_version: 1
+  record_kind: static_tf_profile_registry
+  default_profile: project_default
+  profiles:
+    project_default:
+      status: project_accepted
+      scope: onboard_only
+      physical_calibration_status: unverified
+      parent_frame: base
+      child_frame: utlidar_lidar
+      translation_xyz_m: [0.28945, 0.0, -0.046825]
+      quaternion_xyzw: [0.0, 0.9913405653290647, 0.0, 0.1313159683094573]
+      source:
+        kind: existing_project_configuration
+        source_path: description/launch/go2_static_tf.launch.py

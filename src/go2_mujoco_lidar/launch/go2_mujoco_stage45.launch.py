@@ -30,7 +30,7 @@ def _guard(context):
 
 
 def generate_launch_description() -> LaunchDescription:
-    perception_share = get_package_share_directory("go2_perception")
+    perception_share = get_package_share_directory("go2_inputs")
     default_model = PathJoinSubstitution(
         [
             EnvironmentVariable("UNITREE_MUJOCO_ROOT"),

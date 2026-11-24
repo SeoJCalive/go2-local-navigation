@@ -60,7 +60,7 @@ def _start(context):
         RegisterEventHandler(OnProcessExit(
             on_exit=[EmitEvent(event=Shutdown(reason="sim stack process exited"))])),
         include("go2_mujoco_lidar", "go2_mujoco_stage45.launch.py", lidar_arguments),
-        include("bringup", "go2_odometry_adapter.launch.py", {"use_sim_time": "true"}),
+        include("go2_inputs", "go2_odometry_adapter.launch.py", {"use_sim_time": "true"}),
     ]
     if LaunchConfiguration("mapping").perform(context).lower() == "true":
         actions.append(include("go2_nav2", "go2_slam_mapping.launch.py", {

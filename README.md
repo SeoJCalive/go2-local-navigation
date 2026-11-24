@@ -1,5 +1,45 @@
 # go2_local_navigation
 
+## 현재 MuJoCo 실행 구조 (W04)
+
+시뮬레이션 mapping·저장 지도 localization·Nav2의 실행 기준은
+[`src/go2_nav2/SIM_SESSION.md`](src/go2_nav2/SIM_SESSION.md)다.
+현재 source는 core 4개, 실물 후보 5개, 개발 검증 1개 패키지다.
+아래 날짜별 관찰은 당시 실행 근거이며 현재 package inventory는 이 표를 따른다.
+
+| 경로·패키지 | 책임 | workspace 직접 의존성 |
+| --- | --- | --- |
+| `src/description` | canonical URDF·static TF·DDS XML 판정 | 없음 |
+| `src/go2_inputs` | cloud gate·공식 scan converter 조합·odom adapter | description |
+| `src/go2_nav2` | SLAM·AMCL·Nav2 설정·BT·세션 guard | go2_inputs |
+| `src/go2_mujoco_lidar` | MuJoCo 센서·공개 sim 세션·지도 저장 | description, go2_inputs, go2_nav2 |
+| `optional/real_robot/go2_sensor` | 실물 센서 acceptance | 없음 |
+| `optional/real_robot/go2_state_estimation` | 실물 source probe | go2_inputs |
+| `optional/real_robot/go2_perception` | 실물 obstacle candidate | go2_inputs |
+| `optional/real_robot/go2_control` | Sport 경계·trial recorder | 없음 |
+| `optional/real_robot/bringup` | 실물·비동작 조합·offline RViz | description, go2_inputs, go2_control, go2_perception, go2_sensor, go2_state_estimation |
+| `tools/go2_validation` | fault·shadow·preflight observer/runner | bringup, description, go2_inputs, go2_control, go2_nav2, go2_perception, go2_state_estimation |
+
+`bringup`의 Nav2 설정 연계 검사는 `test_depend=go2_nav2`다.
+core는 실물·검증 패키지를 설치하지 않고 빌드할 수 있다.
+일반 `colcon build`는 optional 디렉터리도 발견하므로 범위를 명시한다.
+
+```bash
+# ROS/Unitree overlay와 W01의 MUJOCO_ROOT/UNITREE_MUJOCO_ROOT를 먼저 지정한다.
+colcon build --base-paths src
+# 실물 후보와 개발 검증도 포함하는 전체 build:
+colcon build --base-paths src optional/real_robot tools/go2_validation
+python3 tools/check_package_dependencies.py
+```
+
+공개 `go2_mujoco_lidar`의 `go2_sim_bringup.launch.py`,
+`go2_sim_navigation.launch.py`, `sim_save_map`과
+`go2_nav2/config/nav2_mujoco.yaml`은 유지한다. 내부 입력 launch는
+`go2_inputs`, static TF launch는 `description`, controller preview/costmap-only는
+`bringup`, `integrated_preflight_observer`는 `go2_validation`으로 이동했다.
+호출 이관·bridge 변경 지침·전후 검증은
+[`src/go2_nav2/W04_BOUNDARIES.md`](src/go2_nav2/W04_BOUNDARIES.md)를 따른다.
+
 ## 목적
 
 Unitree Go2와 Jetson AGX Orin에서 센서 계약을 읽기 전용으로 먼저 검증하고,
@@ -138,16 +178,10 @@ mount되어 있다. 저장소 루트 `AGENTS.md`가 이 경로에 재귀 적용�
 관리한다. 확인되지 않은 센서 field·QoS·TF·extrinsic·odometry는 계속
 `unverified` 또는 `TBD`로 기록한다.
 
-## 현재 기초 패키지
+## W04 이전 패키지 설명
 
-- `go2_sensor`: 센서 topic 계약과 acceptance 경계
-- `go2_state_estimation`: odometry source 관찰과 `odom → base` adapter
-- `go2_perception`: LiDAR obstacle candidate 보고 경계
-- `bringup`: launch·설정과 재사용 가능한 통합 preflight observer
-- `description`: 공식 Go2 전체 URDF와 TF 계약
-- `go2_control`: 비동작 기본 motion 계약, 제한·watchdog·Sport request 변환 후보
-- `go2_nav2`: 비동작 Nav2 preview, experimental SLAM·saved-map localization, Domain 0 no-goal observer와 합성 전체 Nav2 runtime asset
-- `go2_validation`: fault·replay·mapping·localization·Nav2 shadow·Domain 0 live observer·통합 preflight의 validation orchestration
+8월 검증의 패키지 책임은 당시 commit의 README를 따른다. 현재 소유권은 위
+W04 표와 각 package README가 관리한다.
 
 현재 범위에는 프로젝트 내부 `/go2_control/cmd_vel_candidate`와
 `/go2_control/sport_request_preview`가 포함된다. 실제 `/api/sport/request` publish,

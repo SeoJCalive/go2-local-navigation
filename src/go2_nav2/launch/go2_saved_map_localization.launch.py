@@ -19,9 +19,9 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description() -> LaunchDescription:
     """Domain 64에서 AMCL이 유일한 map→odom owner가 되도록 구성한다."""
-    bringup_share = get_package_share_directory("bringup")
+    bringup_share = get_package_share_directory("go2_inputs")
     nav2_share = get_package_share_directory("go2_nav2")
-    perception_share = get_package_share_directory("go2_perception")
+    perception_share = get_package_share_directory("go2_inputs")
     scan_launch = os.path.join(
         perception_share,
         "launch",
