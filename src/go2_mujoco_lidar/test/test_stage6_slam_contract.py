@@ -18,11 +18,11 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
     monkeypatch, tmp_path,
 ) -> None:
     """Yaw +90 degrees maps world +Y to child +X at the base origin."""
-    monkeypatch.setenv("ROS_DOMAIN_ID", "1")
+    monkeypatch.setenv("ROS_DOMAIN_ID", "41")
     monkeypatch.setenv("ROS_LOCALHOST_ONLY", "1")
     monkeypatch.setenv("RMW_IMPLEMENTATION", "rmw_cyclonedds_cpp")
     monkeypatch.setenv(
-        "CYCLONEDDS_URI", (PACKAGE_ROOT / "test/headless/cyclonedds_w02.xml").as_uri()
+        "CYCLONEDDS_URI", (PACKAGE_ROOT / "test/headless/cyclonedds_w03.xml").as_uri()
     )
     import rclpy
     from nav_msgs.msg import Odometry

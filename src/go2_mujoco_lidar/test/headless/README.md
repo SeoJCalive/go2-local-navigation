@@ -65,3 +65,98 @@ owned PID 목록도 보존한다. `mj_step()`은 qpos 적분 전 센서를 계�
 이 결과는 별도 headless driver의 무중력 자유 운동과 실제 pinned DDS bridge에 대한
 관찰이다. GUI simulator main의 동시 실행 scheduling, RL/joystick 주행, SLAM/AMCL
 지도 reset·재사용과 실제 로봇 동작은 검증하지 않았다.
+
+## W03 통합 launch 검증
+
+이미 실행 중인 Domain 1 stack의 binary를 교체하거나 DDS에 연결하지 않고 새 launch를
+검사할 때 사용한다. W03은 `/tmp/w03-build`, `/tmp/w03-install`, `/tmp/w03-log`에만
+build/test 결과를 쓴다. headless source는 W01의 실제 `Go2Bridge`와 `mj_step`을
+호출하고 Domain 41·lo·전용 discovery tag를 고정한다. physics world는 새 install의
+`scene/go2_indoor.xml`이다. 무중력 정지 상태로 SLAM 연결성을 확인하며 map 정확도,
+RL 제어, 실제 로봇 동작은 검증하지 않는다.
+
+ROS/Unitree overlay와 W01의 두 dependency root를 지정한 AGX 셸에서 실행한다.
+
+```bash
+colcon --log-base /tmp/w03-log build \
+  --build-base /tmp/w03-build --install-base /tmp/w03-install \
+  --packages-up-to go2_mujoco_lidar --cmake-args -DCMAKE_BUILD_TYPE=Release
+cmake -S src/go2_mujoco_lidar/test/headless -B /tmp/w03-headless-build \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build /tmp/w03-headless-build --target w03_headless -j 4
+source /tmp/w03-install/setup.bash
+export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=1 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://$PWD/src/go2_mujoco_lidar/test/headless/cyclonedds_w03.xml"
+colcon --log-base /tmp/w03-log test \
+  --build-base /tmp/w03-build --install-base /tmp/w03-install \
+  --packages-select go2_mujoco_lidar --event-handlers console_direct+
+colcon test-result --test-result-base /tmp/w03-build/go2_mujoco_lidar --verbose
+python3 src/go2_mujoco_lidar/test/headless/verify_bringup.py \
+  --simulator /tmp/w03-headless-build/w03_headless \
+  --tf-observer /tmp/w03-build/go2_mujoco_lidar/tf_owner_observer \
+  --output "$PWD/.omo/evidence/w03-bringup-runtime"
+```
+
+Humble rclpy의 subscription API는 publisher GID를 callback에 제공하지 않는다.
+따라서 test-only `tf_owner_observer`가 public rclcpp MessageInfo에서 edge별 GID를
+TSV로 기록한다. Humble CycloneDDS는 이 sample GID에 publication handle을 넣고
+graph endpoint GID에는 GUID를 넣으므로 두 값의 byte 직접 비교는 성립하지 않는다.
+public DDS `DCPSPublication` metadata의 instance handle과 endpoint key로 둘을
+연결한 뒤 Python observer가 graph endpoint와 대조한다.
+관련 upstream 구현은 [rclpy subscription](https://github.com/ros2/rclpy/blob/humble/rclpy/src/rclpy/subscription.cpp)과
+[Cyclone RMW message_info_from_sample_info](https://github.com/ros2/rmw_cyclonedds/blob/humble/rmw_cyclonedds_cpp/src/rmw_node.cpp)다.
+고정 edge 기대 목록은 canonical URDF의 fixed joint에서 독립적으로 읽는다.
+각 edge를 tf2 buffer에서도 직접 조회하고 `view_frames`의 PDF/YAML을 보존한다.
+`/clock`, `/scan`, `/odom`, `/map`, 두 source state의 publisher 수와 모든 sim node의
+`use_sim_time` parameter도 실제 graph에서 조회한다.
+공식 converter가 내부 생성하는 `transform_listener_impl_*` helper는 parameter
+service를 제공하지 않는다. [converter 구현](https://github.com/ros-perception/pointcloud_to_laserscan/blob/humble/src/pointcloud_to_laserscan_node.cpp)의
+TF Buffer는 converter 자신의 `get_clock()`을 공유하므로, launch가 소유하는 converter의
+`use_sim_time=true`와 그 buffer의 실제 transform lookup을 검사한다.
+
+환경 matrix·실제 파일 XML parsing·`/proc` fixture가 guard/world unit test이고,
+실제 LiDAR에 zero quaternion과 identity quaternion을 번갈아 입력하는 시험이 오류
+예산 oracle이다. 예산 2와 3 각각에서 K-1 오류 후 성공은 살아 있고, 그 뒤 K번째
+연속 오류에서는 exit 1인지 검사한다. 이는 의도적으로 주입한 무효 ROS state 시험이다.
+
+`result.json`은 topic 목록·edge별 owner·수신 수·거부 결과·owned PID와 종료 후 잔류
+목록을 보존한다. Domain 0 거부 시험은 ROS node 초기화 전에 launch에서 실패하므로
+Domain 0 DDS participant를 만들지 않는다. simulator·검증용 ROS launch·GID observer
+중 자신이 시작한 PID에만 signal을 보내며 기존 Domain 1 process는 다루지 않는다.
+
+### 2026-11-24 W03 AGX 결과
+
+- `/tmp/w03-*`에서 의존 패키지 포함 8개 fresh Release build가 exit 0이었다.
+  GID observer 추가 후 변경 패키지의 최종 incremental build도 exit 0이었다.
+- package Python test는 최종 29개가 통과했고 기존 C++ executable 2개도 통과했다.
+  최초 오류 예산 test는 FATAL 요약문까지 오류 발생 횟수에 포함해 2개가 실패했다.
+  실제 ERROR 행만 세도록 바로잡은 후 해당 target 3개가 모두 통과했다.
+- active domain XML 검사 확장 후 해당 target 14개가 모두 통과했다.
+  마지막 `colcon test-result`는 30 tests, 0 errors, 0 failures, 0 skipped였다.
+  이 집계는 전체 pytest 29개와 최근 재실행 CTest wrapper 1개를 합한 값이다.
+  C++ 2개와 이전 CTest wrapper 수를 중복 가산한 수치로 설명하지 않는다.
+- installed `go2_sim_bringup.launch.py mapping:=true`의 headless 실행이 exit 0이었다.
+  `/scan` 16개, `/odom` 20개, `/map` 1개를 관찰했다. map은 `67×116`, resolution
+  약 `0.05 m`였다. 수신 수는 관찰 종료 시점의 값이며 SLAM 정확도 지표가 아니다.
+- topic 목록에는 clock, raw/filtered/planar/validated cloud, scan, source/canonical
+  odometry, map, tf, tf_static이 모두 있었다. 원시 목록은 `result.json`에 보존했다.
+- `/clock`, `/scan`, `/odom`, `/map`, `/lowstate`, `/sportmodestate`의 publisher는
+  각각 1개였다. clock owner는 LiDAR이고 map owner는 SLAM이었다.
+- canonical URDF fixed 29개와 map/odom/base/LiDAR 연결 3개, 총 TF edge 32개가
+  각각 실제 publisher identity 1개를 가졌다. DDS metadata와 graph GUID를 연결해
+  owner를 확인했고 각 edge를 tf2 buffer로 조회했다. `view_frames`도 exit 0이었다.
+- launch가 시작한 ROS node 7개와 GID observer의 `use_sim_time`은 모두 true였다.
+  parameterless TF listener helper 2개의 이름도 별도로 기록했다.
+- physics와 raycast world는 같은 resolved `go2_indoor.xml`이었다.
+  시작 로그 SHA-256은
+  `4cf00f56fad49701ea06c0c7fe01f0f4273063825929d3291cd50d3c8023231a`였다.
+- Domain 0, loopback 누락, 다른 expected MJCF의 세 launch는 모두 exit 1로
+  node 시작 전에 거부됐고 각 이유가 로그에 있었다.
+- 시작한 장기 process/child PID 10개는 종료 후 모두 `/proc`에서 사라졌다.
+  관찰한 기존 simulator·default-install·map_server/AMCL PID 6개의 argv와 시작 tick은
+  전후 동일했다. 기존 process에 signal을 보내거나 default build/install/log를
+  변경하지 않았다.
+- 로그·topic/owner/parameter/result JSON·`view_frames` PDF/YAML은
+  `.omo/evidence/w03-bringup-runtime/`에 보존했다.
+- GUI·RL/joystick·SLAM reset/map 재사용·Nav2/AMCL 통합·실제 로봇 동작과 지도
+  정확도는 검증하지 않았다. 기존 Release planar assert 문제(F20)는 W07 범위다.

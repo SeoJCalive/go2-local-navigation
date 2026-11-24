@@ -1,6 +1,8 @@
 // Join simulation-only DDS state at identical stamps, then convert to base
 // pose/body twist. The wall timer consumes each fresh pair once for cloud/odom;
 // Sport input drives /clock. Reset clears the epoch; steady time detects stalls.
+// Consecutive state/raycast failures exhaust a positive error budget and escape
+// the executor to main's non-zero exit; a successful scan clears that budget.
 // This node has no physical command interface.
 #include "go2_mujoco_lidar/lidar_model.hpp"
 #include "go2_mujoco_lidar/step_pairing.hpp"
@@ -111,6 +113,10 @@ public:
       declare_parameter<double>("range_max", 5.0),
       declare_parameter<bool>("environment_only", false))
   {
+    raycast_error_limit_ = declare_parameter<int>("raycast_error_limit", 3);
+    if (raycast_error_limit_ <= 0) {
+      throw std::invalid_argument("raycast_error_limit must be positive");
+    }
     const double publish_rate = declare_parameter<double>("publish_rate", 10.0);
     if (publish_rate <= 0.0) {
       throw std::invalid_argument("publish_rate must be positive");
@@ -216,6 +222,7 @@ private:
       filtered_publisher_->publish(make_cloud(stamp, hits, true));
       planar_publisher_->publish(make_cloud(stamp, planar_hits, false));
       odometry_publisher_->publish(make_odometry(stamp, state));
+      consecutive_raycast_errors_ = 0;
       if (!first_scan_logged_) {
         RCLCPP_INFO(
           get_logger(), "first scan: raw=%zu self=%zu filtered=%zu planar=%zu",
@@ -223,11 +230,19 @@ private:
         first_scan_logged_ = true;
       }
     } catch (const std::exception & error) {
-      RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "%s", error.what());
+      ++consecutive_raycast_errors_;
+      RCLCPP_ERROR(
+        get_logger(), "raycast error %d/%d: %s",
+        consecutive_raycast_errors_, raycast_error_limit_, error.what());
+      if (consecutive_raycast_errors_ >= raycast_error_limit_) {
+        throw std::runtime_error("consecutive raycast error budget exhausted");
+      }
     }
   }
 
   LidarModel model_;
+  int raycast_error_limit_{3};
+  int consecutive_raycast_errors_{0};
   bool first_scan_logged_{false};
   bool stale_logged_{false};
   std::chrono::steady_clock::time_point last_fresh_input_{std::chrono::steady_clock::now()};

@@ -66,6 +66,51 @@ use_sim_time인 mapping gate와 odometry adapter도 공유 clock-jump helper로 
 `/odom`을 각각 한 번씩 소유하도록 유지하고, `start_inputs=false`·`use_sim_time=true`로
 기존 SLAM Toolbox mapping owner만 추가한다. static TF·scan·odometry를 중복 생성하지 않는다.
 
+## 통합 simulation 입력 실행
+
+`go2_sim_bringup.launch.py`는 이미 clean environment에서 실행한 physics simulator의
+PID를 받아 LiDAR·cloud gate·scan·static TF·odometry adapter와 선택적 SLAM을
+한 번에 시작한다. simulator와 RL controller는 기존 수동 절차대로 별도로 실행한다.
+이 launch는 이 두 외부 process를 종료하거나 재시작하지 않는다.
+
+```bash
+export ROS_DOMAIN_ID=1 ROS_LOCALHOST_ONLY=1
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+# ROS/Unitree 및 선택한 local_navigation install을 source한 셸에서 실행한다.
+# SIM_PID는 사용자가 시작한 unitree_mujoco -s <MJCF> -i 1 -n lo의 실제 PID다.
+ros2 launch go2_mujoco_lidar go2_sim_bringup.launch.py \
+  simulator_pid:="$SIM_PID" mapping:=true \
+  horizontal_samples:=720 vertical_samples:=1 vertical_min:=0.0 vertical_max:=0.0
+```
+
+- world의 단일 원본은 `/proc/$SIM_PID/cmdline`의 `-s`다. 상대 경로는 simulator
+  cwd에서 해석하며 raycast에도 그 resolved path를 전달한다. 선택적
+  `model_path:=<expected MJCF>`가 다른 파일을 가리키면 node 시작 전에 거부한다.
+- 시작 로그에 world resolved path와 SHA-256을 기록한다. 이 hash는 현재 MJCF
+  파일의 provenance이며 이미 로드된 simulator 메모리의 checksum은 아니다.
+  simulator를 실행하는 동안 MJCF와 include/asset을 수정하지 않는다.
+- ROS와 physics의 domain이 같아야 하고 physics는 `-n lo`여야 한다.
+  ROS Domain 0 또는 loopback 격리가 없는 실행은 기본 거부한다.
+  기존 runbook의 Domain 1·`ROS_LOCALHOST_ONLY=0`도 실제 `CYCLONEDDS_URI` 파일이
+  CycloneDDS lo-only 설정이면 허용한다. 단순히 파일 이름으로 판정하지 않는다.
+- `allow_unsafe_simulation:=true`는 domain-zero/network 경계의 명시적 override다.
+  world와 physics/ROS domain 불일치는 override하지 않는다.
+- 모든 ROS node는 `use_sim_time=true`다. `/clock`은 LiDAR, `odom -> base`는
+  adapter, `base -> utlidar_lidar`는 static publisher, URDF fixed TF는
+  robot_state_publisher, `map -> odom`은 `mapping:=true`일 때 SLAM만 소유한다.
+- 하나의 ROS process가 종료하면 launch가 나머지 소유 process도 종료한다.
+  `raycast_error_limit`(기본 3)은 연속 실패 수다. 각 오류를 기록하고 성공한 scan은
+  계수를 초기화한다. 예산 소진은 LiDAR exit 1로 이어져 전체 launch를 종료한다.
+- mapping 중 physics reset 뒤에는 이 launch 전체를 재시작한다. W02의 입력 epoch
+  복구가 SLAM 지도 epoch 복구를 보장하지 않는다.
+
+기존 stage45·stage6·stage62 진입점과 raster 기본값 `360×8`은 유지한다.
+stage45와 이를 포함하는 launch에는 같은 domain/loopback guard와
+`allow_unsafe_simulation`·`raycast_error_limit` argument가 추가됐다.
+통합 진입점을 쓰면 기존 runbook의 ROS 터미널 3(LiDAR/scan), 4(odom), 5(SLAM)를
+위 명령 하나로 대체한다. 이때 세 launch를 별도로 중복 실행하지 않는다.
+simulator/RL·RViz·지도 저장 절차와 bridge 저장소는 바꾸지 않았다.
+
 ## Stage 6-2 indoor upright hold
 
 `go2_mujoco_stage62_upright_hold.launch.py`는 simulation-only Domain 1에서

@@ -1,16 +1,31 @@
-"""공식 Go2 MuJoCo 상태에서 raw·self-filtered cloud와 기존 /scan을 함께 생성한다."""
+"""공식 Go2 상태를 cloud/scan으로 변환하고 static TF를 한 번 시작한다.
+
+publisher 시작 전 sim domain/loopback을 검사한다. legacy model_path interface는
+유지한다. 실제 simulator world 일치 확인과 odom/SLAM 조합은 go2_sim_bringup을 쓴다.
+"""
 
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+from go2_mujoco_lidar.sim_session import simulation_domain
 
 
 PLANAR_TOPIC = "/simulation/utlidar/cloud_planar_selected"
+
+
+def _guard(context):
+    simulation_domain(
+        os.environ,
+        LaunchConfiguration("allow_unsafe_simulation").perform(context).lower() == "true",
+    )
+    return []
 
 
 def generate_launch_description() -> LaunchDescription:
@@ -37,6 +52,10 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
             DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),
             DeclareLaunchArgument("environment_only", default_value="false"),
+            DeclareLaunchArgument("allow_unsafe_simulation", default_value="false",
+                                  choices=["true", "false"]),
+            DeclareLaunchArgument("raycast_error_limit", default_value="3"),
+            OpaqueFunction(function=_guard),
             Node(
                 package="go2_mujoco_lidar",
                 executable="mujoco_lidar_node",
@@ -49,6 +68,8 @@ def generate_launch_description() -> LaunchDescription:
                         "vertical_max": vertical_max,
                         "environment_only": environment_only,
                         "use_sim_time": True,
+                        "raycast_error_limit": ParameterValue(
+                            LaunchConfiguration("raycast_error_limit"), value_type=int),
                     }
                 ],
                 output="screen",
