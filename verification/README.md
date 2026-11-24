@@ -1,9 +1,16 @@
 # 검증 진입점
 
-이 디렉터리는 `go2_local_navigation`의 각 모듈이 현재 어디까지 검증됐고,
+이 디렉터리는 `go2_local_navigation`의 과거 실물·replay 검증 수준과
 어떤 조건에서 무엇을 다시 확인해야 하는지 찾을 때 사용한다. 실제 측정값과 실행
 상세를 다시 기록하지 않고, 패키지별 contract와 로컬 실행 record를 연결하는
 반복 참조 인덱스 역할만 한다.
+
+현재 simulation 실행은 [루트 README](../README.md), 2026-11 안정화 결과는
+[안정화 색인](../docs/stabilization-2026-11/README.md)을 따른다.
+아래 단계와 8월 기록은 당시 증거이며 현재 source inventory와 구분한다.
+9월 미추적 실험은 [archive index](archive-index.md)에서 보존 위치와 manifest를 찾는다.
+`structured/project_manifest.yaml`의 package inventory만 현재 source 10개를
+반영하며 과거 8개/15개 실행 파일 결과는 별도 historical 필드로 보존한다.
 
 ## 파일 구조
 
@@ -162,7 +169,7 @@ profile을 바꾼다. 장치 제품명만 보고 `xbox` profile로 바꾸지 않
 스틱 조작 확인을 요구하지 않는다. 설정을 통과했는데도 무반응이 보고된 경우에만
 `/wirelesscontroller`의 축·키 변화를 별도 진단한다.
 
-## 현재 단계
+## 2026-08 검증 단계
 
 - 9단계 `integrated_non_actuating_preflight`: `completed`
 - 10단계 `stationary_smoke_and_soak`: `completed_with_warning`

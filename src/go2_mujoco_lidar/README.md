@@ -3,12 +3,12 @@
 W04에서 scan·odometry 입력의 소유자는 `go2_inputs`, static TF·DDS 환경 판정의
 소유자는 `description`으로 바뀌었다. 아래 공개 sim 명령과 기본값은 유지한다.
 runtime은 실물 후보와 `go2_validation`에 의존하지 않는다.
-현재 4개 core 구조와 호출 이관은 [W04 기록](../go2_nav2/W04_BOUNDARIES.md)을 따른다.
+현재 4개 core 구조와 호출 이관은 [W04 기록](../../docs/stabilization-2026-11/W04_BOUNDARIES.md)을 따른다.
 반복 가능한 mapping/save/localization/5-goal/reset 수용 시험은
 [추적 하네스](test/acceptance/README.md), 기본 시험 분류와 Release 음성 대조는
-[W07 inventory](W07_TEST_INVENTORY.md)를 따른다.
+[W07 inventory](../../docs/stabilization-2026-11/W07_TEST_INVENTORY.md)를 따른다.
 빌드·Release 음성 대조·종료 원인과 반복 수용 결과는
-[W07 기록](W07_STABILIZATION.md)에 있다.
+[W07 기록](../../docs/stabilization-2026-11/W07_STABILIZATION.md)에 있다.
 
 이 패키지는 공식 `unitree_mujoco`의 Go2 MJCF를 수정하지 않고, simulator가 ROS2로
 내보내는 `/lowstate`와 `/sportmodestate`를 별도 MuJoCo model에 반영해 LiDAR ray를
@@ -73,7 +73,7 @@ use_sim_time인 mapping gate와 odometry adapter도 공유 clock-jump helper로 
 초기화하므로 node 재시작 없이 cloud와 odom이 복구된다. SLAM/AMCL 지도 reset과
 이전 지도에서 navigation을 재개하는 정책은 이 입력 복구 계약에 포함하지 않는다.
 
-`go2_mujoco_stage6_slam.launch.py`는 Stage 4/5가 `/scan`을, bringup adapter가
+`go2_mujoco_stage6_slam.launch.py`는 Stage 4/5가 `/scan`을, go2_inputs adapter가
 `/odom`을 각각 한 번씩 소유하도록 유지하고, `start_inputs=false`·`use_sim_time=true`로
 기존 SLAM Toolbox mapping owner만 추가한다. static TF·scan·odometry를 중복 생성하지 않는다.
 

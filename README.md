@@ -1,400 +1,190 @@
 # go2_local_navigation
 
-## 현재 MuJoCo 실행 구조 (W04)
+Unitree Go2의 MuJoCo 상태에서 LiDAR·odometry를 만들고, SLAM mapping과 저장 지도
+AMCL/Nav2를 실행하는 ROS 2 Humble workspace다. simulator·RL controller·joystick
+FIFO bridge는 별도 process다. 현재 상태는 simulation `candidate`이며 실물 실행
+기준으로 사용하지 않는다.
 
-시뮬레이션 mapping·저장 지도 localization·Nav2의 실행 기준은
-[`src/go2_nav2/SIM_SESSION.md`](src/go2_nav2/SIM_SESSION.md)다.
-현재 source는 core 4개, 실물 후보 5개, 개발 검증 1개 패키지다.
-아래 날짜별 관찰은 당시 실행 근거이며 현재 package inventory는 이 표를 따른다.
+## 구성과 문서
 
-| 경로·패키지 | 책임 | workspace 직접 의존성 |
-| --- | --- | --- |
-| `src/description` | canonical URDF·static TF·DDS XML 판정 | 없음 |
-| `src/go2_inputs` | cloud gate·공식 scan converter 조합·odom adapter | description |
-| `src/go2_nav2` | SLAM·AMCL·Nav2 설정·BT·세션 guard | go2_inputs |
-| `src/go2_mujoco_lidar` | MuJoCo 센서·공개 sim 세션·지도 저장 | description, go2_inputs, go2_nav2 |
-| `optional/real_robot/go2_sensor` | 실물 센서 acceptance | 없음 |
-| `optional/real_robot/go2_state_estimation` | 실물 source probe | go2_inputs |
-| `optional/real_robot/go2_perception` | 실물 obstacle candidate | go2_inputs |
-| `optional/real_robot/go2_control` | Sport 경계·trial recorder | 없음 |
-| `optional/real_robot/bringup` | 실물·비동작 조합·offline RViz | description, go2_inputs, go2_control, go2_perception, go2_sensor, go2_state_estimation |
-| `tools/go2_validation` | fault·shadow·preflight observer/runner | bringup, description, go2_inputs, go2_control, go2_nav2, go2_perception, go2_state_estimation |
+| 경로 | 패키지와 책임 |
+| --- | --- |
+| `src/description` | canonical URDF·static TF·DDS 환경 판정 |
+| `src/go2_inputs` | cloud gate·공식 scan converter 조합·odom adapter |
+| `src/go2_nav2` | SLAM·AMCL·Nav2 설정·session guard·tf2 loader |
+| `src/go2_mujoco_lidar` | MuJoCo 센서·공개 sim launch·지도 저장 |
+| `optional/real_robot` | sensor/state-estimation/perception/control/bringup 5개 실물 후보 |
+| `tools/go2_validation` | fault·shadow·preflight 등 개발 검증 패키지 |
+| `third_party` | simulator/SDK/MuJoCo와 tf2의 고정 버전 설치 절차 |
+| `verification` | 추적 checkpoint와 과거 검증 인덱스 |
+| `docs/stabilization-2026-11` | 안정화 변경 이력과 검증 결과 |
 
-`bringup`의 Nav2 설정 연계 검사는 `test_depend=go2_nav2`다.
-core는 실물·검증 패키지를 설치하지 않고 빌드할 수 있다.
-일반 `colcon build`는 optional 디렉터리도 발견하므로 범위를 명시한다.
+- 운영 상세: [SIM_SESSION](src/go2_nav2/SIM_SESSION.md).
+- 반복 수용 시험: [acceptance](src/go2_mujoco_lidar/test/acceptance/README.md).
+- 무중력·정지 입력 진단: [headless](src/go2_mujoco_lidar/test/headless/README.md).
+- 변경 이력: [안정화 색인](docs/stabilization-2026-11/README.md).
+- 과거 증거: [verification](verification/README.md), [보관 위치](verification/archive-index.md).
 
-```bash
-# ROS/Unitree overlay와 W01의 MUJOCO_ROOT/UNITREE_MUJOCO_ROOT를 먼저 지정한다.
-colcon build --base-paths src
-# 실물 후보와 개발 검증도 포함하는 전체 build:
-colcon build --base-paths src optional/real_robot tools/go2_validation
-python3 tools/check_package_dependencies.py
-```
+## 최초 준비와 빌드
 
-공개 `go2_mujoco_lidar`의 `go2_sim_bringup.launch.py`,
-`go2_sim_navigation.launch.py`, `sim_save_map`과
-`go2_nav2/config/nav2_mujoco.yaml`은 유지한다. 내부 입력 launch는
-`go2_inputs`, static TF launch는 `description`, controller preview/costmap-only는
-`bringup`, `integrated_preflight_observer`는 `go2_validation`으로 이동했다.
-호출 이관·bridge 변경 지침·전후 검증은
-[`src/go2_nav2/W04_BOUNDARIES.md`](src/go2_nav2/W04_BOUNDARIES.md)를 따른다.
-
-## 목적
-
-Unitree Go2와 Jetson AGX Orin에서 센서 계약을 읽기 전용으로 먼저 검증하고,
-이후 장애물 정보 보고, mapping, Nav2 costmap, 목적지 주행으로 확장하기 위한
-Python 기반 ROS 2 프로젝트다.
-
-현재 상태는 `candidate`(후보)다. static TF와 LiDAR 입력 형식·QoS·주기는 AGX에서
-검증했으며, read-only LiDAR acceptance와 odometry source probe도 AGX에서
-검증했다. odometry source는 `header=odom`, `child=base_link`로 관찰됐고,
-프로젝트는 `base_link → base` mapping과 `go2_state_estimation/odometry_adapter_node`
-owner를 수용했다. adapter runtime에서 `/odom`과 `odom → base` dynamic TF를
-확인했지만, 이 mapping은 공식 onboard frame 동일성이나 물리 calibration으로
-승격하지 않는다. 2026-08-26에는 정지 상태 raw bag record/replay와
-`/perception/obstacle_candidates` output을 검증했다. 2026-08-27에는 motion adapter
-비동작 dry-run과 Nav2 local costmap·controller preview를 검증했으며, 실제 Sport
-control publisher는 생성하지 않았다. 같은 날 30초 통합 비동작 preflight에서 필수
-TF·sensor·odom·obstacle candidate·local costmap, 안전 gate, AGX 자원과 clean
-teardown을 함께 확인했고 46개 check가 모두 PASS였다. 이어서 30초 smoke는 47개
-check가 모두 PASS했고 30분 soak는 46 PASS·1 WARN이었다. 유일한 경고는 정지 yaw
-누적 drift `0.248012 rad`이며, 최종 장착 전 해결된 사실로 승격하지 않는다.
-
-같은 날 software-only Wave 1·2에서 Domain 61 합성 fault 10개와 Domain 62 정지·외부
-replay 입력을 검증했다. 외부 자료는 cloud `17,776`, odometry `173,616`개를 가진
-full canonical bag과 120초 short bag으로 변환했으며, 두 ingress 모두 `/scan` frame
-`base`, command publisher 0과 clean teardown을 통과했다. 이 결과는 mapping 입력과
-fault recovery 근거이며 SLAM 지도 품질, localization 또는 목적지 도달 근거가 아니다.
-
-이 자료의 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. raw
-`go2_china_office_indoor.mcap`은 8개 channel을 가지며 derived canonical bag은
-`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 사용한다. topic·frame·rate와 pinned
-DimOS 코드에 따라 센서 계열은 Go2 built-in L1 ULIDAR로 강하게 추론하지만 hardware
-manifest가 없어 `unverified`다. 같은 source 디렉터리의 Mid-360·Point-LIO DB는
-canonical short·full 계보에 포함되지 않는다.
-
-이어 Domain 63 loopback에서 stationary와 external-full을 1.0배속으로 재생해 두
-SLAM mapping run을 완료했다. `/map`, SLAM Toolbox 단독 `map → odom`, occupancy
-map·pose graph 저장과 재로딩, command publisher 0과 잔류 process 0을 확인했다.
-이는 map 생성·저장 경계의 replay 근거이며 지도 정확도·loop closure 품질이나
-localization·NavigateToPose의 근거로 승격하지 않는다.
-
-2026-08-31에는 Go2를 끈 채 Domain 64 loopback에서 stationary bag과 그 bag으로
-저장한 지도를 다시 연결했다. Map Server와 AMCL은 active였고 `/scan` `300`개,
-`/odom` `2923`개, finite AMCL pose `1`개와 AMCL 단독 `map → odom` owner를 확인했다.
-command·control publisher와 종료 뒤 잔류 node·process는 모두 0이었다. 이 결과는
-saved-map localization 연결성과 소유권의 replay 검증이며 위치 정확도 증명이 아니다.
-
-같은 날 Domain 65에서는 합성 `/clock`, `map → odom`, `odom → base`, odometry만
-제공하고 Nav2 전체 stack을 `/go2_nav2/shadow_cmd_vel`에 격리했다. success는
-`SUCCEEDED`, cancel은 `CANCELED`, blocked goal·outside-map goal·planner failure·
-no-progress는 각각 기대한 `ABORTED`로 종료됐다. 여섯 시나리오 모두 lifecycle,
-costmap, TF owner, 물리 command publisher 0과 clean teardown을 통과했다. 이는 합성
-입력에서의 Nav2 action 계약 근거이며 실제 Go2 목적지 도달이나 장애물 회피 근거가
-아니다.
-
-같은 날 12-L Domain 0 supplement에서는 Go2를 켠 임시 정지 상태에서 live `/scan`·
-`/odom`으로 SLAM map과 12-L 저장 지도를 만들었다. 이어 12-L2에서는 그 저장 지도를
-Map Server·AMCL에 연결하고 Planner·Controller·Behavior Server·BT Navigator를 goal
-없이 함께 기동했다. `/scan` `948`개, `/odom` `9286`개, finite AMCL pose `1`개와 두
-costmap을 수신했고 모든 lifecycle node가 active였으며 AMCL만 `map → odom`을
-소유했다. action goal, path, non-zero inert velocity, ROS command publisher와 잔류
-node·process는 모두 `0`이었다. 이는 실제 입력의 localization·Nav2 연결성을 확인한
-것이며 정지 상태의 작은 지도와 초기 pose 하나만 사용했으므로 위치 추적 정확도나
-실제 목적지 도달 근거가 아니다.
-
-2026-08-28에는 DimOS 저장소의 Go2 LiDAR extrinsic을 외부 replay 전용
-`dimos_replay` TF profile로 추가하고 같은 120초 short bag을 기존
-`project_default`와 A/B했다. 최대 translation step은 `10.014682 → 8.768064 m`,
-yaw step은 `0.545220 → 0.366329 rad`로 감소했지만 두 profile 모두 현재 연속성
-기준 `0.5 m`·`0.2 rad`를 초과했다. 따라서 source extrinsic은 유효한 보정이지만
-순간이동의 단독 원인으로 확정하지 않으며, 기존 실물 기본 TF도 변경하지 않는다.
-
-같은 날 TF를 `dimos_replay`로 고정하고 raw 단일 cloud와 10-frame odometry 보정
-누적을 A/B했다. 누적 profile은 유효 beam 중앙값을 `36 → 251`, translation·yaw
-기준 초과 횟수를 각각 `487 → 94`, `49 → 4`로 줄였지만 최대 step은 여전히
-`8.221949 m`·`0.358414 rad`였다. 따라서 scan 희소성은 부분 원인으로 남기고,
-누적 profile은 외부 replay 실험 후보로만 유지한다.
-
-이후 canonical 120초 DimOS bag만을 다시 재생한 최종 resolution에서
-`dimos_odom_accumulated_emit3`는 frame/emit `3/3`, input/retry `64/64`, converter
-`min_height=-0.10`, queue `64`와 profile-scoped coarse `0.1745`를 사용했다.
-최종 A/B는 response expansion `false`, loop closing `true`를 양쪽 공통값으로
-통제했고 candidate에만 coarse `0.1745`를 적용했다. baseline coarse는 `0.349`였으며
-전역 launch 기본값 `0.349/true/true`는 바꾸지 않았다. baseline `raw_single`은
-`0.5535118551684397 m` / `0.3678837777692796 rad`로 failed였지만 candidate는
-`0.41047936583987504 m` / `0.1800169168112875 rad`, exceedance·unaligned·regressive
-모두 `0`으로 passed였다. cloud `1843` 수신·`1842` 처리·`614` output, intrinsic
-drop `1`, overflow/pending/regression `0`과 occupancy·pose graph 저장·재로딩, clean
-teardown도 final A/B와 두 repeat에서 동일하게 통과했다. 이는 Go2 OFF,
-`physical_execution=false`, `command_publication=false`인 이 정확한 bag/profile의
-software replay continuity 결과만 뜻하며, 실물 장착·live fit·지도 ground truth·
-localization/Nav2는 계속 미검증이다.
-
-2026-08-29에는 같은 bag·emit3·TF·SLAM 공통값을 유지하고 coarse search만
-`0.0698~0.2792 rad` 7개로 바꿔 순차 비교했다. 앞의 네 값은 passed, 뒤의 세 값은
-yaw 기준으로 failed였고 `0.0698`은 `0.3752606931950222 m` /
-`0.08927691681128769 rad`를 기록했다. 이는 이번 범위의 continuity 우선 후속
-후보일 뿐, 최저 시험 경계이며 지도 ground truth·live 조건이 없으므로 기존
-replay canonical `0.1745`를 교체하지 않는다.
-
-이어서 같은 조건에서 `0~4°`를 `1°` 간격으로 추가 시험했다. 5개 후보가 모두
-passed했고, `0°`는 yaw 최대 `0.01852879921693318 rad`, `1°`는 translation
-최대 `0.2800537845414384 m`로 각각 해당 지표의 최저값이었다. 두 지표의 최소값이
-같은 후보에 모이지 않았으므로 `0°`·`1°` 모두 replay 후보로만 보존하고 운영
-canonical은 `0.1745`로 유지한다. 상세 결과와 한계는
-`records/experiments/go2_local_navigation_dimos_lower_search_20260829.md`와
-같은 stem의 YAML projection에서 조회한다.
-
-후속 causal A/B에서는 동일 입력에서 `use_scan_matching`만 끈 경우 short·full corrected
-pose가 odometric pose와 같아지고 held-out 재현성이 회복됐다. 따라서 최초 pose 열화는
-Karto sequential scan matching으로 확인했다. 반면 full loop-off는 장거리 edge를
-제거해도 회복되지 않아 explicit loop closure는 주원인에서 제외했다. matching-off에도
-PGM fan·streak와 occupancy support 손실이 남으므로 occupancy 생성은 `open`이다.
-matching-off는 진단 음성 대조군이며 package/default/canonical 설정은 변경하지 않았다.
-
-2026-08-30에는 matching-off의 동일 admitted scan·pose를 고정해 occupancy만 분석했다.
-`unsupported_occupied`는 첫 측정 prefix인 node `30` 또는 그 이전부터 지속됐다.
-`multi_segment_occupied` 후보는 primary skeleton을 `4000 → 4`셀로 줄여 수치 gate를
-통과했지만, blind visual QA에서는 baseline보다 fan/streak와 topology 가독성이
-악화됐다. 따라서 최종 winner는 없고 full candidate 실행은 `0`회다. 상태는
-`root-cause-classified`이며 `src/`, TF, scan profile, SLAM/default는 변경하지 않았다.
-
-최종 profile·상태·한계는 canonical record
-`go2-local-navigation-dimos-slam-continuity-resolution-20260828`의
-`records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.md`와
-YAML projection에서 조회한다. final A/B·repeat·build/test run artifact 경로는
-[`data/README.md`](data/README.md)에 보존한다.
-
-## 작업 위치와 규칙
-
-이 프로젝트는 저장소의
-`remote_agx_home/go2_projects/projects/go2_local_navigation` 경로로 AGX SSHFS
-mount되어 있다. 저장소 루트 `AGENTS.md`가 이 경로에 재귀 적용되므로 프로젝트
-전용 `AGENTS.md`는 두지 않는다.
-
-프로젝트의 안전 경계와 패키지별 책임은 이 README와 각 패키지 README에서
-관리한다. 확인되지 않은 센서 field·QoS·TF·extrinsic·odometry는 계속
-`unverified` 또는 `TBD`로 기록한다.
-
-## W04 이전 패키지 설명
-
-8월 검증의 패키지 책임은 당시 commit의 README를 따른다. 현재 소유권은 위
-W04 표와 각 package README가 관리한다.
-
-현재 범위에는 프로젝트 내부 `/go2_control/cmd_vel_candidate`와
-`/go2_control/sport_request_preview`가 포함된다. 실제 `/api/sport/request` publish,
-`/lowcmd`, stand/walk와 navigation motion 실행은 포함하지 않는다.
-
-## 검증 진입점
-
-모듈별 현재 검증 수준, 근거 record, 남은 합격 조건과 재검증 시점은
-[`verification/README.md`](verification/README.md)에서 찾는다. 검색·비교용 중앙
-인덱스는 `verification/structured/acceptance_matrix.yaml`, 프로젝트 범위 manifest는
-`verification/structured/project_manifest.yaml`이며, 실제 수치와 실행 상세는 기존
-package contract와 로컬 `records/`가 계속 소유한다.
-
-9단계 통합 검증은 다음 명령으로 반복한다.
+Ubuntu 22.04·ROS Humble·Unitree ROS 메시지 overlay가 필요하다.
+시스템 의존성과 새 환경의 설치 계약은
+[simulator bootstrap](third_party/unitree_mujoco/README.md)과
+[tf2 bootstrap](third_party/tf2/README.md)을 따른다.
+아래 명령은 AGX 프로젝트 루트에서 실행한다. 기존 공유 checkout 대신 전용
+dependency root를 사용하며 기본 build/install/log를 덮어쓰지 않는다.
 
 ```bash
-source /home/bi-agx1/go2_runtime/go2_agx_ros2_humble_env.sh
 cd /home/bi-agx1/go2_projects/projects/go2_local_navigation
-source install/setup.bash
-ros2 run go2_validation integrated_preflight \
-  --ros-args -p duration_sec:=30 -p run_label:=stage9
+# ROS overlay를 source하지 않은 clean shell
+export SIM_DEPS="$HOME/.local/share/go2-local-navigation-sim"
+bash third_party/unitree_mujoco/setup.sh "$SIM_DEPS"
+export UNITREE_MUJOCO_ROOT="$SIM_DEPS/unitree_mujoco"
+export MUJOCO_ROOT="$SIM_DEPS/mujoco-3.3.6"
+
+source /opt/ros/humble/setup.bash
+source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
+bash third_party/tf2/setup.sh /tmp/go2-sim
+export GO2_TF2_PREFIX=/tmp/go2-sim-install/tf2-pin
+colcon --log-base /tmp/go2-sim-log build --base-paths src \
+  --build-base /tmp/go2-sim-build --install-base /tmp/go2-sim-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release --event-handlers console_direct+
+source /tmp/go2-sim-install/setup.bash
 ```
 
-9단계 성공 run은 `data/runs/preflight/20260827_020502_stage9/result.json`이다.
-10단계는 `20260827_150959_stage10_smoke`와
-`20260827_151053_stage10_soak`이며, 실행은 완료됐지만 soak의 yaw drift 경고를
-보존한다. 정확한 수치와 checksum은 로컬
-`records/experiments/go2_local_navigation_stationary_soak_20260827.md`와 같은
-stem의 YAML projection을 따른다. runtime JSON과 로그는 Git 대상이 아니다.
+core는 4개다. 전체 10개를 빌드할 때는 `--base-paths src optional/real_robot
+tools/go2_validation`을 사용한다. 일반 colcon 탐색은 optional도 발견한다.
+`python3 tools/check_package_dependencies.py`로 직접 의존성과 순환을 검사한다.
+simulator에는 Sport stamp·IMU 필드 패치가 필수이며 설치 스크립트가 이를 적용한다.
+bridge는 형제 저장소의 `cleanup/domain-guard`에 있는 nonzero-domain guard와
+waypoint 하한 변경을 사용하고 별도 prefix에 빌드한다.
 
-`go2_control`은 현재 AGX graph와 공식 Unitree Request schema를 근거로 구현됐고
-motion adapter와 read-only trial recorder를 포함한 22개 package 테스트를 통과했다.
-recorder는 실제 `/odom` 5947개를 기록하고 control publisher 없이 clean exit했다.
-기본 이중 gate는 닫혀 있으며 실제 command 전송은 수행하지 않았다. 2026-08-28
-`go2_validation` 분리와 profile 경계 반영 뒤 AGX 실제 workspace를 clean build해
-표준 `install/`에 반영했다. 전체 8 packages, 287 tests, 0 failures, 0 errors,
-3 skipped와 설치 executable `go2_validation=10`, `go2_nav2=0`을 확인했다. 원시
-로그·JUnit archive·install surface·직접 QA와 checksum은
-`.omo/evidence/validation-package-refactor-closeout-20260828/README.md`에 보존한다.
-이 수치는 software-only 구조·계약 검증이며 replay나 live 성능의 추가 합격
-근거가 아니다. 2026-08-29 sweep runner 추가 뒤에는 AGX에서 `go2_validation`을
-재빌드하고 157개를 수집해 154 passed·3 skipped·0 failures·0 errors와 현재 설치
-executable `go2_validation=11`을 확인했다. 2026-08-31 saved-map localization과
-Nav2 shadow를 추가한 Stage 13 동결 검증은 전체 8 packages, 318 tests, 0 failures,
-0 errors, 5 skipped와 설치 executable `go2_validation=14`, `go2_nav2=0`을 확인했다.
-Domain 64·65의 조건·checksum과 주장 한계는
-[`software-only freeze`](verification/software_only_freeze.md)를 따른다.
-후속 12-L2 구현 뒤 현재 workspace 전체 검증은 8 packages, 327 tests, 0 failures,
-0 errors, 5 skipped와 설치 executable `go2_validation=15`, `go2_nav2=0`을 확인했다.
-이는 live no-goal observer의 구현·연결성 검증이며 기존 freeze snapshot을 소급
-변경하지 않는다.
+## 시작 순서
 
-## 로봇 전원 없이 RViz2로 URDF·TF 보기
+한 실행에 사용하지 않는 nonzero domain, joystick 장치/FIFO와 world를 선택한다.
+아래 Domain 41은 전용 예다. 기존 Domain 1 stack을 중지하거나 재사용하지 않는다.
+수동 Xbox는 현재 `/dev/input/js0`의 장치/FD 동일성을 먼저 확인하며,
+FIFO는 자신이 시작할 simulator의 설정과 같은 경로로 만든다.
+공유 simulator config를 수정하지 않는다.
 
-Go2가 꺼져 있거나 AGX와 Go2 Ethernet이 연결되지 않은 상태에서는
-`bringup/go2_offline_rviz.launch.py`로 공식 URDF와 프로젝트 static TF를 RViz2에서
-확인할 수 있다. 이 launch는 CycloneDDS를 loopback으로 제한하므로 Go2 통신이
-필요하지 않다.
-
-### 최초 1회 환경 설치
-
-AGX에서 다음 패키지를 한 번 설치한다.
+터미널 1은 ROS 환경을 source하지 않은 clean shell에서 시작한다.
+`unitree_mujoco`는 `../config.yaml`을 읽으므로 전용 checkout의 `simulate/config.yaml`에
+이 세션의 joystick 설정이 준비되어 있어야 한다.
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y ros-humble-rviz2 ros-humble-joint-state-publisher
+export SIM_DEPS="$HOME/.local/share/go2-local-navigation-sim"
+export WORLD=/home/bi-agx1/go2_projects/projects/go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml
+cd "$SIM_DEPS/unitree_mujoco/simulate/build"
+./unitree_mujoco -r go2 -s "$WORLD" -i 41 -n lo
 ```
 
-### 프로젝트 build
-
-프로젝트 파일이나 launch 설정을 변경한 뒤 AGX에서 build한다.
+터미널 2도 clean shell에서 시작한다.
 
 ```bash
-source /home/bi-agx1/go2_runtime/go2_agx_ros2_humble_env.sh
-cd /home/bi-agx1/go2_projects/projects/go2_local_navigation
-colcon build --symlink-install --packages-select description bringup
-source install/setup.bash
+cd /home/bi-agx1/go2_projects/projects/go2_rl_locomotion_baseline/deploy/robots/go2/build
+./go2_ctrl -n lo -d 41
 ```
 
-### RViz2 실행
-
-AGX의 그래픽 로그인 세션에 있는 터미널에서 다음을 실행한다.
+`Connected to robot`·`FSM: Start Passive`를 확인한 뒤 LT+A, 약 3초 기립,
+Start+D-pad Down으로 FixStand → Velocity_Down을 선택한다.
+터미널 3부터는 다음 공통 ROS 환경을 사용한다.
+`SIM_PID`에는 터미널 1에서 시작한 실제 PID를 넣는다.
 
 ```bash
-source /home/bi-agx1/go2_runtime/go2_agx_ros2_humble_env.sh
-cd /home/bi-agx1/go2_projects/projects/go2_local_navigation
-source install/setup.bash
-ros2 launch bringup go2_offline_rviz.launch.py
+source /opt/ros/humble/setup.bash
+source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
+source /tmp/go2-sim-install/setup.bash
+export GO2_TF2_PREFIX=/tmp/go2-sim-install/tf2-pin
+export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+# 실제 XML의 lo-only interface와 loopback peer로 제한한다.
+export CYCLONEDDS_URI="file:///home/bi-agx1/go2_projects/projects/go2_local_navigation/src/go2_mujoco_lidar/config/cyclonedds_loopback.xml"
+ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
+  simulator_pid:="$SIM_PID" mode:=mapping tf2_prefix:="$GO2_TF2_PREFIX"
 ```
 
-RViz2에는 다음이 자동으로 표시된다.
+이 명령이 LiDAR·scan·static TF·odom adapter·SLAM을 한 번씩 시작한다.
+센서만 필요하면 `go2_sim_bringup.launch.py simulator_pid:="$SIM_PID"
+mapping:=false`를 사용한다. mapping을 포함한 정규 운영은 tf2 pin을 적용하는
+`go2_sim_navigation.launch.py`를 사용한다.
+world는 simulator의 `-s`에서 읽어 raycast에 전달하고 경로·SHA-256을 기록한다.
+기본 센서는 `720×8`, 수직 `±15°`이며 base 방위각별 최소 절대 elevation ray를
+고르는 planar-selected cloud가 `/scan` 입력이다. sensor-frame 단일 수평 layer와
+다르므로 기본 실행에서 raster override를 생략한다.
 
-- Fixed Frame: `base`
-- 공식 Go2 `RobotModel`
-- `TF` frame 축과 이름
-- Grid
-- `base → imu`, `base → radar`, `base → front_camera`,
-  `base → utlidar_lidar` 연결
+터미널 4는 같은 ROS 환경에서 bridge install을 추가 source한다.
+`OWN_FIFO`는 터미널 1의 전용 joystick FIFO다. 수동 Xbox 주행에서는 이 bridge를
+실행하지 않는다.
 
-이 launch가 시작하는 `joint_state_publisher`는 URDF에서 기본 joint state를
-합성하는 시각화용 publisher다. 실제 관절 상태가 아니며 `/utlidar/*`,
-`/utlidar/robot_odom`, `/odom`, `/cmd_vel`, Unitree service, motor command를
-사용하지 않는다. 따라서 이 상태에서는 실시간 LiDAR·IMU·odom·map은 표시되지
-않는다.
-
-종료할 때는 RViz2가 실행 중인 터미널에서 `Ctrl+C`를 누른다. 이 offline launch는
-static TF와 합성 joint state를 내부에서 함께 시작하므로
-`go2_static_tf.launch.py`나 `go2_odometry_adapter.launch.py`를 별도로 실행하지
-않는다.
-
-SSH 터미널에서 실행해 `Unable to open display`가 나오면 오류가 아니라 GUI display가
-없는 상태다. AGX의 실제 그래픽 화면 터미널에서 실행하거나 X/Wayland display가
-전달된 세션을 사용해야 한다.
-
-## TF 설계
-
-```text
-map → odom → base
-                ├── imu
-                ├── radar
-                └── utlidar_lidar
+```bash
+source /tmp/go2-bridge-install/local_setup.bash
+ros2 run go2_nav2_mujoco_bridge twist_to_joystick --ros-args \
+  -p fifo_path:="$OWN_FIFO"
 ```
 
-`map→odom`은 SLAM/localization, `odom→base`는
-`go2_state_estimation/odometry_adapter_node`,
-센서 frame 연결은 실제 값이 확인된 뒤 해당 구성요소가 소유한다. 현재
-canonical model과 프로젝트 root는 모두 `base`이며, 공식 native sensor 의미는
-`imu`=차체 IMU, `radar`=기본 Unitree LiDAR, `front_camera`=기본 내장
-카메라로 기록한다. runtime `/utlidar/cloud`의 frame_id는
-`utlidar_lidar`로 확인했고 static TF 연결도 runtime에서 검증했다. URDF 기준값은
-`description/urdf/go2_description.urdf`에서 확인하고, 좌표 확인 이미지는
-`description/urdf/go2_description_coordinate_check.png`에서 확인한다.
+bridge build와 FIFO 입력 절차는 형제 저장소의 README를 따른다.
+bridge의 legacy Nav2 launch를 동시에 시작하지 않는다.
+별도 RViz는 같은 ROS 환경에서 실행하고 tf2가 필요하면
+`LD_LIBRARY_PATH="$GO2_TF2_PREFIX/tf2/lib:$LD_LIBRARY_PATH" rviz2`로 pin을 적용한다.
+Nav2/SLAM native child의 pin은 세션 launch가 강제하고 `TF2_LOADED`로 확인한다.
 
-static sensor TF는 `bringup/config/static_tf_profiles.yaml`에서 profile별로
-관리한다. 기본 `project_default`는 기존 실물·일반 launch에 계속 사용하고,
-`dimos_replay`는 해당 외부 bag을 재생할 때만 명시한다. source frame 대응은 외부
-replay용 project mapping이며 실물 센서의 물리 calibration으로 승격하지 않는다.
+## 지도 저장과 재로딩
 
-하나의 TF edge에는 하나의 publisher만 둔다. 센서 입력과 perception 보고는
-읽기 전용으로 유지하며, `/cmd_vel`, Unitree control service, motor command,
-stand/walk, navigation command는 별도 승인 전까지 추가하거나 실행하지 않는다.
+주행을 멈추고 mapping이 살아 있는 동안 같은 ROS 환경의 별도 셸에서 저장한다.
+output은 suffix 없는 새 절대 경로다.
 
-공식 URDF는 구조·기준값을 보관하는 asset이지 실행 승인이나 현재 runtime
-TF 검증 결과가 아니다. `map→odom`과 `odom→base`는 URDF fixed
-joint로 추가하지 않는다.
+```bash
+ros2 run go2_mujoco_lidar sim_save_map \
+  --simulator-pid "$SIM_PID" --output /tmp/go2-map/route
+```
 
-## 다음 확인 단계
+YAML·PGM과 world/domain/hash를 담은 `.session.json`을 저장한다.
+posegraph/data와 원자적 SLAM checkpoint 저장은 별도다.
+mapping ROS launch를 종료하고 모든 owned ROS PID가 사라진 뒤 simulator/RL은
+유지한 채 다음을 실행한다.
 
-1. 10단계 정지 smoke·soak는 실행 완료 상태로 유지하되 yaw drift 경고를 후속 시험에 연결한다.
-2. 11단계 software fault recovery와 12단계의 mapping·saved-map localization·합성 Nav2 shadow는 software-only 범위에서 완료했다.
-3. 외부 replay continuity와 occupancy 품질은 별도 판정으로 유지한다. canonical continuity는 정확한 bag/profile에서만 통과했고 occupancy production 후보는 없으며, Domain 64 localization 연결성과 Domain 65 Nav2 action 결과를 지도·위치 정확도로 승격하지 않는다.
-4. 13단계 software-only freeze 당시 보류됐던 Domain 0 중 live scan·정지 SLAM mapping은 12-L, live saved-map localization·no-goal Nav2 observer 연결성은 12-L2에서 `stationary-onboard-verified`로 보완했다. 지도·위치 정확도와 실제 goal은 계속 보류한다.
-5. 다음 실행 단계인 14단계에서 AGX 최종 고정과 footprint·케이블·전원·열·센서 시야를 기록한다.
-6. 15단계는 이동 가능한 전원, 단일 command owner와 최신 승인이 있을 때만 축·StopMove를 제한적으로 검증한다.
+```bash
+ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
+  simulator_pid:="$SIM_PID" mode:=localization tf2_prefix:="$GO2_TF2_PREFIX" \
+  map:=/tmp/go2-map/route.yaml initial_pose:=0.0,0.0,0.0
+```
 
-센서·odometry source probe 결과는
-`records/experiments/go2_local_navigation_sensor_odometry_probe_20260823.md`와
-같은 stem의 YAML projection에 보존한다.
+initial_pose는 저장 지도에서 현재 base의 실제 x,y,yaw다. 원점은 형식 예다.
+AMCL이 새 pose를 수락한 뒤에만 Nav2 lifecycle이 시작된다.
+`map → odom`은 mapping에서 SLAM, localization에서 AMCL 하나만 소유한다.
+동일 domain 세션은 OS lock으로 직렬화한다.
+localization 종료는 [SIM_SESSION 종료 순서](src/go2_nav2/SIM_SESSION.md#종료-순서)의
+lifecycle FINALIZED 확인 후 ROS launch → bridge → RL → simulator 순서로 진행한다.
+physics reset은 전체 세션 재시작 조건이다.
 
-adapter mapping 결정과 runtime 결과는 각각
-`records/decisions/go2_local_navigation_odom_frame_mapping_20260823.md`,
-`records/experiments/go2_local_navigation_odom_adapter_20260823.md`와 같은 stem의
-YAML projection에 보존한다.
+## 검증과 격리
 
-정지 상태 bag/replay와 perception 결과는
-`records/experiments/go2_local_navigation_stationary_bag_perception_20260826.md`와
-같은 stem의 YAML projection에 보존한다.
+```bash
+# 위 build prefix와 같은 전체/핵심 package 범위를 사용한다.
+colcon --log-base /tmp/go2-sim-test-log test --base-paths src \
+  --build-base /tmp/go2-sim-build --install-base /tmp/go2-sim-install \
+  --executor sequential --return-code-on-test-failure --ctest-args -j1
+colcon test-result --test-result-base /tmp/go2-sim-build --verbose
+```
 
-motion adapter dry-run과 Nav2 preview 결과는 각각
-`records/experiments/go2_local_navigation_motion_adapter_dry_run_20260827.md`,
-`records/experiments/go2_local_navigation_nav2_non_actuating_preview_20260827.md`와
-같은 stem의 YAML projection에 보존한다.
+실제 simulator→RL→SLAM→저장→AMCL/Nav2→FIFO 경로는
+[추적 acceptance](src/go2_mujoco_lidar/test/acceptance/README.md)를 사용한다.
+기본 13점 mapping, 다섯 goal, 독립 qpos 오차, 비바닥 접촉, 입력 reset, lifecycle
+FINALIZED와 owned 잔류 0을 판정하며 일반 colcon test에는 등록하지 않는다.
 
-통합 비동작 preflight 결과는
-`records/experiments/go2_local_navigation_integrated_preflight_20260827.md`와 같은
-stem의 YAML projection에 보존한다.
+- Domain 0은 정규 sim/bridge 경로에서 거부한다. guard 우회 옵션은 운영에 쓰지 않는다.
+- 모든 physics/RL/ROS process는 같은 domain과 loopback 격리를 사용한다.
+- build/install/log는 `/tmp` 전용 경로만 사용한다. 다른 실행의 PID에 signal을 보내지 않는다.
+- 소유한 PID/start tick/session과 FIFO만 정리하고 기존 Domain 1 identity를 보존한다.
+- 자동 테스트 통과는 구현 계약의 일치다. 실제 지도·위치 정확도와 실물 안전성은 별도다.
 
-정지 smoke·soak와 trial recorder QA 결과는 각각
-`records/experiments/go2_local_navigation_stationary_soak_20260827.md`,
-`records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.md`와
-같은 stem의 YAML projection에 보존한다.
+## 한계와 미확인
 
-stationary·external-full SLAM mapping 결과는
-`records/experiments/go2_local_navigation_slam_mapping_replay_20260827.md`와 같은
-stem의 YAML projection에 보존한다.
-
-Domain 0 live scan·정지 SLAM mapping supplement 결과는
-`records/experiments/go2_local_navigation_domain0_live_mapping_shadow_20260831.md`와
-같은 stem의 YAML projection에 보존한다.
-
-Domain 0 live saved-map localization·no-goal Nav2 observer 결과는
-`records/experiments/go2_local_navigation_domain0_live_localization_nav2_observer_20260831.md`와
-같은 stem의 YAML projection에 보존한다.
-
-DimOS source extrinsic과 120초 TF profile A/B 결과는
-`records/experiments/go2_local_navigation_dimos_tf_profile_ab_20260828.md`와 같은
-stem의 YAML projection에 보존한다.
-
-DimOS 단일 cloud와 10-frame odometry 보정 누적 A/B 결과는
-`records/experiments/go2_local_navigation_dimos_scan_projection_ab_20260828.md`와
-같은 stem의 YAML projection에 보존한다.
-
-canonical emit3 replay-only resolution은
-`records/experiments/go2_local_navigation_dimos_slam_continuity_resolution_20260828.md`와
-같은 stem의 YAML projection에 보존한다. 앞선 TF/10-frame A/B의 failed/open 결과는
-그 최종 profile 적용 전 조건의 역사적 근거로 보존한다.
-
-최신 pose·occupancy 원인 분리는
-`records/experiments/go2_local_navigation_dimos_slam_causal_attribution_20260829.md`와
-같은 stem의 YAML projection에 보존한다. 이 후속 기록은 continuity pass를 폐기하지
-않고 당시 근본 원인 설명만 부분 대체한다.
-
-고정 pose occupancy breakpoint와 후보 판정은
-`records/experiments/go2_local_navigation_dimos_occupancy_quality_resolution_20260830.md`와
-같은 stem의 YAML projection에 보존한다. 수치 gate의 winner와 blind visual-approved
-winner를 분리하며, 이 기록의 후보는 live/default 설정으로 승격하지 않는다.
+- F02의 동일 source 세 번에서 13점 mapping·다섯 목표·무접촉·무잔류를 확인했다.
+  조건과 수치는 [F02 기록](docs/stabilization-2026-11/F02_MAPPING.md)을 따른다.
+- 공유 GUI simulator/W01 patch는 누적 double time을 stamp로 변환한다.
+  약 257초 이후 1 ns 불일치가 발생할 수 있어 긴 실행의 exact pairing은 미해결이다.
+  acceptance native driver의 정수 epoch clock 수정이 GUI 경로에도 적용됐다고 보지 않는다.
+- 지도 외곽 fan/streak·전체 지도 정확도·다른 world/policy·장시간 안정성은 미검증이다.
+- reset 뒤 입력 복구만 확인했으며 AMCL 재초기화·goal 재개는 미검증이다.
+- 실제 로봇 동작, 최종 장착, physical goal, SDK 외 RL telemetry의 격리는 미검증이다.
+- 새 OS rosdep provisioning과 GitHub hosted CI는 이번 AGX 결과로 검증되지 않는다.

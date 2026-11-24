@@ -115,4 +115,4 @@ BT·sampling domain의 연결/유효성·주기와 deadline 관계 검사다. �
 입력 elevation만 -0.10에서 -0.50으로 바꾼 별도 target이다.
 정상 선택 `{4,1,6,7}`을 기대하면 고의 변경 입력은 `{0,1,6,7}`을 내므로
 GoogleTest가 exit 1이어야 한다. 정상 suite에는 등록하지 않는다.
-명령은 [acceptance README](test/acceptance/README.md)를 따른다.
+명령은 [acceptance README](../../src/go2_mujoco_lidar/test/acceptance/README.md)를 따른다.

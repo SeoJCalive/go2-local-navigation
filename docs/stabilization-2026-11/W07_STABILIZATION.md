@@ -4,7 +4,7 @@
 MuJoCo 수용 시험과 종료 경계를 확인할 때 읽는다. 기준은
 `e473c58ce5d5d606f3debed2564bb1f971cb5995`이며,
 파일별 분류는 [시험 inventory](W07_TEST_INVENTORY.md),
-전체 simulator 실행 명령은 [수용 README](test/acceptance/README.md)에 있다.
+전체 simulator 실행 명령은 [수용 README](../../src/go2_mujoco_lidar/test/acceptance/README.md)에 있다.
 
 ## 기본 시험과 빌드
 

@@ -9,7 +9,7 @@ localization → JSON에 지정한 N개 world goal → 입력 epoch reset을 재
 F02에서는 전체 13점 mapping의 stall 0, 매 physics step의 비바닥 robot/world
 접촉 0과 runner/launch 모두 TERM/KILL escalation 0도 판정한다.
 실측 하한·경로 여유·긴 epoch clock과 연속 3회 결과는
-[F02 기록](../../F02_MAPPING.md)을 따른다.
+[F02 기록](../../../../docs/stabilization-2026-11/F02_MAPPING.md)을 따른다.
 기본 goals는 W04/W06과 같은 5개다. 지도 전체 정확도, 실물 동작 또는 reset 뒤
 AMCL 재초기화와 goal 재개를 판정하지 않는다.
 
@@ -100,7 +100,7 @@ observer는 공유 `watch_simulation_epoch()`로 TF cache를 비워 Humble Pytho
 Buffer에 이전 epoch의 transform이 남지 않게 한다.
 터미널 전체 group의 직접 signal은 이 경로와 다르며 수동 절차는
 [SIM_SESSION의 종료 순서](../../../go2_nav2/SIM_SESSION.md#종료-순서)를 따른다.
-stack과 preload 대조는 [W07 보고서](../../W07_STABILIZATION.md)에 있다.
+stack과 preload 대조는 [W07 보고서](../../../../docs/stabilization-2026-11/W07_STABILIZATION.md)에 있다.
 
 Release F20 음성 대조군은 다음과 같이 실행한다. 정상 binary와 같은 oracle을 쓰되
 한 ray의 elevation 입력을 `-0.10 → -0.50 rad`로 고의 변경한 별도 binary다.

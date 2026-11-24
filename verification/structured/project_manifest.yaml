@@ -2,11 +2,13 @@ schema_version: 1
 record_kind: project_manifest
 source_markdown: "../../README.md"
 record_id: "go2-local-navigation-project-20260822"
-title: "Go2 로컬 내비게이션 프로젝트 기초 골격"
+title: "Go2 simulation 현재 구성과 과거 검증 근거"
 project_name: go2_local_navigation
 status: "candidate"
 recorded_at: "2026-08-22"
 latest_verified_at: "2026-08-31"
+source_inventory_reviewed_at: "2026-11-24"
+historical_evidence_through: "2026-08-31"
 provenance:
   kind: "design_from_current_agx_record"
   derived_from:
@@ -19,7 +21,7 @@ provenance:
   latest_onboard_go2_powered: true
 remote_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation"
 workspace_path: "remote_agx_home/go2_projects/projects/go2_local_navigation"
-purpose: "AGX에서 Go2 센서 계약을 읽기 전용으로 검증하고 이후 자율주행 단계를 준비하는 프로젝트"
+purpose: "MuJoCo 센서 입력에서 SLAM·저장 지도 AMCL/Nav2를 실행하고 실물 후보와 검증 도구를 분리하는 프로젝트"
 scope:
   - read_only_sensor_acceptance
   - lidar_obstacle_candidate_reporting
@@ -50,6 +52,7 @@ scope:
   - software_only_freeze
   - domain0_stationary_live_mapping_shadow
   - domain0_live_localization_no_goal_nav2_observer
+scope_semantics: "historical_evidence_inventory_through_20260831_not_current_executable_surface"
 verified_outputs:
   - "/scan"
   - "/odom"
@@ -138,9 +141,9 @@ candidate_outputs:
   - "/go2_nav2/costmap_only_cmd_vel_unused"
 component_boundaries:
   - component_id: "mapping_scan_projection"
-    owner: "go2_perception"
+    owner: "go2_inputs"
     status: "experimental"
-    role: "PointCloud2를 mapping용 LaserScan으로 투영하고 외부 replay 누적 profile 후보를 제공"
+    role: "cloud gate와 공식 PointCloud2→LaserScan converter를 조합"
   - component_id: "slam_mapping_runtime"
     owner: "go2_nav2"
     status: "experimental"
@@ -160,13 +163,13 @@ component_boundaries:
   - component_id: "software_validation_orchestration"
     owner: "go2_validation"
     status: "validation_tool"
-    role: "fault·replay·mapping acceptance와 통합 preflight를 실행하고 결과를 판정"
+    role: "fault·shadow·live no-goal·통합 preflight를 실행하고 결과를 판정"
   - component_id: "odometry_continuity"
-    owner: "go2_state_estimation"
+    owner: "go2_inputs"
     status: "single_implementation_profile_selected"
     profiles:
       onboard: "onboard_observe"
-      replay: "replay_enforce"
+      validation: "validation_enforce"
 verification:
   entrypoint: "verification/README.md"
   structured_matrix: "verification/structured/acceptance_matrix.yaml"
@@ -175,14 +178,21 @@ verification:
   status: "stage_12l2_completed_stationary_onboard_connectivity_with_warning"
   package_boundary_record_id: "go2-local-navigation-validation-package-refactor-20260828"
   package_inventory:
-    count: 8
-    workspace_install_status: "verified_current"
-    workspace_install_path: "/home/bi-agx1/go2_projects/projects/go2_local_navigation/install"
+    count: 10
+    core: ["description", "go2_inputs", "go2_nav2", "go2_mujoco_lidar"]
+    optional_real_robot: ["go2_sensor", "go2_state_estimation", "go2_perception", "go2_control", "bringup"]
+    tools: ["go2_validation"]
+    workspace_install_status: "source_inventory_verified_default_install_not_refreshed"
+    verified_build_install_path: "/tmp/w08-install"
     validation_executable_owner: "go2_validation"
-    validation_executable_count: 15
+    validation_executable_count: 8
     nav2_validation_executable_count: 0
+    clean_test_summary: "W08: 260 tests, 0 errors, 0 failures, 2 skipped"
+    evidence_summary: "docs/stabilization-2026-11/W08_CLOSEOUT.md"
+  historical_package_inventory_20260831:
+    count: 8
+    validation_executable_count: 15
     clean_test_summary: "327 tests, 0 errors, 0 failures, 5 skipped"
-    latest_targeted_validation_test_summary: "12 tests, 0 errors, 0 failures, 0 skipped"
     evidence_summary: ".omo/evidence/validation-package-refactor-closeout-20260828/README.md"
 open_findings:
   - finding_id: "external_dynamic_map_to_odom_continuity"

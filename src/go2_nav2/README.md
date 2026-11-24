@@ -1,120 +1,36 @@
-# `go2_nav2`
+# go2_nav2
 
-W04 현재 역할은 공통 SLAM·saved-map AMCL·Nav2 runtime asset과 session guard다.
-직접 workspace 의존성은 `go2_inputs` 하나이며 실물 Sport·obstacle·validation을
-설치하지 않는다. `go2_controller_preview.launch.py`, `go2_costmap_only.launch.py`와
-`nav2_non_actuating.yaml`은 `optional/real_robot/bringup`으로 이동했다.
-shadow/live no-goal launch·map·정상/실패 BT는 W06에서 확인한 caller 때문에 유지한다.
-현재 sim 절차는 [SIM_SESSION.md](SIM_SESSION.md), 전체 구조는
-[W04_BOUNDARIES.md](W04_BOUNDARIES.md)를 따른다. 아래 stage 설명은 기존 검증 맥락이다.
+SLAM Toolbox·저장 지도 AMCL·Nav2 설정과 simulation 세션의 guard를 제공한다.
+입력 조합은 `go2_inputs`가 소유하며 직접 workspace runtime 의존성도 이 패키지
+하나다. 실물 Sport·obstacle·validation 실행을 포함하지 않는다.
+현재 simulation 절차는 [SIM_SESSION](SIM_SESSION.md), 전체 구조와 설치는
+[루트 README](../../README.md)를 따른다.
 
-MuJoCo의 현재 세션 진입점과 Nav2 설정 소유권은
-[SIM_SESSION.md](SIM_SESSION.md)를 따른다. 아래 비동작/합성 asset 설명은 legacy
-경로에도 적용된다. 현재 sim Nav2의 단일 설정은 `config/nav2_mujoco.yaml`이다.
-
-`go2_nav2`는 비동작 Nav2 runtime asset만 소유한다. local costmap, controller
-preview, SLAM mapping, saved-map localization, Domain 0 no-goal observer와 합성 전체
-Nav2 launch·설정·map·BT가 대상이다. 이 asset은 모두 실험 후보이며 production
-navigation runtime 또는 실제 motion 승인을 뜻하지 않는다. fault, mapping,
-localization, Nav2 shadow acceptance와 통합 preflight 같은 검증 orchestration은
-`go2_validation`이 소유한다.
-
-## 폴더 및 파일 구조
-
-```text
-go2_nav2/
-├── README.md
-├── package.xml
-├── resource/
-│   └── go2_nav2
-├── setup.cfg
-├── setup.py
-├── config/
-│   ├── nav2_non_actuating.yaml
-│   ├── nav2_shadow.yaml
-│   ├── navigation_contract.yaml
-│   ├── saved_map_localization.yaml
-│   └── slam_mapping.yaml
-├── launch/
-│   ├── go2_controller_preview.launch.py
-│   ├── go2_costmap_only.launch.py
-│   ├── go2_nav2_live_observer.launch.py
-│   ├── go2_nav2_shadow.launch.py
-│   ├── go2_saved_map_localization.launch.py
-│   └── go2_slam_mapping.launch.py
-├── maps/
-│   ├── shadow_blocked.pgm
-│   ├── shadow_blocked.png
-│   ├── shadow_blocked.yaml
-│   ├── shadow_open.pgm
-│   ├── shadow_open.png
-│   └── shadow_open.yaml
-├── behavior_trees/
-│   ├── navigate_to_pose_shadow.xml
-│   └── navigate_to_pose_shadow_missing_planner.xml
-├── go2_nav2/
-│   └── __init__.py
-└── test/
-    ├── test_localization_shadow_configuration.py
-    ├── test_live_navigation_observer_configuration.py
-    ├── test_nav2_shadow_runtime_configuration.py
-    ├── test_navigation_configuration.py
-    └── test_shadow_assets.py
-```
-
-## 파일별 역할
-
-| 파일 | 역할 |
+| 경로 | 역할 |
 | --- | --- |
-| `README.md` | runtime-only 경계, 실험 후보 상태와 retained asset을 설명한다. |
-| `package.xml` | Nav2 runtime asset을 위한 ROS 2 metadata와 의존성을 선언한다. |
-| `resource/go2_nav2` | ament index package marker다. |
-| `setup.cfg` | ament Python script 설치 경로를 지정한다. |
-| `setup.py` | config, launch, map, BT asset을 package share 경로에 설치한다. validation executable은 등록하지 않는다. |
-| `config/nav2_non_actuating.yaml` | local costmap·controller preview의 frame, obstacle source, candidate velocity 제한과 닫힌 gate parameter를 정의한다. |
-| `config/nav2_shadow.yaml` | Domain 65 합성 Nav2의 Map Server, global/local costmap, planner, controller, behavior server와 BT Navigator parameter를 정의한다. |
-| `config/navigation_contract.yaml` | 비동작 Nav2 runtime의 source, candidate 상태, 안전 경계와 실험 상태를 구조화한다. |
-| `config/saved_map_localization.yaml` | Map Server와 AMCL의 frame, scan, particle와 단일 `map → odom` owner parameter를 정의한다. |
-| `config/slam_mapping.yaml` | SLAM Toolbox mapping의 frame, scan, map 저장과 기본 search parameter를 정의한다. |
-| `launch/go2_controller_preview.launch.py` | controller output을 내부 candidate topic으로 remap하고 닫힌 motion adapter preview를 시작한다. |
-| `launch/go2_costmap_only.launch.py` | stationary perception·odometry와 local costmap owner만 조합하며 motion adapter와 goal은 시작하지 않는다. |
-| `launch/go2_nav2_live_observer.launch.py` | Domain 0 실제 scan·odometry에 저장 지도 AMCL과 네 Nav2 server를 연결하되 goal node를 만들지 않고 velocity를 inert `/go2_nav2/shadow_cmd_vel`로 격리한다. |
-| `launch/go2_nav2_shadow.launch.py` | Domain 65 Map Server와 Nav2 전체 lifecycle을 합성 fixture에 연결하고 velocity를 inert `/go2_nav2/shadow_cmd_vel`로 격리한다. |
-| `launch/go2_saved_map_localization.launch.py` | 저장 지도, live 또는 simulation scan·odometry, Map Server와 AMCL을 조합한다. planner·controller·command node는 시작하지 않으며, 외부 조합이 입력을 소유할 때는 `start_inputs=false`로 scan·odometry include만 제외한다. |
-| `launch/go2_slam_mapping.launch.py` | mapping scan·odometry와 단일 SLAM Toolbox owner를 조합한다. 기본 `execution_mode=onboard`, `continuity_profile=onboard_observe`를 선언하고 하위 launch에 전달하며, 외부 조합이 입력을 소유할 때는 `start_inputs=false`로 scan·odometry include만 제외한다. |
-| `maps/shadow_blocked.pgm` | blocked synthetic navigation 후보의 occupancy raster다. |
-| `maps/shadow_blocked.png` | blocked raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
-| `maps/shadow_blocked.yaml` | blocked raster의 image, resolution, origin과 threshold manifest다. |
-| `maps/shadow_open.pgm` | open/cancel/failure synthetic navigation 후보의 occupancy raster다. |
-| `maps/shadow_open.png` | open raster를 시각적으로 열어 보기 위한 PNG sidecar다. 원본 PGM을 대체하지 않는다. |
-| `maps/shadow_open.yaml` | open raster의 image, resolution, origin과 threshold manifest다. |
-| `behavior_trees/navigate_to_pose_shadow.xml` | synthetic `NavigateToPose` 후보용 recovery·replanning BT 구조다. |
-| `behavior_trees/navigate_to_pose_shadow_missing_planner.xml` | planner-failure 시나리오에서 존재하지 않는 planner ID를 요청하는 진단용 BT다. |
-| `go2_nav2/__init__.py` | 이 package가 validation orchestration을 소유하지 않는 Nav2 runtime asset 경계임을 설명한다. |
-| `test/test_localization_shadow_configuration.py` | Map Server·AMCL frame·owner와 command 경로 부재를 검사한다. |
-| `test/test_live_navigation_observer_configuration.py` | 실제 입력 localization include, 네 Nav2 server와 합성 fixture 부재를 검사한다. |
-| `test/test_nav2_shadow_runtime_configuration.py` | Domain 65 lifecycle, inert velocity remap과 planner-failure BT를 검사한다. |
-| `test/test_navigation_configuration.py` | costmap frame·obstacle source·controller 제한과 costmap-only launch의 non-actuating 경계를 검사한다. |
-| `test/test_shadow_assets.py` | map raster·BT와 `go2_validation` 소유 scenario config의 연결을 검사한다. |
+| `config/nav2_mujoco.yaml` | simulation Nav2 단일 설정·RotationShim·정책 응답 범위 |
+| `config/slam_mapping.yaml` | SLAM Toolbox mapping 설정 |
+| `config/saved_map_localization.yaml` | Map Server·AMCL 기본 설정; sim 세션은 자동 원점 pose를 끈다 |
+| `config/nav2_shadow.yaml` | 합성 shadow와 실제 입력 no-goal observer 설정 |
+| `config/navigation_contract.yaml` | 과거 비동작 실험 계약과 근거 |
+| `launch/go2_slam_mapping.launch.py` | SLAM 조합; 외부 입력 owner가 있으면 `start_inputs=false` |
+| `launch/go2_saved_map_localization.launch.py` | Map Server·AMCL 조합; 외부 입력이면 `start_inputs=false` |
+| `launch/go2_nav2_shadow.launch.py` | 합성 fixture용 inert velocity Nav2 |
+| `launch/go2_nav2_live_observer.launch.py` | 실제 입력의 no-goal AMCL/Nav2 observer |
+| `maps` | 합성 shadow open/blocked fixture와 preview sidecar |
+| `behavior_trees` | sim/shadow/live가 쓰는 정상 BT와 검증용 실패 BT |
+| `go2_nav2/sim_session.py` | 지도·초기 pose·mode·flock·tf2 prefix 검증 |
+| `go2_nav2/sim_session_guard.py` | AMCL 초기화 수락·소유권 감시·종료 FINALIZED 확인 |
+| `go2_nav2/tf2_exec.py` | native process preload와 실제 loaded tf2 검사 |
 
-## 실행 경계
+`sim_session_guard`는 이 패키지의 설치 실행 파일이다. 개발 검증 runner는
+`tools/go2_validation`에 있으며, controller preview/costmap-only와
+`nav2_non_actuating.yaml`은 `optional/real_robot/bringup`에 있다.
+static TF는 `description`이 소유한다.
 
-이 package의 launch는 Nav2/SLAM runtime asset만 조합한다. validation executable은
-`ros2 run go2_validation <executable>`로 실행하며, fault·replay·mapping
-acceptance와 host lifecycle을 `go2_nav2`에서 실행하지 않는다.
-
-`go2_slam_mapping.launch.py`는 현재 replay 중심 검증 이력 때문에
-`use_sim_time=true`를 기본으로 선언한다. `execution_mode=onboard` 기본값과 별개이므로
-live Go2에서 사용할 때는 `use_sim_time:=false`를 명시하고 clock owner가 없음을
-preflight로 확인해야 한다. replay-only TF·scan profile이 onboard mode에서 거부된다는
-사실만으로 이 launch 전체가 live-ready라고 판단하지 않는다.
-
-`go2_saved_map_localization.launch.py`와 `go2_nav2_shadow.launch.py`는 각각 Domain
-64·65의 software-only 검증에서 실행했다. 전자는 AMCL 연결성과 owner를 확인한
-replay 자산이고, 후자는 합성 action 계약을 확인한 자산이다.
-`go2_nav2_live_observer.launch.py`는 12-L2에서 Domain 0 실제 입력과 12-L 저장 지도를
-사용해 AMCL·Nav2 lifecycle·costmap 연결성을 goal 없이 확인했다. 세 결과 모두 위치·
-지도 정확도나 실제 목적지 도달을 증명하지 않는다.
-
-각도 sweep 시각 비교본은 package runtime asset이 아니며,
-`.user/img/slam_map/angle_sweep_20260829/`에서 관리한다.
+정규 sim 진입점은 `go2_mujoco_lidar/go2_sim_navigation.launch.py`다.
+legacy SLAM launch의 `execution_mode=onboard`와 `use_sim_time=true` 기본값은
+별개의 조건이므로 live에서는 `use_sim_time=false`와 clock 부재를 명시적으로 확인한다.
+Domain 64 replay·65 합성 action·과거 Domain 0 정지 no-goal 관찰은 지도 정확도,
+위치 정확도나 실물 목표 도달 근거가 아니다.
+과거 패키지 이동과 당시 검증은 [안정화 기록](../../docs/stabilization-2026-11/README.md)에 있다.
