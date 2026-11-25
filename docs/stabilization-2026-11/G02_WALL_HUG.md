@@ -10,6 +10,11 @@ motion gate는 구현하지 않았으며 새 gate 재생과 GUI를 추가 실행
 편입했다. [편입 결과](G02_FORMAL_TESTS.md)와 [실행 방법](../../src/go2_mujoco_lidar/test/wall_hug/README.md)을 따른다.
 이 후속 작업은 새 gate 구현이나 새 graph/GUI 실행을 포함하지 않는다.
 
+같은 날 추가 승인한 실제 엔진 재최적화·gate 비교는
+[counterfactual replay 결과](G02_COUNTERFACTUAL_REPLAY.md)가 소유한다.
+아래 구현 중단·고정 후보 재판정 설명은 그 추가 승인 전 단계의 범위다.
+후속 구현은 오프라인 전용 prefix와 새 브랜치에만 있으며 sigma 3.0과 공유 설치를 유지한다.
+
 증거의 기준 디렉터리는 [G02 증거](../../.omo/evidence/g02-wall-hug/README.md)다.
 아래 원시 파일은 이 저장소의 비추적 증거 경로로 연결하며 본문에 복제하지 않는다.
 

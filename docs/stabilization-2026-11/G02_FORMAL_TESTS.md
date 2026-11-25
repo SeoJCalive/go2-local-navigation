@@ -5,6 +5,9 @@
 원래 오연결 관측은 [G02 기록](G02_WALL_HUG.md)이 소유한다. 기준 source는
 `cleanup/sim-stabilization`의 `2087585`, 승격한 원본은 `123f8b7`이다.
 
+이 문서의 replay는 고정 후보 재판정이다. 이후 추가 승인한 실제 Karto/Ceres
+재최적화·gate 실험과 그 정식 검사는 [counterfactual 결과](G02_COUNTERFACTUAL_REPLAY.md)를 따른다.
+
 ## 편입 범위
 
 - 기존 `test/`와 ament pytest/GoogleTest runner에 G02 Python 56개와 C++ 5개를 추가했다.
