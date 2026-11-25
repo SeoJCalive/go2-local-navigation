@@ -115,6 +115,34 @@ build/go2_mujoco_lidar/planar_selection_broken_input \
   --gtest_filter=PlanarSelection.ChoosesClosestElevationAndFirstTie
 ```
 
+## GUI binary 장시간 clock 검증
+
+F04의 `gui_clock.py`는 shared GUI binary를 Xvfb·software GL에서 실행한다.
+별도 acceptance native main으로 대체하지 않는다. Domain 41·lo-only XML을 사용하고
+ROS sensor bringup만 시작한다. 610초의 Sport·cloud·odom, 정수 ms 격자와
+Low/Sport exact stamp 교집합, 출력 간격 1초 미만을 검사한 뒤 XTest Backspace로
+reset하고 같은 ROS process의 5초 새 epoch를 기다린다.
+Xvfb와 libXtst가 필요하다. shared binary의 동일 inode를 전용 output에 hard link하고
+joystick 없는 pinned 기본 config를 복사하므로 공유 config와 기존 FIFO를 보존한다.
+
+```bash
+# ROS/Unitree와 현재 workspace install을 source한 셸
+export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://$PWD/src/go2_mujoco_lidar/config/cyclonedds_loopback.xml"
+SHARED="$HOME/go2_projects/shared/dependencies"
+timeout --signal=TERM --kill-after=60s 1400s python3 -u \
+  src/go2_mujoco_lidar/test/acceptance/gui_clock.py \
+  --simulator "$SHARED/unitree_mujoco/simulate/build/unitree_mujoco" \
+  --config "$HOME/.local/share/go2-local-navigation-sim/unitree_mujoco/simulate/config.yaml" \
+  --world "$PWD/../go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml" \
+  --output "$PWD/runs/gui-clock-01"
+```
+
+`ROS_LOCALHOST_ONLY=0`은 SDK와 RMW의 interface 중복 설정을 피하는 값이다.
+실제 네트워크 경계는 위 XML의 `lo`, multicast off, `127.0.0.1` peer다.
+결과는 `result.json`의 stream별 수·stamp 범위·최대 간격·reset epoch와 owned 잔류다.
+실제 Xbox 조작·RViz·RL 주행과 지도 정확도는 소유자 GUI 시험으로 확인한다.
+
 ## tf2 preload 종료 대조
 
 새 shell에서 ROS·Unitree·변경 install만 source하고, 위 Domain 41/local DDS 환경을

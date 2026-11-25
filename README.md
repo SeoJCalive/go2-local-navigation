@@ -54,7 +54,8 @@ source install/setup.bash
 core는 4개다. 전체 10개를 빌드할 때는 `--base-paths src optional/real_robot
 tools/go2_validation`을 사용한다. 일반 colcon 탐색은 optional도 발견한다.
 `python3 tools/check_package_dependencies.py`로 직접 의존성과 순환을 검사한다.
-simulator에는 Sport stamp·IMU 필드 패치가 필수이며 설치 스크립트가 이를 적용한다.
+simulator에는 Sport stamp·IMU 필드와 GUI 정수 epoch clock 패치가 필수이며
+설치 스크립트가 이를 적용한다.
 bridge는 형제 저장소의 `cleanup/domain-guard`에 있는 nonzero-domain guard와
 waypoint 하한 변경을 사용하고 별도 prefix에 빌드한다.
 
@@ -181,9 +182,9 @@ FINALIZED와 owned 잔류 0을 판정하며 일반 colcon test에는 등록하�
 
 - F02의 동일 source 세 번에서 13점 mapping·다섯 목표·무접촉·무잔류를 확인했다.
   조건과 수치는 [F02 기록](docs/stabilization-2026-11/F02_MAPPING.md)을 따른다.
-- 공유 GUI simulator/W01 patch는 누적 double time을 stamp로 변환한다.
-  약 257초 이후 1 ns 불일치가 발생할 수 있어 긴 실행의 exact pairing은 미해결이다.
-  acceptance native driver의 정수 epoch clock 수정이 GUI 경로에도 적용됐다고 보지 않는다.
+- 공유 GUI simulator도 `0003`의 정수 epoch step과 mutex snapshot을 사용한다.
+  기존 약 257초의 1 ns 불일치 원인과 GUI·수용 검증 범위는
+  [F04 기록](docs/stabilization-2026-11/F04_GUI_CLOCK.md)을 따른다.
 - 지도 외곽 fan/streak·전체 지도 정확도·다른 world/policy·장시간 안정성은 미검증이다.
 - reset 뒤 입력 복구만 확인했으며 AMCL 재초기화·goal 재개는 미검증이다.
 - 실제 로봇 동작, 최종 장착, physical goal, SDK 외 RL telemetry의 격리는 미검증이다.

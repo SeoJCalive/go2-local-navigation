@@ -3,7 +3,7 @@
 # 흐름: upstream 고정 checkout -> 배포물 해시 검증 -> 상태 패치 -> SDK 설치 -> 빌드.
 # 입력: $1 설치 루트(기본 ~/.local/share/go2-local-navigation-sim), JOBS(기본 4).
 # BUILD_ACCEPTANCE=1이면 RL_ROOT의 기존 object로 전용 검증 driver도 만든다.
-# GitHub HTTPS 접근이 필요하다. 기존 공유 dependency를 대상으로 지정하지 않는다.
+# GitHub HTTPS 접근이 필요하다. 공유 갱신은 백업 후 APPLY_AGX_CONFIG=1로 명시한다.
 # GUI, DDS/ROS node, 제어 프로그램은 실행하지 않는다.
 set -euo pipefail
 
@@ -36,35 +36,63 @@ checkout https://github.com/unitreerobotics/unitree_mujoco.git "$sim_commit" "$r
 checkout https://github.com/unitreerobotics/unitree_sdk2.git "$sdk_commit" "$root/unitree_sdk2"
 [[ -z $(git -C "$root/unitree_sdk2" status --porcelain --untracked-files=no) ]]
 
-archive="$root/mujoco-$mujoco_version-linux-$(uname -m).tar.gz"
+dist_root="${MUJOCO_DIST_ROOT:-$root}"
+mkdir -p "$dist_root"
+archive="$dist_root/mujoco-$mujoco_version-linux-$(uname -m).tar.gz"
 if [[ ! -f "$archive" ]]; then
   curl --fail --location --connect-timeout 30 --max-time 300 --output "$archive.part" \
     "https://github.com/google-deepmind/mujoco/releases/download/$mujoco_version/$(basename "$archive")"
   mv "$archive.part" "$archive"
 fi
 echo "$digest  $archive" | sha256sum --check -
-tar -xzf "$archive" -C "$root"
+tar -xzf "$archive" -C "$dist_root"
 if [[ ! -e "$root/unitree_mujoco/simulate/mujoco" ]]; then
-  ln -s "$root/mujoco-$mujoco_version" "$root/unitree_mujoco/simulate/mujoco"
+  ln -s "$dist_root/mujoco-$mujoco_version" "$root/unitree_mujoco/simulate/mujoco"
 fi
-[[ $(readlink -f "$root/unitree_mujoco/simulate/mujoco") == "$root/mujoco-$mujoco_version" ]]
+[[ $(readlink -f "$root/unitree_mujoco/simulate/mujoco") == "$dist_root/mujoco-$mujoco_version" ]]
 
 patch="$patch_dir/0001-sport-state-simulation-time-imu.patch"
-if git -C "$root/unitree_mujoco" diff --quiet -- simulate/src/unitree_sdk2_bridge.h; then
-  git -C "$root/unitree_mujoco" apply --check "$patch"
-  git -C "$root/unitree_mujoco" apply "$patch"
-else
-  git -C "$root/unitree_mujoco" apply --reverse --check "$patch"
+epoch_patch="$patch_dir/0003-gui-integer-epoch.patch"
+# 0001 또는 0001+0003의 기존 설치를 인식한다. 임의 변경은 아래 byte 비교로 거부한다.
+if ! git -C "$root/unitree_mujoco" apply --reverse --check "$epoch_patch" 2>/dev/null; then
+  if git -C "$root/unitree_mujoco" diff --quiet -- simulate/src/unitree_sdk2_bridge.h; then
+    git -C "$root/unitree_mujoco" apply --check "$patch"
+    git -C "$root/unitree_mujoco" apply "$patch"
+  else
+    git -C "$root/unitree_mujoco" apply --reverse --check "$patch"
+  fi
+  git -C "$root/unitree_mujoco" apply --check "$epoch_patch"
+  git -C "$root/unitree_mujoco" apply "$epoch_patch"
 fi
-# 다른 tracked 변경이 섞인 checkout은 빌드하지 않는다.
-git -C "$root/unitree_mujoco" diff --exit-code -- . ':!simulate/src/unitree_sdk2_bridge.h'
-git -C "$root/unitree_mujoco" diff -- simulate/src/unitree_sdk2_bridge.h | cmp - "$patch"
+if [[ "${APPLY_AGX_CONFIG:-0}" == 1 ]]; then
+  config_patch="$patch_dir/0002-agx-config-snapshot.patch"
+  if git -C "$root/unitree_mujoco" diff --quiet -- simulate/config.yaml; then
+    git -C "$root/unitree_mujoco" apply "$config_patch"
+  fi
+fi
+# pinned upstream의 독립 임시 tree에 clean apply하고 모든 변경 파일을 byte 비교한다.
+reference=$(mktemp -d)
+trap 'rm -rf -- "$reference"' EXIT
+git -C "$root/unitree_mujoco" archive "$sim_commit" | tar -x -C "$reference"
+git -C "$reference" apply "$patch"
+git -C "$reference" apply "$epoch_patch"
+if [[ "${APPLY_AGX_CONFIG:-0}" == 1 ]]; then
+  git -C "$reference" apply "$config_patch"
+fi
+for path in simulate/src/unitree_sdk2_bridge.h simulate/src/main.cc \
+  simulate/src/simulation_step.h simulate/config.yaml; do
+  cmp "$reference/$path" "$root/unitree_mujoco/$path"
+done
+git -C "$root/unitree_mujoco" diff --exit-code -- . \
+  ':!simulate/src/unitree_sdk2_bridge.h' ':!simulate/src/main.cc' ':!simulate/config.yaml'
+echo "PINNED_PATCH_BYTE_COMPARE PASS"
 
-cmake -S "$root/unitree_sdk2" -B "$root/unitree_sdk2/build" \
+sdk_build="${SDK_BUILD_ROOT:-$root/unitree_sdk2/build}"
+cmake -S "$root/unitree_sdk2" -B "$sdk_build" \
   -DBUILD_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX="$root/sdk-install" -DCMAKE_INSTALL_LIBDIR=lib
 df -h "$root"
-cmake --build "$root/unitree_sdk2/build" --parallel "${JOBS:-4}"
-cmake --install "$root/unitree_sdk2/build"
+cmake --build "$sdk_build" --parallel "${JOBS:-4}"
+cmake --install "$sdk_build"
 cmake -S "$root/unitree_mujoco/simulate" -B "$root/unitree_mujoco/simulate/build" \
   -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
   -Dunitree_sdk2_DIR="$root/sdk-install/lib/cmake/unitree_sdk2"
@@ -73,7 +101,7 @@ cmake --build "$root/unitree_mujoco/simulate/build" --parallel "${JOBS:-4}"
 
 if [[ "${BUILD_ACCEPTANCE:-0}" == 1 ]]; then
   project=$(cd "$patch_dir/../.." && pwd)
-  UNITREE_MUJOCO_ROOT="$root/unitree_mujoco" MUJOCO_ROOT="$root/mujoco-$mujoco_version" \
+  UNITREE_MUJOCO_ROOT="$root/unitree_mujoco" MUJOCO_ROOT="$dist_root/mujoco-$mujoco_version" \
     cmake -S "$project/src/go2_mujoco_lidar/test/acceptance" -B "$root/acceptance-build" \
       -DCMAKE_BUILD_TYPE=Release \
       -DRL_ROOT="${RL_ROOT:-$(dirname "$project")/go2_rl_locomotion_baseline}" \

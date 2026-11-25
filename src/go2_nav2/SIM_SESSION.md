@@ -108,6 +108,9 @@ navigation lifecycle을 시작한다. 90 wall seconds 내 수락/시작이 없�
 
 실제 Xbox 장치 입력과 RViz에서 보이는 지도·목표 주행을 확인할 때 사용한다.
 자동 headless 수용 시험과 별개이며, 아래 육안·패드 항목은 소유자가 확인한다.
+GUI 시험 전 simulator setup의 `0003-gui-integer-epoch.patch`를 적용한다.
+이 패치는 GUI physics와 DDS snapshot을 같은 정수 epoch 시간에 맞추며,
+재현·장시간 검증 근거는 [F04 기록](../../docs/stabilization-2026-11/F04_GUI_CLOCK.md)에 둔다.
 
 1. simulator를 시작하기 전에 `/dev/input/js0`의 실제 Xbox 장치와 사용 중인 FD를
    확인한다. 전용 `unitree_mujoco/simulate/config.yaml`에서 `use_joystick: 1`,

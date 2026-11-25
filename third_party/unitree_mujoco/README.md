@@ -13,6 +13,10 @@ patch와 설치 절차를 `third_party/unitree_mujoco/`에서 함께 관리한�
 - MuJoCo: `3.3.6`; 공식 Linux release archive의 아키텍처별 SHA-256은 `setup.sh`에 고정했다.
 - `0001-sport-state-simulation-time-imu.patch`: SportModeState의 simulation timestamp,
   IMU quaternion/gyro와 yaw_speed를 채운다. LiDAR의 clock·state 입력에 필수다.
+- `0003-gui-integer-epoch.patch`: GUI의 두 physics stepping 지점에서 정수 epoch
+  step으로 시간을 계산한다. bridge는 physics/UI mutex 안에서 한 snapshot을 읽고
+  Low tick과 Sport stamp를 같은 nanosecond 값에서 만든다. Backspace reset과
+  history seek는 다음 step에서 counter를 재설정한다. acceptance도 같은 helper를 쓴다.
 - `0002-agx-config-snapshot.patch`: 2026-11-24 AGX의 나머지 미커밋 변경을 보존한다.
   형제 bridge world 절대 경로와 joystick FIFO가 들어 있으므로 자동 설치에는 적용하지 않는다.
   해당 world/FIFO의 생성·실행은 별도 세션 설정이다.
@@ -66,6 +70,23 @@ CI도 같은 스크립트를 사용하고 두 root 환경변수를 이후 build/
 기존 MuJoCo C++ 테스트는 GUI나 ROS publisher 없이 실행한다.
 이 설치 절차는 simulator·ROS node·로봇 동작을 시작하지 않는다.
 
+공유 AGX checkout을 갱신할 때는 현재 수정 파일을 먼저 archive에 복사한다.
+아래 명시 옵션은 기존 0002 config를 보존하고, 기존 MuJoCo 배포 경로를 사용하며,
+root 소유 install manifest가 있는 과거 SDK build 대신 사용자 소유 build를 만든다.
+기본 전용 설치에는 이 옵션이 필요 없다.
+
+```bash
+SHARED="$HOME/go2_projects/shared/dependencies"
+APPLY_AGX_CONFIG=1 MUJOCO_DIST_ROOT="$SHARED/mujoco-dist" \
+  SDK_BUILD_ROOT="$SHARED/sdk-build" BUILD_ACCEPTANCE=1 \
+  bash third_party/unitree_mujoco/setup.sh "$SHARED"
+```
+
+매 setup은 pinned simulator의 `git archive`로 만든 임시 clean tree에 0001·0003과
+선택한 0002를 적용하고 header·main·step helper·config를 `cmp`한다.
+`PINNED_PATCH_BYTE_COMPARE PASS`는 공유 수정본을 복사한 결과가 아닌 clean apply와의
+byte 일치다. 임시 tree는 종료 시 제거하며 공유 evidence 디렉터리는 보존한다.
+
 수용 시험에는 GUI binary 대신 qpos·접촉 기록·reset·전용 DDS discovery를 제공하는
 추적 native driver가 필요하다. 형제 RL 저장소의 기존 object·config·policy를 사용하는
 아래 선택 빌드로 준비한다. simulator와 재링크 controller는 모두 영구 root에 남는다.
@@ -86,7 +107,7 @@ BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh
 ## AGX 변경분의 독립 재현 확인
 
 공유 checkout에는 쓰지 않고 `/tmp`의 전용 설치 루트에서 확인한다.
-`setup.sh`로 0001을 적용한 뒤 아래 비교를 수행한다.
+`setup.sh`로 0001·0003을 적용한 뒤 아래 비교를 수행한다.
 
 ```bash
 diff -u "$SHARED_SIM/simulate/src/unitree_sdk2_bridge.h" \

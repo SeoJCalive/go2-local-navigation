@@ -23,7 +23,7 @@ set_target_properties(acceptance_simulator PROPERTIES
   BUILD_RPATH "${MJ}/lib;/opt/unitree_robotics/lib")
 enable_testing()
 add_executable(acceptance_clock_test clock_test.cpp)
-target_include_directories(acceptance_clock_test PRIVATE "${MJ}/include")
+target_include_directories(acceptance_clock_test PRIVATE "${SIM}/simulate/src" "${MJ}/include")
 target_link_directories(acceptance_clock_test PRIVATE "${MJ}/lib")
 target_link_libraries(acceptance_clock_test PRIVATE mujoco)
 set_target_properties(acceptance_clock_test PROPERTIES BUILD_RPATH "${MJ}/lib")
