@@ -17,41 +17,43 @@ AMCL 재초기화와 goal 재개를 판정하지 않는다.
 `test_sim_shutdown.py`는 simulator 없이 OS·ROS service·Launch 종료 경계를 검사한다.
 runtime ROS/SLAM/Nav2 설치,
 W01 simulator 패치, 기존 RL policy/object build와 `cleanup/domain-guard` bridge가
-필요하다. bridge는 현재 waypoint 수정 branch를 전용 prefix에 빌드한다.
-모든 build는 새 `/tmp` 경로를 쓰며,
-실행 output은 `--output`으로 지정한다.
+필요하다. bridge는 현재 waypoint 수정 branch의 기본 install을 사용한다.
+실행 binary와 library는 영구 경로에 준비하고 output은 새 `--output`으로 지정한다.
 
-AGX 프로젝트 루트에서 ROS/Unitree 환경과 W01의 `MUJOCO_ROOT`,
-`UNITREE_MUJOCO_ROOT`를 지정한 뒤 실행한다. `RL_ROOT`는 controller object와
-`config`·policy를 가진 저장소, `SDK_ROOT`는 Unitree SDK2 저장소다.
+AGX 프로젝트 루트에서 실행한다. `SIM_DEPS` 기본값은 아래 영구 root다.
+setup은 controller object·config·policy를 형제 `go2_rl_locomotion_baseline`에서
+참조한다. 다른 checkout은 setup의 `RL_ROOT`로 선택한다.
 
 ```bash
-export RL_ROOT=/home/bi-agx1/go2_projects/projects/go2_rl_locomotion_baseline
-export SDK_ROOT=/home/bi-agx1/go2_projects/shared/dependencies/unitree_sdk2
-export BRIDGE_ROOT=/home/bi-agx1/go2_projects/projects/go2_nav2_mujoco_bridge
+# ROS overlay를 source하지 않은 clean shell
+export SIM_DEPS="$HOME/.local/share/go2-local-navigation-sim"
+BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh "$SIM_DEPS"
+source /opt/ros/humble/setup.bash
+source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
+bash third_party/tf2/setup.sh
+export UNITREE_MUJOCO_ROOT="$SIM_DEPS/unitree_mujoco"
+export MUJOCO_ROOT="$SIM_DEPS/mujoco-3.3.6"
+df -h .
+colcon build --packages-select go2_nav2 go2_mujoco_lidar \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+source install/setup.bash
+source ../go2_nav2_mujoco_bridge/install/local_setup.bash
 export A="$PWD/src/go2_mujoco_lidar/test/acceptance"
-cmake -S "$A" -B /tmp/w07-acceptance-build -DCMAKE_BUILD_TYPE=Release \
-  -DRL_ROOT="$RL_ROOT" -DSDK_ROOT="$SDK_ROOT"
-cmake --build /tmp/w07-acceptance-build -j4
-ctest --test-dir /tmp/w07-acceptance-build --output-on-failure
-# bridge도 기본 install 대신 전용 prefix에 빌드한다.
-colcon --log-base /tmp/w07-bridge-log build --base-paths "$BRIDGE_ROOT/src" \
-  --build-base /tmp/w07-bridge-build --install-base /tmp/w07-bridge-install
-source /tmp/w07-bridge-install/local_setup.bash
-source /tmp/w07-close-install/setup.bash
 export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=1 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI="file://$A/cyclonedds.xml"
-export LD_LIBRARY_PATH="/tmp/w05-install/tf2-pin/tf2/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH"
 timeout --signal=TERM --kill-after=300s 1800s python3 -u "$A/acceptance.py" \
-  --domain 41 --dds-config "$A/cyclonedds.xml" \
-  --goals "$A/goals.json" --route "$A/route.json" \
-  --simulator /tmp/w07-acceptance-build/acceptance_simulator \
-  --controller /tmp/w07-acceptance-build/rlroot/deploy/robots/go2/build/go2_ctrl \
-  --controller-cwd /tmp/w07-acceptance-build/rlroot/deploy/robots/go2/build \
-  --world "$BRIDGE_ROOT/worlds/go2_complex_indoor.xml" \
-  --tf-observer /tmp/w07-close-build/go2_mujoco_lidar/tf_owner_observer \
-  --tf2-prefix /tmp/w05-install/tf2-pin --output /tmp/w07-run1
+  --domain 41 --output "$PWD/runs/acceptance-01"
 ```
+
+기본 simulator는 `$SIM_DEPS/acceptance-build/acceptance_simulator`, controller/cwd는
+같은 build의 `rlroot/deploy/robots/go2/build/{go2_ctrl,}`다. GUI binary는 독립
+truth/contact/reset CLI가 없어 이 driver를 대신할 수 없다.
+tf observer는 현재 workspace install의 `lib/go2_mujoco_lidar/tf_owner_observer`,
+tf2는 프로젝트 `third_party/tf2/install`, world는 형제 bridge의
+`worlds/go2_complex_indoor.xml`이다. route/goals/DDS XML은 이 디렉터리의 추적 파일이다.
+모든 path argument는 기존처럼 명시 override할 수 있다. launch의 `tf2_prefix`도
+같은 영구 pin을 기본 선택한다. `/tmp` build 산출물을 요구하지 않는다.
 
 새 output directory가 필수다. 재실행은 output만 바꾼다. domain을 바꾸면 XML의
 Domain id와 환경도 같이 바꾼다. native driver는 같은 전용 discovery tag를 요구한다.
@@ -107,9 +109,9 @@ Release F20 음성 대조군은 다음과 같이 실행한다. 정상 binary와 
 정상 suite에 등록되지 않으며 반드시 exit 1이어야 한다.
 
 ```bash
-cmake --build /tmp/w07-close-build/go2_mujoco_lidar \
+cmake --build build/go2_mujoco_lidar \
   --target planar_selection_broken_input -j2
-/tmp/w07-close-build/go2_mujoco_lidar/planar_selection_broken_input \
+build/go2_mujoco_lidar/planar_selection_broken_input \
   --gtest_filter=PlanarSelection.ChoosesClosestElevationAndFirstTie
 ```
 
@@ -123,7 +125,7 @@ simulator·RL 또는 로봇 command publisher는 시작하지 않는다.
 
 ```bash
 python3 -u "$A/teardown_probe.py" --cycles 5 \
-  --pin /tmp/w05-install/tf2-pin/tf2/lib/libtf2.so --output /tmp/w07-tf2-ab
+  --pin "$PWD/third_party/tf2/install/tf2/lib/libtf2.so" --output "$PWD/runs/tf2-ab"
 ```
 
 새 costmap 출력과 clock 역행 뒤 출력을 확인한 다음 SIGINT를 보낸다.

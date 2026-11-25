@@ -32,7 +32,7 @@ Ubuntu 22.04·ROS Humble·Unitree ROS 메시지 overlay가 필요하다.
 [simulator bootstrap](third_party/unitree_mujoco/README.md)과
 [tf2 bootstrap](third_party/tf2/README.md)을 따른다.
 아래 명령은 AGX 프로젝트 루트에서 실행한다. 기존 공유 checkout 대신 전용
-dependency root를 사용하며 기본 build/install/log를 덮어쓰지 않는다.
+dependency root와 프로젝트 기본 build/install/log를 사용한다.
 
 ```bash
 cd /home/bi-agx1/go2_projects/projects/go2_local_navigation
@@ -44,12 +44,11 @@ export MUJOCO_ROOT="$SIM_DEPS/mujoco-3.3.6"
 
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
-bash third_party/tf2/setup.sh /tmp/go2-sim
-export GO2_TF2_PREFIX=/tmp/go2-sim-install/tf2-pin
-colcon --log-base /tmp/go2-sim-log build --base-paths src \
-  --build-base /tmp/go2-sim-build --install-base /tmp/go2-sim-install \
+bash third_party/tf2/setup.sh
+df -h .
+colcon build --base-paths src \
   --cmake-args -DCMAKE_BUILD_TYPE=Release --event-handlers console_direct+
-source /tmp/go2-sim-install/setup.bash
+source install/setup.bash
 ```
 
 core는 4개다. 전체 10개를 빌드할 때는 `--base-paths src optional/real_robot
@@ -93,13 +92,12 @@ Start+D-pad Down으로 FixStand → Velocity_Down을 선택한다.
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
-source /tmp/go2-sim-install/setup.bash
-export GO2_TF2_PREFIX=/tmp/go2-sim-install/tf2-pin
+source /home/bi-agx1/go2_projects/projects/go2_local_navigation/install/setup.bash
 export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # 실제 XML의 lo-only interface와 loopback peer로 제한한다.
 export CYCLONEDDS_URI="file:///home/bi-agx1/go2_projects/projects/go2_local_navigation/src/go2_mujoco_lidar/config/cyclonedds_loopback.xml"
 ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
-  simulator_pid:="$SIM_PID" mode:=mapping tf2_prefix:="$GO2_TF2_PREFIX"
+  simulator_pid:="$SIM_PID" mode:=mapping
 ```
 
 이 명령이 LiDAR·scan·static TF·odom adapter·SLAM을 한 번씩 시작한다.
@@ -116,7 +114,7 @@ world는 simulator의 `-s`에서 읽어 raycast에 전달하고 경로·SHA-256�
 실행하지 않는다.
 
 ```bash
-source /tmp/go2-bridge-install/local_setup.bash
+source /home/bi-agx1/go2_projects/projects/go2_nav2_mujoco_bridge/install/local_setup.bash
 ros2 run go2_nav2_mujoco_bridge twist_to_joystick --ros-args \
   -p fifo_path:="$OWN_FIFO"
 ```
@@ -124,7 +122,8 @@ ros2 run go2_nav2_mujoco_bridge twist_to_joystick --ros-args \
 bridge build와 FIFO 입력 절차는 형제 저장소의 README를 따른다.
 bridge의 legacy Nav2 launch를 동시에 시작하지 않는다.
 별도 RViz는 같은 ROS 환경에서 실행하고 tf2가 필요하면
-`LD_LIBRARY_PATH="$GO2_TF2_PREFIX/tf2/lib:$LD_LIBRARY_PATH" rviz2`로 pin을 적용한다.
+프로젝트 루트에서
+`LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2`로 pin을 적용한다.
 Nav2/SLAM native child의 pin은 세션 launch가 강제하고 `TF2_LOADED`로 확인한다.
 
 ## 지도 저장과 재로딩
@@ -134,7 +133,7 @@ output은 suffix 없는 새 절대 경로다.
 
 ```bash
 ros2 run go2_mujoco_lidar sim_save_map \
-  --simulator-pid "$SIM_PID" --output /tmp/go2-map/route
+  --simulator-pid "$SIM_PID" --output "$PWD/runs/gui-map/route"
 ```
 
 YAML·PGM과 world/domain/hash를 담은 `.session.json`을 저장한다.
@@ -144,8 +143,8 @@ mapping ROS launch를 종료하고 모든 owned ROS PID가 사라진 뒤 simulat
 
 ```bash
 ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
-  simulator_pid:="$SIM_PID" mode:=localization tf2_prefix:="$GO2_TF2_PREFIX" \
-  map:=/tmp/go2-map/route.yaml initial_pose:=0.0,0.0,0.0
+  simulator_pid:="$SIM_PID" mode:=localization \
+  map:="$PWD/runs/gui-map/route.yaml" initial_pose:=0.0,0.0,0.0
 ```
 
 initial_pose는 저장 지도에서 현재 base의 실제 x,y,yaw다. 원점은 형식 예다.
@@ -160,10 +159,9 @@ physics reset은 전체 세션 재시작 조건이다.
 
 ```bash
 # 위 build prefix와 같은 전체/핵심 package 범위를 사용한다.
-colcon --log-base /tmp/go2-sim-test-log test --base-paths src \
-  --build-base /tmp/go2-sim-build --install-base /tmp/go2-sim-install \
+colcon test --base-paths src \
   --executor sequential --return-code-on-test-failure --ctest-args -j1
-colcon test-result --test-result-base /tmp/go2-sim-build --verbose
+colcon test-result --verbose
 ```
 
 실제 simulator→RL→SLAM→저장→AMCL/Nav2→FIFO 경로는
@@ -173,7 +171,9 @@ FINALIZED와 owned 잔류 0을 판정하며 일반 colcon test에는 등록하�
 
 - Domain 0은 정규 sim/bridge 경로에서 거부한다. guard 우회 옵션은 운영에 쓰지 않는다.
 - 모든 physics/RL/ROS process는 같은 domain과 loopback 격리를 사용한다.
-- build/install/log는 `/tmp` 전용 경로만 사용한다. 다른 실행의 PID에 signal을 보내지 않는다.
+- build/install/log와 tf2 prefix는 프로젝트의 Git 제외 영구 경로를 사용한다.
+- 소유자 GUI·Xbox·RViz 점검은 [SIM_SESSION GUI 절차](src/go2_nav2/SIM_SESSION.md#소유자-gui-시험)를 따른다.
+- 다른 실행의 PID에 signal을 보내지 않는다.
 - 소유한 PID/start tick/session과 FIFO만 정리하고 기존 Domain 1 identity를 보존한다.
 - 자동 테스트 통과는 구현 계약의 일치다. 실제 지도·위치 정확도와 실물 안전성은 별도다.
 

@@ -6,9 +6,9 @@ W03의 같은 Domain 41·전용 discovery tag와 정지 source를 재사용하�
 [Nav2 세션 문서](../../../go2_nav2/SIM_SESSION.md)에 있다.
 
 ```bash
-# /tmp/w05-install과 bridge install을 source하되 새 W05 overlay가 마지막이어야 한다.
+# 기본 workspace install과 bridge install을 source한다.
 # UNITREE_MUJOCO_ROOT, MUJOCO_ROOT, Domain/localhost/DDS는 W03 예와 같다.
-bash third_party/tf2/setup.sh /tmp/w05
+bash third_party/tf2/setup.sh
 python3 src/go2_mujoco_lidar/test/headless/verify_navigation_session.py \
   --output "$PWD/.omo/evidence/w05-navigation-session"
 ```

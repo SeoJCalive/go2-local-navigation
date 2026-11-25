@@ -13,6 +13,7 @@
 | [W07_STABILIZATION](W07_STABILIZATION.md) | 시험 oracle·종료 원인·실제 반복 수용 결과 |
 | [W07_TEST_INVENTORY](W07_TEST_INVENTORY.md) | 시험 파일별 분류와 Release 음성 대조 |
 | [F02_MAPPING](F02_MAPPING.md) | 정책 제어 하한·13점 경로·긴 epoch와 세 번의 수용 |
+| [F03_RUNTIME](F03_RUNTIME.md) | 영구 dependency·기본 install 경로와 임시 산출물 정리 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

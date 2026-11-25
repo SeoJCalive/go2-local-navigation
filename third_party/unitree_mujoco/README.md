@@ -45,7 +45,8 @@ sudo apt-get install -y --no-install-recommends \
 ROS overlay를 source하지 않은 셸에서 프로젝트 루트를 기준으로 실행한다.
 `SIM_DEPS`는 기존 공유 dependency와 겹치지 않는 전용 절대 경로로 정한다.
 스크립트는 재실행할 수 있고, pin 또는 tracked 변경이 다르면 덮어쓰지 않고 실패한다.
-archive 해시는 매번 검증하며, 성공 시 simulator와 `jstest`를 빌드만 한다.
+기본 root는 `$HOME/.local/share/go2-local-navigation-sim`이다.
+archive 해시는 매번 검증하며, 성공 시 simulator와 `jstest`를 빌드한다.
 
 ```bash
 SIM_DEPS="$HOME/.local/share/go2-local-navigation-sim"
@@ -64,6 +65,23 @@ colcon test-result --verbose
 CI도 같은 스크립트를 사용하고 두 root 환경변수를 이후 build/test step에 전달한다.
 기존 MuJoCo C++ 테스트는 GUI나 ROS publisher 없이 실행한다.
 이 설치 절차는 simulator·ROS node·로봇 동작을 시작하지 않는다.
+
+수용 시험에는 GUI binary 대신 qpos·접촉 기록·reset·전용 DDS discovery를 제공하는
+추적 native driver가 필요하다. 형제 RL 저장소의 기존 object·config·policy를 사용하는
+아래 선택 빌드로 준비한다. simulator와 재링크 controller는 모두 영구 root에 남는다.
+
+```bash
+# ROS overlay를 source하지 않은 clean shell
+BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh
+# RL_ROOT를 지정하면 다른 기존 RL checkout/object를 선택할 수 있다.
+# 출력: $SIM_DEPS/acceptance-build/acceptance_simulator
+#       $SIM_DEPS/acceptance-build/rlroot/deploy/robots/go2/build/go2_ctrl
+```
+
+기본 RL 원본은 프로젝트의 형제 `go2_rl_locomotion_baseline`이다.
+`rlroot`의 config/logs는 이 저장소를 참조하고 controller의 FSM/policy object는 바꾸지 않는다.
+빌드 직전마다 `df`를 출력한다. default workspace의 `BUILD_TESTING=ON` 빌드는
+`install/go2_mujoco_lidar/lib/go2_mujoco_lidar/tf_owner_observer`도 설치한다.
 
 ## AGX 변경분의 독립 재현 확인
 

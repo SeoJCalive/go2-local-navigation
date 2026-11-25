@@ -132,3 +132,8 @@ def test_tf2_requires_source_version_and_exact_built_bytes(tmp_path):
     package.write_text("<package><version>0.25.23</version></package>")
     with pytest.raises(RuntimeError, match="version"):
         tf2_library(tmp_path)
+
+
+def test_missing_tf2_reports_bootstrap_command(tmp_path):
+    with pytest.raises(RuntimeError, match=r"bash third_party/tf2/setup.sh"):
+        tf2_library(tmp_path / "missing")

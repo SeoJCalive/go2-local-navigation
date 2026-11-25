@@ -13,7 +13,7 @@ from pathlib import Path
 import shlex
 import sys
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction,
@@ -128,7 +128,9 @@ def generate_launch_description():
         DeclareLaunchArgument("mode", choices=["mapping", "localization"]),
         DeclareLaunchArgument("map", default_value=""),
         DeclareLaunchArgument("initial_pose", default_value=""),
-        DeclareLaunchArgument("tf2_prefix", default_value=os.environ.get("GO2_TF2_PREFIX", "")),
+        DeclareLaunchArgument("tf2_prefix", default_value=os.environ.get(
+            "GO2_TF2_PREFIX",
+            str(Path(get_package_prefix("go2_nav2")).parents[1] / "third_party/tf2/install"))),
         DeclareLaunchArgument("horizontal_samples", default_value="720"),
         DeclareLaunchArgument("vertical_samples", default_value="8"),
         DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),

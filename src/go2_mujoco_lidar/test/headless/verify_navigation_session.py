@@ -157,7 +157,7 @@ def main():
             "--dds-config", str(config),
         ], native)
         base = ["ros2", "launch", "go2_mujoco_lidar", "go2_sim_navigation.launch.py",
-                f"simulator_pid:={simulator.pid}", "tf2_prefix:=/tmp/w05-install/tf2-pin"]
+                f"simulator_pid:={simulator.pid}"]
         tap = start("mapping_tf", [args.tf_observer])
         mapping = start("mapping", base + ["mode:=mapping"])
         spin_until(lambda: bool(maps) and owners(output / "mapping_tf.log", "slam_toolbox"),

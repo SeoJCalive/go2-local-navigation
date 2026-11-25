@@ -15,12 +15,16 @@ binary를 복사하거나 bridge checkout에 의존하지 않는다.
 ROS Humble 환경을 source한 AGX 셸에서 프로젝트 루트 기준으로 실행한다.
 
 ```bash
-bash third_party/tf2/setup.sh /tmp/w05
-# /tmp/w05-build/tf2-source, /tmp/w05-build/tf2-pin,
-# /tmp/w05-install/tf2-pin, /tmp/w05-log/tf2-pin만 사용한다.
+bash third_party/tf2/setup.sh
+# third_party/tf2/build/{tf2-source,tf2-pin}, install/, log/를 사용한다.
+# 모두 Git에서 제외하며 재부팅 후에도 보존된다.
 ```
 
-`tf2_prefix:=/tmp/w05-install/tf2-pin`을 launch에 넘긴다. source commit, package
+정규 launch는 기본 workspace install에서 프로젝트의 `third_party/tf2/install`을
+자동 선택한다. 다른 prefix는 `tf2_prefix:=/absolute/prefix` 또는
+`GO2_TF2_PREFIX`로 선택한다. 누락 시 위 setup 명령을 포함한 오류로 종료한다.
+선택적 setup 인자는 작업 루트이며 산출물은 `<root>/{build,install,log}`다.
+source commit, package
 version, 설치 library SHA-256을 검사하고 native 실행 prefix가 preload를 강제한다.
 prefix는 실제 child `/proc/PID/maps`를 검사해 `TF2_LOADED`를 남긴다.
 다른 tf2가 동시에 로딩되거나 10초 안에 로딩되지 않으면 실패한다.

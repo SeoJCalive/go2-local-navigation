@@ -7,7 +7,7 @@ W04에서 내부 입력은 `go2_inputs`, static TF와 공통 DDS 판정은 `desc
 W07부터 전용 simulator/RL/bridge를 시작하는 반복 수용 시험은
 [추적 하네스](../go2_mujoco_lidar/test/acceptance/README.md)를 사용한다.
 현재 bridge의 `cleanup/domain-guard`는 nonzero domain과 loopback을 허용한다.
-수용 시험은 bridge를 별도 `/tmp` prefix에 빌드한다.
+수용 시험도 형제 bridge와 이 프로젝트의 기본 install, 영구 dependency root를 사용한다.
 
 시뮬레이션의 sensors·SLAM/AMCL·Nav2를 한 진입점에서 시작하고 저장 지도를
 명시적으로 다시 선택할 때 사용한다. simulator, RL controller와 FIFO bridge는
@@ -55,7 +55,8 @@ vx `[-2,4]`, vy `[-1,1]`, yaw `[-2,2]`를 정규화한다. 다른 policy 선택�
 
 이 프로젝트의 새 진입점은 Domain 0을 거부하며 실제 로봇 명령을 만들지 않는다.
 
-별도 process의 명령 형식은 다음과 같다. `SIM_BIN`은 전용 W01 simulator build,
+별도 process의 명령 형식은 다음과 같다. `SIM_BIN`은
+`$HOME/.local/share/go2-local-navigation-sim/unitree_mujoco/simulate/build/unitree_mujoco`,
 `WORLD`는 이 세션의 MJCF, `OWN_FIFO`는 그 simulator 설정의 전용 joystick device다.
 공유 simulator의 config/FIFO를 바꾸거나 재사용하지 않는다.
 
@@ -78,23 +79,22 @@ ros2 run go2_nav2_mujoco_bridge twist_to_joystick --ros-args -p fifo_path:="$OWN
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
-source /tmp/go2-sim-install/setup.bash
+source install/setup.bash
 export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI="file://$PWD/src/go2_mujoco_lidar/config/cyclonedds_loopback.xml"
-bash third_party/tf2/setup.sh /tmp/go2-sim
+bash third_party/tf2/setup.sh
 
 ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
-  simulator_pid:="$SIM_PID" mode:=mapping tf2_prefix:=/tmp/go2-sim-install/tf2-pin
+  simulator_pid:="$SIM_PID" mode:=mapping
 
 # 별도 터미널, 같은 ROS/DDS 환경. output은 suffix 없는 새 절대 경로다.
 ros2 run go2_mujoco_lidar sim_save_map \
-  --simulator-pid "$SIM_PID" --output /tmp/go2-map/route
+  --simulator-pid "$SIM_PID" --output "$PWD/runs/gui-map/route"
 
 # mapping launch 종료/owned child 정리 완료 후 같은 simulator/RL을 유지한다.
 ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
   simulator_pid:="$SIM_PID" mode:=localization \
-  tf2_prefix:=/tmp/go2-sim-install/tf2-pin \
-  map:=/tmp/go2-map/route.yaml initial_pose:=0.0,0.0,0.0
+  map:="$PWD/runs/gui-map/route.yaml" initial_pose:=0.0,0.0,0.0
 ```
 
 initial_pose는 해당 지도의 현재 base 위치/방향이다. 위 원점은 형식 예이며 임의
@@ -103,6 +103,33 @@ spawn에 재사용할 값이 아니다. `INITIAL_POSE_SENT_ONCE`는 active AMCL�
 yaw 0.5 rad window를 검사해 `INITIAL_POSE_ACCEPTED`를 기록한다. 이 window는
 초기화 수락 조건이며 localization 정확도 합격 기준이 아니다. 수락된 후에만
 navigation lifecycle을 시작한다. 90 wall seconds 내 수락/시작이 없으면 실패한다.
+
+## 소유자 GUI 시험
+
+실제 Xbox 장치 입력과 RViz에서 보이는 지도·목표 주행을 확인할 때 사용한다.
+자동 headless 수용 시험과 별개이며, 아래 육안·패드 항목은 소유자가 확인한다.
+
+1. simulator를 시작하기 전에 `/dev/input/js0`의 실제 Xbox 장치와 사용 중인 FD를
+   확인한다. 전용 `unitree_mujoco/simulate/config.yaml`에서 `use_joystick: 1`,
+   `joystick_type: "xbox"`, `joystick_device: "/dev/input/js0"`를 선택한다.
+   bootstrap 기본값은 `use_joystick: 0`이다. 수동 패드에는 FIFO bridge를 실행하지 않는다.
+2. 위 GUI simulator와 RL 명령을 clean shell에서 같은 nonzero domain·`lo`로 실행한다.
+   LT+A → 약 3초 기립 → Start+D-pad Down을 확인한 뒤 mapping launch를 실행한다.
+3. 같은 ROS/DDS 환경의 별도 셸에서
+   `LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2`를 실행한다.
+   Fixed Frame은 `map`, Global Options의 simulation time과 `/map`·`/scan`·TF를
+   확인하고 Xbox로 실내를 주행한다. 지도와 scan/robot pose의 일치를 육안 확인한다.
+4. 정지 후 위 CLI로 새 `runs/gui-map/route`를 저장한다. mapping ROS launch와
+   owned child 종료를 확인하고 simulator/RL은 유지한다. 실제 현재 map pose로
+   localization을 시작해 `INITIAL_POSE_ACCEPTED`와 `NAVIGATION_READY`를 확인한다.
+5. Nav2 goal 주행에는 전용 FIFO로 새 simulator/RL 세션을 준비하고 그 FIFO의 bridge를
+   같은 domain에서 시작한다. RViz의 `Nav2 Goal`로 목표를 순서대로 보내고
+   action `SUCCEEDED`, 화면의 도착 자세와 장애물 여유를 확인한다.
+6. 별도 시험 세션에서 physics reset 후 cloud/odom 새 epoch 복구를 확인한다.
+   지도·AMCL·goal 재개는 보장하지 않으므로 전체 세션을 재시작한다.
+7. 별도 셸에서 Domain 0 launch와 실제 simulator `-s`와 다른 `model_path`의
+   bringup을 각각 실행해 node 생성 전 거부되는지 확인한다. 실제 world·domain은
+   바꾸지 않는다. 종료는 아래 FINALIZED 확인 뒤 ROS → bridge → RL → simulator다.
 
 ## 종료 순서
 

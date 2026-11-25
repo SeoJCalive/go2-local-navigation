@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Build pinned tf2 only; caller supplies a private /tmp prefix, never global ROS.
-# Inputs: sourced Humble environment, absolute workspace prefix. Output: build,
-# install and log roots suffixed to that prefix, plus a source/version/hash receipt.
+# 목적: Humble 환경에서 고정 tf2만 프로젝트 전용 prefix에 설치한다.
+# 입력: 선택적 절대 작업 루트. 기본값은 이 스크립트 디렉터리다.
+# 출력: root/{build,install,log}, source/version/library hash receipt. 전역 ROS는 수정하지 않는다.
 set -euo pipefail
-root="${1:?usage: setup.sh /absolute/private-prefix}"
+root="${1:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}"
 [[ "$root" = /* ]] || { echo "absolute prefix required" >&2; exit 1; }
 commit=404b7224d623d614f18fa9738dbf1716403d857e
-source_dir="$root-build/tf2-source"
-mkdir -p "$root-build"
+source_dir="$root/build/tf2-source"
+mkdir -p "$root/build"
 if [[ ! -d "$source_dir/.git" ]]; then
   git init "$source_dir"
   git -C "$source_dir" remote add origin https://github.com/ros2/geometry2.git
@@ -16,11 +16,12 @@ if [[ ! -d "$source_dir/.git" ]]; then
 fi
 [[ "$(git -C "$source_dir" rev-parse HEAD)" = "$commit" ]]
 [[ -z "$(git -C "$source_dir" status --porcelain --untracked-files=no)" ]]
-colcon --log-base "$root-log/tf2-pin" build \
-  --base-paths "$source_dir/tf2" --build-base "$root-build/tf2-pin" \
-  --install-base "$root-install/tf2-pin" \
+df -h "$root"
+colcon --log-base "$root/log" build \
+  --base-paths "$source_dir/tf2" --build-base "$root/build/tf2-pin" \
+  --install-base "$root/install" \
   --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
-python3 - "$root-install/tf2-pin" "$commit" <<'PY'
+python3 - "$root/install" "$commit" <<'PY'
 import hashlib
 import json
 from pathlib import Path

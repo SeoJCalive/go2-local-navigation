@@ -86,10 +86,15 @@ def session_lock(domain, directory=Path("/tmp")):
 
 def tf2_library(prefix):
     """고정 source/version과 build 때 기록한 library hash를 검사한다."""
-    root = Path(prefix).expanduser().resolve(strict=True)
-    version = ElementTree.parse(root / "tf2/share/tf2/package.xml").findtext("version")
-    record = json.loads((root / "go2-tf2-pin.json").read_text())
-    library = (root / "tf2/lib/libtf2.so").resolve(strict=True)
+    try:
+        root = Path(prefix).expanduser().resolve(strict=True)
+        version = ElementTree.parse(root / "tf2/share/tf2/package.xml").findtext("version")
+        record = json.loads((root / "go2-tf2-pin.json").read_text())
+        library = (root / "tf2/lib/libtf2.so").resolve(strict=True)
+    except FileNotFoundError as error:
+        raise RuntimeError(
+            f"tf2 pin missing at {prefix}; from project root run: bash third_party/tf2/setup.sh"
+        ) from error
     digest = hashlib.sha256(library.read_bytes()).hexdigest()
     if version != "0.25.24" or record != {
         "commit": TF2_COMMIT, "version": "0.25.24", "sha256": digest,

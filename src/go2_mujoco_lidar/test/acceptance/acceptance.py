@@ -34,6 +34,10 @@ from owned_processes import OwnedProcesses, existing_stack, snapshot
 from ament_index_python.packages import get_package_prefix
 
 PROJECT = Path(__file__).resolve().parents[4]
+HERE = Path(__file__).resolve().parent
+SIM_DEPS = Path(os.environ.get(
+    "SIM_DEPS", str(Path.home() / ".local/share/go2-local-navigation-sim")))
+CONTROLLER_DIR = SIM_DEPS / "acceptance-build/rlroot/deploy/robots/go2/build"
 
 
 def yaw(q):
@@ -44,16 +48,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
     parser.add_argument("--domain", type=int, required=True)
-    parser.add_argument("--goals", type=Path, required=True)
-    parser.add_argument("--route", type=Path, required=True)
-    parser.add_argument("--simulator", type=Path, required=True)
-    parser.add_argument("--controller", type=Path, required=True)
-    parser.add_argument("--controller-cwd", type=Path, required=True)
-    parser.add_argument("--world", type=Path, required=True)
-    parser.add_argument("--tf-observer", type=Path, required=True)
-    parser.add_argument("--tf2-prefix", type=Path, required=True)
-    parser.add_argument("--dds-config", type=Path, required=True)
+    parser.add_argument("--goals", type=Path, default=HERE / "goals.json")
+    parser.add_argument("--route", type=Path, default=HERE / "route.json")
+    parser.add_argument("--simulator", type=Path,
+                        default=SIM_DEPS / "acceptance-build/acceptance_simulator")
+    parser.add_argument("--controller", type=Path, default=CONTROLLER_DIR / "go2_ctrl")
+    parser.add_argument("--controller-cwd", type=Path, default=CONTROLLER_DIR)
+    parser.add_argument("--world", type=Path,
+                        default=PROJECT.parent / "go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml")
+    parser.add_argument("--tf-observer", type=Path,
+                        default=Path(get_package_prefix("go2_mujoco_lidar"))
+                        / "lib/go2_mujoco_lidar/tf_owner_observer")
+    parser.add_argument("--tf2-prefix", type=Path,
+                        default=PROJECT / "third_party/tf2/install")
+    parser.add_argument("--dds-config", type=Path, default=HERE / "cyclonedds.xml")
     args = parser.parse_args()
+    for executable_path in (args.simulator, args.controller, args.tf_observer):
+        if not executable_path.is_file():
+            parser.error(f"missing executable: {executable_path}; "
+                         "run BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh "
+                         "and colcon build --packages-select go2_mujoco_lidar")
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     config = args.dds_config.resolve()
@@ -71,6 +85,10 @@ def main():
     baseline = existing_stack(PROJECT)
     (output / "preexisting.json").write_text(json.dumps(baseline, indent=2))
     result = {"domain": args.domain, "goals": [], "preexisting": baseline, "criteria": {}}
+    result["paths"] = {
+        name: str(getattr(args, name).resolve()) for name in (
+            "simulator", "controller", "controller_cwd", "world", "tf_observer",
+            "tf2_prefix", "goals", "route", "dds_config")}
     result["observer_tf2"] = sorted({
         line.split()[-1] for line in Path("/proc/self/maps").read_text().splitlines()
         if "libtf2.so" in line})
@@ -210,7 +228,9 @@ def main():
         result["walking_mode"] = True
         print("WALKING_MODE_READY", flush=True)
         base = ["ros2", "launch", "go2_mujoco_lidar", "go2_sim_navigation.launch.py",
-                f"simulator_pid:={sim.pid}", f"tf2_prefix:={args.tf2_prefix.resolve()}"]
+                f"simulator_pid:={sim.pid}"]
+        if args.tf2_prefix.resolve() != PROJECT / "third_party/tf2/install":
+            base.append(f"tf2_prefix:={args.tf2_prefix.resolve()}")
         tap = start("mapping_tf", [str(args.tf_observer.resolve())])
         mapping = start("mapping", base + ["mode:=mapping"])
         until(lambda: samples["maps"] and edge_owner(output / "mapping_tf.log", "slam_toolbox"),

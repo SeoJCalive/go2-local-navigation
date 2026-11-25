@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # 목적: 전용 디렉터리에 고정 MuJoCo/SDK/simulator를 준비하고 Release로 빌드한다.
 # 흐름: upstream 고정 checkout -> 배포물 해시 검증 -> 상태 패치 -> SDK 설치 -> 빌드.
-# 입력: $1 설치 루트(필수), JOBS(기본 4). 출력 경로와 사전 apt 의존성은 README.md 참조.
+# 입력: $1 설치 루트(기본 ~/.local/share/go2-local-navigation-sim), JOBS(기본 4).
+# BUILD_ACCEPTANCE=1이면 RL_ROOT의 기존 object로 전용 검증 driver도 만든다.
 # GitHub HTTPS 접근이 필요하다. 기존 공유 dependency를 대상으로 지정하지 않는다.
 # GUI, DDS/ROS node, 제어 프로그램은 실행하지 않는다.
 set -euo pipefail
 
 patch_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-root=$(realpath -m -- "${1:?usage: bash setup.sh DEDICATED_INSTALL_ROOT}")
+root=$(realpath -m -- "${1:-$HOME/.local/share/go2-local-navigation-sim}")
 sim_commit=1eb6642e3f3fdfb7fb13a9794fd6a2dd93ea0e7d
 sdk_commit=9754cd153af3da471b0fe5f3aa535e426fb11db3
 mujoco_version=3.3.6
@@ -61,9 +62,24 @@ git -C "$root/unitree_mujoco" diff -- simulate/src/unitree_sdk2_bridge.h | cmp -
 
 cmake -S "$root/unitree_sdk2" -B "$root/unitree_sdk2/build" \
   -DBUILD_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX="$root/sdk-install" -DCMAKE_INSTALL_LIBDIR=lib
+df -h "$root"
 cmake --build "$root/unitree_sdk2/build" --parallel "${JOBS:-4}"
 cmake --install "$root/unitree_sdk2/build"
 cmake -S "$root/unitree_mujoco/simulate" -B "$root/unitree_mujoco/simulate/build" \
   -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release \
   -Dunitree_sdk2_DIR="$root/sdk-install/lib/cmake/unitree_sdk2"
+df -h "$root"
 cmake --build "$root/unitree_mujoco/simulate/build" --parallel "${JOBS:-4}"
+
+if [[ "${BUILD_ACCEPTANCE:-0}" == 1 ]]; then
+  project=$(cd "$patch_dir/../.." && pwd)
+  UNITREE_MUJOCO_ROOT="$root/unitree_mujoco" MUJOCO_ROOT="$root/mujoco-$mujoco_version" \
+    cmake -S "$project/src/go2_mujoco_lidar/test/acceptance" -B "$root/acceptance-build" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DRL_ROOT="${RL_ROOT:-$(dirname "$project")/go2_rl_locomotion_baseline}" \
+      -DSDK_ROOT="$root/unitree_sdk2" \
+      -Dunitree_sdk2_DIR="$root/sdk-install/lib/cmake/unitree_sdk2"
+  df -h "$root"
+  cmake --build "$root/acceptance-build" --parallel "${JOBS:-4}"
+  ctest --test-dir "$root/acceptance-build" --output-on-failure
+fi
