@@ -15,7 +15,11 @@
     "../go2_nav2_mujoco_bridge/verification/false_closure_wallclose_fullclean_20260927_124408/wallclose_state.data": "5f0bf2ea58222441b3b4861b258022d7ef1f7cf78acd845bb532bef6fb51f7b3",
     "../go2_nav2_mujoco_bridge/verification/false_closure_repro_horizontal_20260927_114513/horizontal_baseline.data": "5adc95cba5869fa0a02aa04075e45ad2263286129680e23413e83fb648adcddc",
     "../go2_nav2_mujoco_bridge/verification/loop_constraint_cause_20260927_033506/event_state.data": "6527b82a364fcf76d6d43a6432513178c21bcdb42f579bcb833be5852de04dc4",
-    "../go2_nav2_mujoco_bridge/verification/loop_constraint_toggle_20260927_040229/toggle_state.data": "e7c852107a60d7d5e16f7393db593909861eea8c83c0200100b140eb3d72ded0"
+    "../go2_nav2_mujoco_bridge/verification/loop_constraint_toggle_20260927_040229/toggle_state.data": "e7c852107a60d7d5e16f7393db593909861eea8c83c0200100b140eb3d72ded0",
+    "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_1800/event_20260921_180820/posegraph.data": "3b425fb2c91ddbdde777d97de3664c9b511a3c162ab6b38df27bae4306baa157",
+    "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_variance_022/event_20260921_2007/posegraph.data": "85cdbc3d0281053368c4991d114e74368b8188fe63bf7cc728561816d1e07545",
+    "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_1800/event_20260921_180820/posegraph.posegraph": "d44e1229f76601adbd22ac590bc54f5b3ea44173d8a4791e34cddb29f907910e",
+    "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_variance_022/event_20260921_2007/posegraph.posegraph": "4ebf9d775fe10c227a8a93b1469fb2e55a4b4d0a5a7ba671d262b9686cecf888"
   },
   "datasets": [
     {"name": "g02-6", "data": ".omo/evidence/g02-wall-hug/maps/baseline6-final.data", "truth": ".omo/evidence/g02-wall-hug/attempts/06/physics-truth.csv"},
@@ -27,7 +31,9 @@
     {"name": "sep-boundary", "data": "../go2_nav2_mujoco_bridge/verification/false_closure_boundary_ab_20260927_031032/a_state.data", "truth": "serialized-simulation-odometry"},
     {"name": "sep-colored", "data": "../go2_nav2_mujoco_bridge/verification/colored_route_incremental_20260927_021853/colored_route_false_closure_map.data", "truth": "serialized-simulation-odometry"},
     {"name": "sep-westspine", "data": "../go2_nav2_mujoco_bridge/verification/west_spine_both_sides_20260927_133932/west_spine_state.data", "truth": "serialized-simulation-odometry"},
-    {"name": "sep-wallboth", "data": "../go2_nav2_mujoco_bridge/verification/wall_both_sides_160cm_20260927_005630/wall_both_sides_map.data", "truth": "serialized-simulation-odometry"}
+    {"name": "sep-wallboth", "data": "../go2_nav2_mujoco_bridge/verification/wall_both_sides_160cm_20260927_005630/wall_both_sides_map.data", "truth": "serialized-simulation-odometry"},
+    {"name": "sep21-1800", "data": "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_1800/event_20260921_180820/posegraph.data", "truth": "serialized-simulation-odometry", "cohort": "supplemental", "historical_sigma": 3.0},
+    {"name": "sep21-variance022", "data": "../../archive/go2_local_navigation/verification_untracked_20260921era/verification/slam_loop_debug_live_20260921_variance_022/event_20260921_2007/posegraph.data", "truth": "serialized-simulation-odometry", "cohort": "supplemental", "historical_sigma": 0.22}
   ],
   "unreplayable": [
     {"name": "g02-7", "reason": "Raw scan/edge/candidate/qpos are present, but no original odometry dataset was serialized; qpos substitution is not an odometry replay."},

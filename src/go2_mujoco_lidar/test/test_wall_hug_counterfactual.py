@@ -6,6 +6,7 @@ No robot, GUI, ROS executor, live scan source or system installation is started.
 """
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -27,6 +28,32 @@ def test_complete_gate_grid_sigma_is_not_a_sweep_parameter():
     assert [g["x"] for g in grid[1:5]] == [1., 1.5, 2., 3.]
     assert {(g["k"], g["c"]) for g in grid[5:]} == {
         (k, c) for k in (.03, .05, .1) for c in (.1, .2, .3)}
+
+
+def test_motion_grid_and_installed_loss_variants():
+    grid = cf.motion_robust_gates()
+    assert len(grid) == len({g["name"] for g in grid}) == 7
+    assert {(g["k"], g["a"], g["b"], g["c"]) for g in grid if "a" in g} == {
+        (k, a, 2., .2) for k in (.03, .05) for a in (.5, 1.)}
+    assert {g["loss"] for g in grid if "loss" in g} == {"HuberLoss", "CauchyLoss"}
+    assert all(g["k"] < 0 and not g["x"] for g in grid if "loss" in g)
+
+
+def test_current_graph_shortcut_and_independent_inclusive_yaw_bound():
+    gate = dict(k=.05, c=.2, a=.5, b=2.)
+    theta = math.radians(2.5)
+    bound = .05 + .2 + theta
+    row = dict(from_scan_id=0, to_scan_id=2,
+               path_graph=[[0, 1, 10.], [1, 2, 10.], [0, 2, 1.]],
+               graph_distance_m=1., xy_bound_m=bound, yaw_bound_rad=theta,
+               correction_m=bound, yaw_correction_rad=-theta, accept=True)
+    cf.validate_motion([row], gate)
+    row["yaw_correction_rad"] = theta + 1e-5
+    row["accept"] = False
+    cf.validate_motion([row], gate)
+    row["graph_distance_m"] = 20.
+    with pytest.raises(ValueError, match="graph distance/bounds"):
+        cf.validate_motion([row], gate)
 
 
 def test_hash_pin_missing_and_corrupt_are_distinct(tmp_path):
@@ -87,7 +114,7 @@ def test_only_new_inserted_loops_reset_arc_not_rejections_or_callbacks():
 
 def test_native_reoptimization_and_repeatability(tmp_path):
     engine = Path(os.environ.get("GO2_COUNTERFACTUAL_ENGINE", str(
-        cf.PROJECT / ".omo/evidence/loop-gate-replay/engine/build/engine_replay")))
+        cf.PROJECT / ".omo/evidence/loop-gate-replay/engine-motion-v2/build/engine_replay")))
     manifest = json.loads(cf.MANIFEST.read_text())
     if not engine.is_file():
         pytest.skip("repo-only Karto engine absent; build counterfactual/build.sh first")
@@ -142,3 +169,54 @@ def test_native_reoptimization_and_repeatability(tmp_path):
                    "-vertices.jsonl", "-decisions.jsonl", ".pgm"):
         assert (tmp_path / ("strict-a" + suffix)).read_bytes() == (
             tmp_path / ("strict-b" + suffix)).read_bytes(), suffix
+
+
+@pytest.mark.parametrize("gate", cf.motion_robust_gates()[1:] + [
+    dict(name="motion-0.03-0.5-CauchyLoss", x=0., k=.03, c=.2,
+         a=.5, b=2., loss="CauchyLoss")], ids=lambda gate: gate["name"])
+def test_native_motion_robust_variants_are_deterministic(tmp_path, gate):
+    """Every new grid/loss variant really rematches and optimizes pinned raw data."""
+    engine = Path(os.environ.get("GO2_COUNTERFACTUAL_ENGINE", str(
+        cf.PROJECT / ".omo/evidence/loop-gate-replay/engine-motion-v2/build/engine_replay")))
+    manifest = json.loads(cf.MANIFEST.read_text())
+    if not engine.is_file():
+        pytest.skip("repo-only v2 engine absent; build into engine-motion-v2 first")
+    try:
+        cf.checked_inputs(cf.PROJECT, manifest)
+    except replay.DatasetAbsent as error:
+        pytest.skip(str(error))
+    environment = dict(os.environ, ROS_DOMAIN_ID="198", ROS_LOCALHOST_ONLY="1",
+                       OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
+    assert not environment.get("LD_PRELOAD")
+    # G02's first 350 inputs contain just one candidate with these permissive
+    # motion bounds. The archived September run closes an earlier loop before
+    # subsequent candidates, exercising a graph with real retained loop edges.
+    dataset = next(d for d in manifest["datasets"] if d["name"] == (
+        "sep21-1800" if "a" in gate else "g02-6"))
+    for repeat in ("a", "b"):
+        prefix = tmp_path / repeat
+        with (tmp_path / (repeat + ".log")).open("w") as log:
+            subprocess.run([
+                str(engine), str(cf.PROJECT / dataset["data"]),
+                str(cf.PROJECT / manifest["parameters"]), str(prefix),
+                str(gate["x"]), str(gate["k"]), str(gate["c"]), "350",
+                str(gate.get("a", -1.)), str(gate.get("b", 0.)),
+                gate.get("loss", "None")], env=environment, stdout=log,
+                stderr=subprocess.STDOUT, check=True, timeout=90)
+        rows = list(replay.records(Path(str(prefix) + "-decisions.jsonl")))
+        assert rows, "the native regression must exercise loop candidates"
+        cf.validate_retained_arc(
+            replay.records(Path(str(prefix) + "-inputs.jsonl")),
+            replay.records(Path(str(prefix) + "-online.jsonl")),
+            replay.records(Path(str(prefix) + "-edges.jsonl")), rows)
+        if "a" in gate:
+            cf.validate_motion(rows, gate)
+            assert all(r["graph_distance_m"] <= r["chain_distance_m"] + 1e-7 for r in rows)
+            assert any(r["retained_loops"] for r in rows), "exercise a post-loop graph"
+        if "loss" in gate:
+            assert f"Using {gate['loss']} loss function" in (
+                tmp_path / (repeat + ".log")).read_text()
+    for suffix in ("-edges.jsonl", "-factors.jsonl", "-online.jsonl",
+                   "-vertices.jsonl", "-decisions.jsonl", ".pgm"):
+        assert (tmp_path / ("a" + suffix)).read_bytes() == (
+            tmp_path / ("b" + suffix)).read_bytes(), (gate["name"], suffix)

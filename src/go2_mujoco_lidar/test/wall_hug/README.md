@@ -159,6 +159,62 @@ python3 -m pytest -q src/go2_mujoco_lidar/test/test_wall_hug_counterfactual.py
 - G02 7차는 raw scan은 있지만 원본 odometry가 없어 실제 odometry 재생에서 제외한다.
   qpos를 엔진 입력으로 대체해 odometry gate의 검증 결과로 제시하지 않는다.
 
+## 현재 graph motion gate·robust loss 후속 비교
+
+후속 비교는 `engine-motion-v2`처럼 **새 전용 prefix**를 사용한다. 원래 10개에
+9월 21일 archive의 `sep21-1800`, `sep21-variance022` 두 raw dataset을 추가했다.
+원래 10개 집계와 추가 두 반례의 결과는 분리해서 읽는다. 0.22 실행의 원본 scan도
+이번에는 같은 sigma 3.0에서 재생하므로 과거 0.22 실행의 정확 재현을 주장하지 않는다.
+
+```bash
+source /opt/ros/humble/setup.bash
+PREFIX="$PWD/.omo/evidence/loop-gate-replay/engine-motion-v2"
+bash src/go2_mujoco_lidar/test/wall_hug/counterfactual/build.sh "$PREFIX"
+ENGINE="$PREFIX/build/engine_replay"
+OUT="$PWD/.omo/evidence/loop-gate-replay/motion-robust"
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --baseline --jobs 3
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --motion-robust --jobs 3
+# motion-selection.json의 best_motion k/a와 best_robust loss를 사용한다.
+# --motion-combined K A LOSS로 최선 둘의 조합을 같은 12개에 재생한다.
+GO2_COUNTERFACTUAL_ENGINE="$ENGINE" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  python3 -m pytest -q src/go2_mujoco_lidar/test/test_wall_hug_counterfactual.py
+python3 src/go2_mujoco_lidar/test/wall_hug/counterfactual_profiles.py \
+  --runs "$OUT" --world ../go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml \
+  --output "$OUT/profiles-final"
+```
+
+- motion gate의 D는 **현재 corrected base pose**의 연속 odometry-chain 길이와
+  실제 삽입된 loop edge 길이로 구성한 무방향 graph 최단거리다. 새 후보 edge는
+  아직 포함하지 않는다. 일반적인 local proximity link는 shortcut에 넣지 않는다.
+- 매 후보마다 현재 scan pose에서 chain prefix를 다시 계산한다. anchor·query·
+  유지 loop 끝점 사이 branch 없는 chain을 압축한 뒤 Dijkstra를 수행한다.
+  V개 scan·L개 유지 loop에서 평균 O(V + L log L) 시간과 O(V + L) 공간이며,
+  최적화 전 길이를 cache해 다음 후보에 재사용하지 않는다.
+- `theta_max=(aD+b)*pi/180`, XY 보정 ≤kD+.2+D*theta_max와
+  `abs(wrap(dyaw))≤theta_max`를 동시에 요구한다. 요청의 최종 명시식인
+  **D*theta_max**를 사용했으며 sin(theta)로 치환하거나 각도를 degree로 곱하지 않는다.
+  k=.03/.05, a=.5/1 deg/m, b=2 deg 전체 네 조합을 실행한다.
+- `ceres_loss_function`은 설치된 2.6.10의 parameter·plugin symbol과 같은 버전
+  source에서 확인했다. HuberLoss/CauchyLoss는 scale .7로 **모든 covariance로
+  whiten한 XY/yaw constraint residual block**에 적용되며 loop 전용 outlier 제거기가
+  아니다. replay process의 NodeOptions override만 사용한다.
+- `result-decisions.jsonl`은 dyaw·D·XY/yaw bound와 압축 경로 graph를 보존한다.
+  Python이 별도 Dijkstra로 전 후보의 D와 수락식을 검사한다. 엔진 로그의
+  `path_searches/path_total_us/path_max_us`는 최단경로 계산 비용이며 map·로그 I/O는 제외한다.
+- 새 motion 네 조합은 앞선 정상 loop가 있는 `sep21-1800`, loss 두 조합은 G02의
+  고정 raw scan으로 두 번씩 350 scan을 처리해
+  edge·factor·online/final pose·decision·PGM byte 결정성을 검사한다.
+  motion .03/.5와 CauchyLoss 조합도 `sep21-1800`의 두 반복에서 검사한다.
+  기존 재최적화 회귀도 유지한다. 늘어난 실제 엔진 실행량에 맞춰 CTest 한도는 900초다.
+- baseline의 horizontal/fullclean/wallboth는 기존 관찰 patch로 raw scan을 추가 보존한다.
+  `counterfactual_profiles.py`는 원래 per-wall count와 정확 일치를 먼저 확인하고,
+  각 doubled run의 normal interval·최종 graph/odometry endpoint 분포·시각별 이동을
+  출력한다. metric 정의와 지도를 수정하지 않는다.
+
 ## Karto 관찰 patch
 
 `karto-observation.patch`는 slam_toolbox 2.6.10 commit

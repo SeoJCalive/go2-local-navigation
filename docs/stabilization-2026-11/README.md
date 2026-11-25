@@ -18,7 +18,7 @@
 | [F05_GUI_REPAIRS](F05_GUI_REPAIRS.md) | 실제 관절 TF·mesh-free 표시·durable 지도 reset·단일 종료 명령 |
 | [G02_WALL_HUG](G02_WALL_HUG.md) | 벽 근접 오연결 재현·gate 비교·수정 중단과 제품 복원 |
 | [G02_FORMAL_TESTS](G02_FORMAL_TESTS.md) | 하니스 정식 pytest/CTest 편입·기록 재생·자료 고정과 검증 경계 |
-| [G02_COUNTERFACTUAL_REPLAY](G02_COUNTERFACTUAL_REPLAY.md) | 격리 Karto/Ceres 재최적화·10개 raw dataset·loop gate 비교와 실물 drift 경계 |
+| [G02_COUNTERFACTUAL_REPLAY](G02_COUNTERFACTUAL_REPLAY.md) | 격리 Karto/Ceres·12개 raw dataset·motion/yaw gate·robust loss 비교와 잔여 이중벽 진단 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

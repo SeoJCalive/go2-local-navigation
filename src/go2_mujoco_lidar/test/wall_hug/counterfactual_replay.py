@@ -9,6 +9,7 @@ See README.md for correctness, lost-edge and simulation-GT definitions.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -31,6 +32,56 @@ def gates():
         dict(name=f"correction-{k:g}-{c:g}", x=0., k=k, c=c)
         for k in (.03, .05, .10) for c in (.1, .2, .3)
     ]
+
+
+def motion_robust_gates():
+    """Requested reference, four current-graph motion bounds and installed losses."""
+    return [dict(name="correction-0.05-0.2", x=0., k=.05, c=.2)] + [
+        dict(name=f"motion-{k:g}-{a:g}", x=0., k=k, c=.2, a=a, b=2.)
+        for k in (.03, .05) for a in (.5, 1.)
+    ] + [
+        dict(name=f"robust-{loss}", x=0., k=-1., c=0., loss=loss)
+        for loss in ("HuberLoss", "CauchyLoss")
+    ]
+
+
+def validate_motion(decisions, gate):
+    """Independent shortest-path and inclusive XY/yaw checks on native snapshots.
+
+    The native path graph is the current chain compressed at retained-loop
+    endpoints; its edge weights are refreshed before each candidate. This checks
+    the solver separately from the native implementation and catches stale bounds.
+    """
+    for row in decisions:
+        graph = {}
+        for source, target, weight in row["path_graph"]:
+            if not math.isfinite(weight) or weight < 0.:
+                raise ValueError("invalid current graph path weight")
+            graph.setdefault(source, []).append((target, weight))
+            graph.setdefault(target, []).append((source, weight))
+        source, target = row["from_scan_id"], row["to_scan_id"]
+        best, queue = {source: 0.}, [(0., source)]
+        while queue:
+            distance, vertex = heapq.heappop(queue)
+            if distance != best[vertex]:
+                continue
+            if vertex == target:
+                break
+            for neighbor, weight in graph[vertex]:
+                candidate = distance + weight
+                if candidate < best.get(neighbor, math.inf):
+                    best[neighbor] = candidate
+                    heapq.heappush(queue, (candidate, neighbor))
+        distance = best[target]
+        theta = math.radians(gate["a"] * distance + gate["b"])
+        bound = gate["k"] * distance + gate["c"] + distance * theta
+        if (abs(row["graph_distance_m"] - distance) > 1e-7 or
+                abs(row["xy_bound_m"] - bound) > 1e-7 or
+                abs(row["yaw_bound_rad"] - theta) > 1e-7):
+            raise ValueError("native current graph distance/bounds mismatch")
+        expected = row["correction_m"] <= bound and abs(row["yaw_correction_rad"]) <= theta
+        if row["accept"] != expected:
+            raise ValueError("native motion decision mismatch")
 
 
 def checked_inputs(project, manifest):
@@ -125,8 +176,14 @@ def run_one(engine, project, manifest, dataset, gate, output):
     command = [str(engine), str(project / dataset["data"]),
                str(project / manifest["parameters"]), str(prefix),
                str(gate["x"]), str(gate["k"]), str(gate["c"]), "0"]
+    if "a" in gate or "loss" in gate:
+        command.extend([str(gate.get("a", -1.)), str(gate.get("b", 0.)),
+                        gate.get("loss", "None")])
     environment = dict(os.environ, OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                        ROS_DOMAIN_ID="198", ROS_LOCALHOST_ONLY="1")
+    if gate["name"] == "none" and dataset["name"] in (
+            "sep-horizontal", "sep-wallfullclean", "sep-wallboth"):
+        environment["GO2_REPLAY_SCAN_EVIDENCE"] = str(prefix) + "-scans.jsonl"
     # Inherit ROS loader paths but never any recorded-prior preload.
     if environment.get("LD_PRELOAD"):
         raise ValueError("LD_PRELOAD must be unset for causal replay")
@@ -148,6 +205,8 @@ def run_one(engine, project, manifest, dataset, gate, output):
     validate_retained_arc(inputs, online,
                          replay.records(Path(str(prefix) + "-edges.jsonl")),
                          replay.records(Path(str(prefix) + "-decisions.jsonl")))
+    if "a" in gate:
+        validate_motion(replay.records(Path(str(prefix) + "-decisions.jsonl")), gate)
     final = list(replay.records(Path(str(prefix) + "-vertices.jsonl")))
     # Map coordinates are initialized from the input world-coordinate odometry.
     # No fitted final transform can hide a bad closure.
@@ -157,6 +216,8 @@ def run_one(engine, project, manifest, dataset, gate, output):
     summary = dict(dataset=dataset["name"], gate=gate, truth=dataset["truth"],
                    inputs=len(inputs), accepted_scans=len(final),
                    loops=loops, wrong_loops=sum(not r["correct"] for r in loops),
+                   wrong_loops_gt_1m=sum(not r["correct"] and r["xy_error_m"] > 1.
+                                        for r in loops),
                    correct_loops=sum(r["correct"] for r in loops),
                    wall_offset_p95_m=metrics["wall_offset_m"]["p95"],
                    doubled_walls=metrics["doubled_wall_components"],
@@ -181,6 +242,8 @@ def main():
     mode.add_argument("--baseline", action="store_true")
     mode.add_argument("--sweep", action="store_true")
     mode.add_argument("--combined", nargs=3, type=float, metavar=("X", "K", "C"))
+    mode.add_argument("--motion-robust", action="store_true")
+    mode.add_argument("--motion-combined", nargs=3, metavar=("K", "A", "LOSS"))
     parser.add_argument("--dataset", action="append")
     args = parser.parse_args()
     manifest = json.loads(MANIFEST.read_text())
@@ -191,6 +254,15 @@ def main():
     if args.combined:
         x, k, c = args.combined
         selected = [dict(name=f"combined-{x:g}-{k:g}-{c:g}", x=x, k=k, c=c)]
+    if args.motion_robust:
+        selected = motion_robust_gates()
+    if args.motion_combined:
+        k, a = map(float, args.motion_combined[:2])
+        loss = args.motion_combined[2]
+        if k not in (.03, .05) or a not in (.5, 1.) or loss not in ("HuberLoss", "CauchyLoss"):
+            parser.error("combined variant must use the requested grid and installed losses")
+        selected = [dict(name=f"motion-{k:g}-{a:g}-{loss}", x=0., k=k, c=.2,
+                         a=a, b=2., loss=loss)]
     if not args.baseline:
         base = args.output / "g02-6/none/summary.json"
         reproduction(json.loads(base.read_text()))
@@ -204,9 +276,62 @@ def main():
     for row in results:
         baseline = json.loads((args.output / row["dataset"] / "none/summary.json").read_text())
         row["correct_loops_lost"] = lost_correct(baseline["loops"], row["loops"])
-    table = args.output / ("baseline.json" if args.baseline else
+    table = args.output / ("motion-robust.json" if args.motion_robust else
+                           "motion-combined.json" if args.motion_combined else
+                           "baseline.json" if args.baseline else
                            "combined.json" if args.combined else "sweep.json")
     table.write_text(json.dumps(results, indent=2) + "\n")
+    if args.motion_robust and not args.dataset:
+        # Preserve the original paper's selection order, on its original 10 inputs.
+        # September 21 is a held-out challenge cohort, reported separately.
+        original = {d["name"] for d in manifest["datasets"] if d.get("cohort") != "supplemental"}
+        candidates = {}
+        for row in results:
+            if row["dataset"] in original:
+                candidates.setdefault(row["gate"]["name"], []).append(row)
+        def rank(rows):
+            g02 = next(r for r in rows if r["dataset"] == "g02-6")
+            gate = rows[0]["gate"]
+            return (sum(r["wrong_loops"] for r in rows), g02["pose_error_max_m"],
+                    g02["wall_offset_p95_m"], -sum(r["correct_loops"] for r in rows),
+                    -gate.get("k", 0.), -gate.get("a", 0.), gate["name"])
+        motion = min((r for r in candidates.values() if "a" in r[0]["gate"]), key=rank)
+        robust = min((r for r in candidates.values() if "loss" in r[0]["gate"]), key=rank)
+        selection = dict(
+            selection_cohort=sorted(original),
+            rule="wrong sum, G02 online max, G02 p95, negative correct total; then larger k/a",
+            best_motion=motion[0]["gate"], best_robust=robust[0]["gate"])
+        (args.output / "motion-selection.json").write_text(json.dumps(selection, indent=2) + "\n")
+        print("MOTION_SELECTION " + json.dumps(selection), flush=True)
+    if args.motion_combined:
+        rows = []
+        for filename in ("baseline.json", "motion-robust.json", "motion-combined.json"):
+            rows.extend(json.loads((args.output / filename).read_text()))
+        supplementary = {d["name"] for d in manifest["datasets"]
+                         if d.get("cohort") == "supplemental"}
+        cohorts = {
+            "original_10": {d["name"] for d in manifest["datasets"]} - supplementary,
+            "supplementary_2": supplementary,
+            "all_12": {d["name"] for d in manifest["datasets"]}}
+        aggregate = {}
+        for cohort, names in cohorts.items():
+            groups = {}
+            for row in rows:
+                if row["dataset"] in names:
+                    groups.setdefault(row["gate"]["name"], []).append(row)
+            aggregate[cohort] = [
+                dict(name=name, datasets=len(group),
+                     wrong=sum(r["wrong_loops"] for r in group),
+                     wrong_xy_over_1m=sum(r["wrong_loops_gt_1m"] for r in group),
+                     correct=sum(r["correct_loops"] for r in group),
+                     correct_pair_absent=sum(len(r["correct_loops_lost"]) for r in group),
+                     p95_max=max(r["wall_offset_p95_m"] for r in group),
+                     doubled_sum=sum(r["doubled_walls"] for r in group),
+                     ghost_sum=sum(r["ghost_components"] for r in group),
+                     pose_max=max(r["pose_error_max_m"] for r in group))
+                for name, group in groups.items()]
+        (args.output / "motion-comparison.json").write_text(
+            json.dumps(dict(aggregate=aggregate, rows=rows), indent=2) + "\n")
     print("COUNTERFACTUAL_COMPLETE " + str(table), flush=True)
 
 
