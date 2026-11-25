@@ -1,0 +1,1128 @@
+[
+  {
+    "attempt": 6,
+    "from_id": 140,
+    "to_id": 275,
+    "time": 201.302,
+    "coarse": 0.364375,
+    "fine": 0.47019444444444447,
+    "coarse_covariance": [
+      0.0027444253859348205,
+      8.717161059968374e-17,
+      0,
+      8.717161059968374e-17,
+      0.13607349736061855,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 19,
+    "implied_correction_m": 3.560014044916116,
+    "path_cumulative_m": 35.85240718103797,
+    "distance_since_actual_loop_m": 35.85240718103797,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4172043010752688,
+        "min_range_m": 0.38083380460739136,
+        "all_endpoints_pca_ratio": 0.3628688114999236,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261265
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3916849015317287,
+        "min_range_m": 0.34250444173812866,
+        "all_endpoints_pca_ratio": 0.5335318724117887,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261400
+      }
+    },
+    "gt_from_pose": [
+      7.519333614,
+      -0.796744891,
+      -1.54045912
+    ],
+    "gt_to_pose": [
+      7.555458378,
+      -2.981687891,
+      -1.2425686640000018
+    ],
+    "relative_pose": [
+      -1.3664165090311435,
+      0.09936251405778851,
+      0.28914026721420805
+    ],
+    "fine_link_covariance": [
+      0.02475604055126292,
+      0.002977977748824917,
+      0,
+      0.002977977748824917,
+      0.005995103558392335,
+      0,
+      0,
+      0,
+      0.00030953657470772706
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 771,
+    "to_id": 864,
+    "time": 604.1,
+    "coarse": 0.38272222222222224,
+    "fine": 0.4814861111111111,
+    "coarse_covariance": [
+      0.012584847543742606,
+      -2.794397500892078e-17,
+      0,
+      -2.794397500892078e-17,
+      0.0026128610828857605,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 52,
+    "implied_correction_m": 0.09848857801796093,
+    "path_cumulative_m": 114.69585864852397,
+    "distance_since_actual_loop_m": 78.843451467486,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3143631436314363,
+        "min_range_m": 0.40705543756484985,
+        "all_endpoints_pca_ratio": 0.32374418301792157,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261896
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3147208121827411,
+        "min_range_m": 0.4407414197921753,
+        "all_endpoints_pca_ratio": 0.6077082839247324,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261989
+      }
+    },
+    "gt_from_pose": [
+      3.174655685,
+      4.394345877,
+      0.01801618400000038
+    ],
+    "gt_to_pose": [
+      4.591074171,
+      2.879469581,
+      2.8183378989999994
+    ],
+    "relative_pose": [
+      1.369293727157641,
+      -1.520018171601179,
+      2.810860943134074
+    ],
+    "fine_link_covariance": [
+      0.019413933334125593,
+      0.0007559978220738757,
+      0,
+      0.000755997822073876,
+      0.00782076865231884,
+      0,
+      0,
+      0,
+      0.0003106325433876156
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 1003,
+    "to_id": 1042,
+    "time": 718.1,
+    "coarse": 0.4465277777777778,
+    "fine": 0.452625,
+    "coarse_covariance": [
+      0.00223950233281493,
+      0,
+      0,
+      0,
+      0.00223950233281493,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 34,
+    "implied_correction_m": 0.010000000000000231,
+    "path_cumulative_m": 136.48781973214776,
+    "distance_since_actual_loop_m": 21.79196108362379,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.5356037151702786,
+        "min_range_m": 0.47454577684402466,
+        "all_endpoints_pca_ratio": 0.42748137447319323,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262128
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.588957055214724,
+        "min_range_m": 0.3978719413280487,
+        "all_endpoints_pca_ratio": 0.2277022325337315,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262167
+      }
+    },
+    "gt_from_pose": [
+      1.250294856,
+      1.798931623,
+      0.07040689499999964
+    ],
+    "gt_to_pose": [
+      1.162250324,
+      1.682354705,
+      0.3926456260000002
+    ],
+    "relative_pose": [
+      -0.08967830768724472,
+      -0.10367941841641137,
+      0.3227974504251896
+    ],
+    "fine_link_covariance": [
+      0.01675704276685523,
+      0.00043500398619397435,
+      0,
+      0.00043500398619397495,
+      0.0065520777510699735,
+      0,
+      0,
+      0,
+      0.00013371186370988525
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 24,
+    "to_id": 1052,
+    "time": 724.3,
+    "coarse": 0.3975416666666667,
+    "fine": 0.5037083333333333,
+    "coarse_covariance": [
+      0.0025154595954302488,
+      0,
+      0,
+      0,
+      0.0025154595954302488,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 17,
+    "implied_correction_m": 3.8264866392031216,
+    "path_cumulative_m": 137.6182404809714,
+    "distance_since_actual_loop_m": 1.1304207488236386,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4331395348837209,
+        "min_range_m": 0.40070387721061707,
+        "all_endpoints_pca_ratio": 0.21115996558197628,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261149
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3768844221105528,
+        "min_range_m": 0.4040292501449585,
+        "all_endpoints_pca_ratio": 0.5708979002404269,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262177
+      }
+    },
+    "gt_from_pose": [
+      1.805241591,
+      1.939636543,
+      0.02147555499999987
+    ],
+    "gt_to_pose": [
+      2.102018883,
+      1.310940217,
+      -1.2140408439999995
+    ],
+    "relative_pose": [
+      0.2877622557556043,
+      -0.6181159833515852,
+      -1.2387079059801251
+    ],
+    "fine_link_covariance": [
+      0.005712715992390105,
+      -0.0006503380805827619,
+      0,
+      -0.0006503380805827619,
+      0.008553953956400833,
+      0,
+      0,
+      0,
+      0.00031119605085372295
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 215,
+    "to_id": 1178,
+    "time": 805.898,
+    "coarse": 0.45694444444444443,
+    "fine": 0.5107638888888889,
+    "coarse_covariance": [
+      5.448698125506249,
+      0.07478056204354067,
+      0,
+      0.07478056204354067,
+      0.013531574498491222,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 22,
+    "implied_correction_m": 2.121320343559643,
+    "path_cumulative_m": 154.41990130907087,
+    "distance_since_actual_loop_m": 16.80166082809947,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.41729323308270677,
+        "min_range_m": 0.46803027391433716,
+        "all_endpoints_pca_ratio": 0.3083187432986536,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261340
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.40816326530612246,
+        "min_range_m": 0.39942821860313416,
+        "all_endpoints_pca_ratio": 0.8882675196679184,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262303
+      }
+    },
+    "gt_from_pose": [
+      1.91692033,
+      -2.015019509,
+      -2.546987842000002
+    ],
+    "gt_to_pose": [
+      -0.292659961,
+      -2.858803057,
+      0.0914086679999997
+    ],
+    "relative_pose": [
+      2.0545501760450646,
+      -0.9599185382782338,
+      2.622914824109509
+    ],
+    "fine_link_covariance": [
+      0.0394349470666033,
+      -0.004182781119688713,
+      0,
+      -0.00418278111968872,
+      0.031950060924697404,
+      0,
+      0,
+      0,
+      0.000133739521166149
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 422,
+    "to_id": 1203,
+    "time": 827.694,
+    "coarse": 0.5097083333333333,
+    "fine": 0.5355972222222222,
+    "coarse_covariance": [
+      0.03312414962749669,
+      -0.004271434009976728,
+      0,
+      -0.004271434009976728,
+      0.008711601872230669,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 36,
+    "implied_correction_m": 2.593260495977989,
+    "path_cumulative_m": 157.75320147014173,
+    "distance_since_actual_loop_m": 3.3333001610708664,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3719512195121951,
+        "min_range_m": 0.4076121747493744,
+        "all_endpoints_pca_ratio": 0.7491568347103112,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261547
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3974358974358974,
+        "min_range_m": 0.397625207901001,
+        "all_endpoints_pca_ratio": 0.8369641627402868,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262328
+      }
+    },
+    "gt_from_pose": [
+      0.388882479,
+      -5.494817499,
+      -3.1047604840000007
+    ],
+    "gt_to_pose": [
+      -0.323376501,
+      -2.851461151,
+      -3.1126151970000002
+    ],
+    "relative_pose": [
+      0.6423077222842724,
+      -2.654182369736598,
+      0.025518598385686264
+    ],
+    "fine_link_covariance": [
+      0.044189439268909766,
+      -0.011156892711055317,
+      0,
+      -0.011156892711055319,
+      0.029962520945300972,
+      0,
+      0,
+      0,
+      0.00012153723080280876
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 462,
+    "to_id": 1281,
+    "time": 878.498,
+    "coarse": 0.4260138888888889,
+    "fine": 0.4955277777777778,
+    "coarse_covariance": [
+      0.0424635651726051,
+      -0.008531046757749532,
+      0,
+      -0.008531046757749532,
+      0.022025882021736005,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 76,
+    "implied_correction_m": 2.3666220653074292,
+    "path_cumulative_m": 168.25100519459681,
+    "distance_since_actual_loop_m": 10.497803724455082,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.506426735218509,
+        "min_range_m": 0.3994198441505432,
+        "all_endpoints_pca_ratio": 0.514785921560604,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261587
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3888888888888889,
+        "min_range_m": 0.39441052079200745,
+        "all_endpoints_pca_ratio": 0.871934905800775,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262406
+      }
+    },
+    "gt_from_pose": [
+      -2.988692846,
+      -3.131588473,
+      2.818677949999998
+    ],
+    "gt_to_pose": [
+      -4.560274142,
+      -3.435510093,
+      0.5840369259999996
+    ],
+    "relative_pose": [
+      1.4400732233587221,
+      0.66594623370657,
+      -2.2441487681143264
+    ],
+    "fine_link_covariance": [
+      0.028855220086000968,
+      -0.009005524595594823,
+      0,
+      -0.009005524595594823,
+      0.04223211961754028,
+      0,
+      0,
+      0,
+      0.0001697730014919641
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 637,
+    "to_id": 1297,
+    "time": 888.994,
+    "coarse": 0.6104166666666667,
+    "fine": 0.6302361111111111,
+    "coarse_covariance": [
+      0.0016382252559726965,
+      -7.157259486150685e-17,
+      0,
+      -7.157259486150685e-17,
+      0.053848913087992424,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 91,
+    "implied_correction_m": 0.4341658669218481,
+    "path_cumulative_m": 170.3261879466144,
+    "distance_since_actual_loop_m": 2.0751827520175823,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3131991051454139,
+        "min_range_m": 0.45820072293281555,
+        "all_endpoints_pca_ratio": 0.6540928634271622,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261762
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.2924731182795699,
+        "min_range_m": 1.2062370777130127,
+        "all_endpoints_pca_ratio": 0.6752317576401388,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262422
+      }
+    },
+    "gt_from_pose": [
+      -3.62448815,
+      0.612156312,
+      -1.4710635040000009
+    ],
+    "gt_to_pose": [
+      -4.50380041,
+      -1.392449738,
+      1.0581189789999996
+    ],
+    "relative_pose": [
+      1.8956226033488977,
+      -1.084941596888163,
+      2.531819943446704
+    ],
+    "fine_link_covariance": [
+      0.027317728336547376,
+      -0.0008952182511606549,
+      0,
+      -0.0008952182511606542,
+      0.010486285865599698,
+      0,
+      0,
+      0,
+      0.0001690659409364119
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 1031,
+    "to_id": 1322,
+    "time": 902.796,
+    "coarse": 0.43975,
+    "fine": 0.4500277777777778,
+    "coarse_covariance": [
+      0.0022740193291642986,
+      0,
+      0,
+      0,
+      0.0022740193291642986,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 11,
+    "implied_correction_m": 1.3069812546475177,
+    "path_cumulative_m": 173.5739993257857,
+    "distance_since_actual_loop_m": 3.24781137917131,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3704918032786885,
+        "min_range_m": 0.3931160271167755,
+        "all_endpoints_pca_ratio": 0.731596121901789,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262156
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4427710843373494,
+        "min_range_m": 1.047262191772461,
+        "all_endpoints_pca_ratio": 0.6202524420069921,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262447
+      }
+    },
+    "gt_from_pose": [
+      0.823158939,
+      0.763092677,
+      1.982838674
+    ],
+    "gt_to_pose": [
+      -2.180300805,
+      0.86286193,
+      0.8050821140000011
+    ],
+    "relative_pose": [
+      1.3163108258735718,
+      2.689625990922088,
+      -1.1817810967024567
+    ],
+    "fine_link_covariance": [
+      0.010242608748914443,
+      0.0022463929279370213,
+      0,
+      0.002246392927937021,
+      0.012877300138298424,
+      0,
+      0,
+      0,
+      0.00016871665106968643
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 677,
+    "to_id": 1340,
+    "time": 913.898,
+    "coarse": 0.3936527777777778,
+    "fine": 0.4832916666666667,
+    "coarse_covariance": [
+      0.011938610352199938,
+      1.656815011880078e-17,
+      0,
+      1.656815011880078e-17,
+      0.0025403097766644326,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 33,
+    "implied_correction_m": 0.09999999999999987,
+    "path_cumulative_m": 175.90327738698053,
+    "distance_since_actual_loop_m": 2.3292780611948274,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4630681818181818,
+        "min_range_m": 0.40695998072624207,
+        "all_endpoints_pca_ratio": 0.5039087961026005,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261802
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4670487106017192,
+        "min_range_m": 0.3884289264678955,
+        "all_endpoints_pca_ratio": 0.48374510404187243,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262465
+      }
+    },
+    "gt_from_pose": [
+      -0.838055084,
+      2.605482021,
+      1.9813461079999994
+    ],
+    "gt_to_pose": [
+      -0.830287884,
+      2.573306085,
+      1.9387871210000007
+    ],
+    "relative_pose": [
+      -0.01783037180935043,
+      -0.009304039678889042,
+      -0.03683336797807102
+    ],
+    "fine_link_covariance": [
+      0.008244000314109535,
+      0.0018931902253265407,
+      0,
+      0.001893190225326541,
+      0.012987387055017745,
+      0,
+      0,
+      0,
+      0.00030804425595466403
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 23,
+    "to_id": 1695,
+    "time": 1157.294,
+    "coarse": 0.47994444444444445,
+    "fine": 0.5200694444444445,
+    "coarse_covariance": [
+      0.002083574487787939,
+      7.880688779038519e-18,
+      0,
+      7.880688779038519e-18,
+      0.009464391212986856,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 40,
+    "implied_correction_m": 0.8510451091321645,
+    "path_cumulative_m": 220.39344228917938,
+    "distance_since_actual_loop_m": 44.49016490219884,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.43209876543209874,
+        "min_range_m": 0.3901671767234802,
+        "all_endpoints_pca_ratio": 0.30114018188059655,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261148
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.44266666666666665,
+        "min_range_m": 0.42543575167655945,
+        "all_endpoints_pca_ratio": 0.31796558155743854,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262820
+      }
+    },
+    "gt_from_pose": [
+      1.623489564,
+      1.951887147,
+      -0.05240852900000004
+    ],
+    "gt_to_pose": [
+      1.74800049,
+      1.707926637,
+      -0.37000582099999946
+    ],
+    "relative_pose": [
+      0.142608655867964,
+      -0.26891412471139553,
+      -0.31724874780945755
+    ],
+    "fine_link_covariance": [
+      0.011700951503050927,
+      -0.0015387162052186462,
+      0,
+      -0.001538716205218646,
+      0.014895039744203606,
+      0,
+      0,
+      0,
+      0.0003483357475356221
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 4,
+    "to_id": 1837,
+    "time": 1246.792,
+    "coarse": 0.4357638888888889,
+    "fine": 0.4875,
+    "coarse_covariance": [
+      0.01125278146550832,
+      -0.005580384509318554,
+      0,
+      -0.005580384509318554,
+      0.011335706263305817,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 17,
+    "implied_correction_m": 0.3106444913401812,
+    "path_cumulative_m": 237.74336677388493,
+    "distance_since_actual_loop_m": 17.349924484705554,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.35185185185185186,
+        "min_range_m": 1.1034867763519287,
+        "all_endpoints_pca_ratio": 0.874291783020333,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261129
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4152542372881356,
+        "min_range_m": 1.4956884384155273,
+        "all_endpoints_pca_ratio": 0.8948251160798261,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262962
+      }
+    },
+    "gt_from_pose": [
+      0.186173292,
+      0.438183139,
+      1.4522136440000004
+    ],
+    "gt_to_pose": [
+      0.165432116,
+      -0.079498807,
+      2.8506103419999995
+    ],
+    "relative_pose": [
+      -0.44021349624965933,
+      -0.00976069083905895,
+      1.4132039063532595
+    ],
+    "fine_link_covariance": [
+      0.026056761945936976,
+      0.0026439345893702476,
+      0,
+      0.0026439345893702485,
+      0.019319143502217737,
+      0,
+      0,
+      0,
+      0.00012137018088564697
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 1090,
+    "to_id": 1844,
+    "time": 1250.592,
+    "coarse": 0.44722222222222224,
+    "fine": 0.46718055555555554,
+    "coarse_covariance": [
+      0.052044703680627566,
+      -0.01450659200944863,
+      0,
+      -0.01450659200944863,
+      0.016082197386844084,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 39,
+    "implied_correction_m": 1.79002793274295,
+    "path_cumulative_m": 238.59256156019683,
+    "distance_since_actual_loop_m": 0.849194786311898,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.5,
+        "min_range_m": 0.3688572943210602,
+        "all_endpoints_pca_ratio": 0.7170321901929343,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262215
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.45,
+        "min_range_m": 2.113534688949585,
+        "all_endpoints_pca_ratio": 0.5025079273124805,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262969
+      }
+    },
+    "gt_from_pose": [
+      -0.639623249,
+      -1.970489613,
+      3.0742548270000007
+    ],
+    "gt_to_pose": [
+      -0.664054576,
+      -0.068413615,
+      3.0423742689999997
+    ],
+    "relative_pose": [
+      -0.09657643738974253,
+      -1.849521205862703,
+      -0.1662056488116761
+    ],
+    "fine_link_covariance": [
+      0.04606589867112813,
+      -0.0034829829954375873,
+      0,
+      -0.0034829829954375873,
+      0.039663476416676405,
+      0,
+      0,
+      0,
+      0.0001215858609288265
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 1237,
+    "to_id": 1926,
+    "time": 1304.488,
+    "coarse": 0.36856944444444445,
+    "fine": 0.5848333333333333,
+    "coarse_covariance": [
+      0.6439809838555436,
+      -0.1952240216100371,
+      0,
+      -0.1952240216100371,
+      0.1323550492670173,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 29,
+    "implied_correction_m": 1.8449457986618467,
+    "path_cumulative_m": 249.39542764220326,
+    "distance_since_actual_loop_m": 10.802866082006432,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3854625550660793,
+        "min_range_m": 0.36703693866729736,
+        "all_endpoints_pca_ratio": 0.5360185998591394,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262362
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4028436018957346,
+        "min_range_m": 0.6071644425392151,
+        "all_endpoints_pca_ratio": 0.6268327689169285,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20263051
+      }
+    },
+    "gt_from_pose": [
+      -4.18834782,
+      -4.381615453,
+      -1.512407026
+    ],
+    "gt_to_pose": [
+      -4.649362951,
+      -5.276758275,
+      -0.06812235700000002
+    ],
+    "relative_pose": [
+      0.7371728552819548,
+      -0.5260350920708197,
+      1.4244535518193013
+    ],
+    "fine_link_covariance": [
+      0.062499828416760744,
+      0.005070157060340545,
+      0,
+      0.005070157060340545,
+      0.01915941316094068,
+      0,
+      0,
+      0,
+      0.00012169247530215302
+    ]
+  },
+  {
+    "attempt": 6,
+    "from_id": 1679,
+    "to_id": 2088,
+    "time": 1427.19,
+    "coarse": 0.3600555555555556,
+    "fine": 0.464375,
+    "coarse_covariance": [
+      0.22177464067201796,
+      0.002019969679947494,
+      0,
+      0.002019969679947494,
+      0.0040780098544409135,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 15,
+    "implied_correction_m": 0.38639358172723337,
+    "path_cumulative_m": 271.0287653431172,
+    "distance_since_actual_loop_m": 21.633337700913927,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.2696245733788396,
+        "min_range_m": 0.9820376038551331,
+        "all_endpoints_pca_ratio": 0.37028061374975096,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20262804
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.4678362573099415,
+        "min_range_m": 1.951786756515503,
+        "all_endpoints_pca_ratio": 0.8299437697274527,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20263213
+      }
+    },
+    "gt_from_pose": [
+      -0.265304288,
+      2.110943766,
+      -0.7274615139999998
+    ],
+    "gt_to_pose": [
+      -1.007961542,
+      -0.388185901,
+      -0.06245999000000069
+    ],
+    "relative_pose": [
+      1.1041491335395532,
+      -2.390426762912937,
+      0.6689503539973513
+    ],
+    "fine_link_covariance": [
+      0.016927356719908353,
+      0.005887595971213035,
+      0,
+      0.005887595971213033,
+      0.016176936340949227,
+      0,
+      0,
+      0,
+      0.00022684779787569666
+    ]
+  },
+  {
+    "attempt": 7,
+    "from_id": 148,
+    "to_id": 284,
+    "time": 202.344,
+    "coarse": 0.4037222222222222,
+    "fine": 0.47323611111111114,
+    "coarse_covariance": [
+      0.0024769505985963954,
+      -2.426712519488793e-17,
+      0,
+      -2.426712519488793e-17,
+      0.010928941598505054,
+      0,
+      0,
+      0,
+      0.00487204
+    ],
+    "chain_size": 18,
+    "implied_correction_m": 3.5000142856851317,
+    "path_cumulative_m": 35.94601817509341,
+    "distance_since_actual_loop_m": 35.94601817509341,
+    "from_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.3876651982378855,
+        "min_range_m": 0.39715081453323364,
+        "all_endpoints_pca_ratio": 0.4572348741478301,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261273
+      }
+    },
+    "to_geometry": {
+      "sensor_only": {
+        "dominant_line_fraction": 0.39737991266375544,
+        "min_range_m": 0.34531277418136597,
+        "all_endpoints_pca_ratio": 0.5452215122632948,
+        "near_wall_degenerate": false,
+        "rule": "sensor-only: >=70% valid endpoints within 0.03m of one line; min range <=0.50m",
+        "hypotheses": 2048,
+        "random_seed": 20261409
+      }
+    },
+    "gt_from_pose": [
+      7.512555532,
+      -0.940113467,
+      -1.637708218
+    ],
+    "gt_to_pose": [
+      7.553407685,
+      -3.001461245,
+      -1.2767926619999974
+    ],
+    "relative_pose": [
+      -1.4847044689873778,
+      -0.04002054694950145,
+      0.34954032051750517
+    ],
+    "fine_link_covariance": null
+  }
+]

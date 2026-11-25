@@ -1,4 +1,8 @@
 # Build MuJoCo sensor runtime and independent state/planar checks; install ROS assets.
+# Flow: resolve pinned MuJoCo/Unitree inputs, build runtime, register ament tests.
+# Outputs: package executables, assets and CTest/pytest results.
+# External contracts: third_party/unitree_mujoco/README.md and test/wall_hug/README.md.
+# G02 diagnostics stay in the repo; no Karto patch or dataset is installed.
 cmake_minimum_required(VERSION 3.16)
 project(go2_mujoco_lidar)
 
@@ -75,6 +79,15 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(tf2_msgs REQUIRED)
   find_package(CycloneDDS REQUIRED)
+  ament_add_gtest(wall_hug_clearance_test test/test_wall_hug_clearance.cpp)
+  target_include_directories(wall_hug_clearance_test PRIVATE test "${MUJOCO_INCLUDE_DIR}")
+  target_link_libraries(wall_hug_clearance_test "${MUJOCO_LIBRARY}")
+  ament_add_pytest_test(wall_hug_policy test/test_wall_hug_policy.py)
+  ament_add_pytest_test(wall_hug_async test/test_wall_hug_async.py TIMEOUT 90)
+  ament_add_pytest_test(wall_hug_geometry test/test_wall_hug_geometry.py)
+  ament_add_pytest_test(wall_hug_pose test/test_wall_hug_pose.py)
+  ament_add_pytest_test(wall_hug_replay test/test_wall_hug_replay.py TIMEOUT 180
+    ENV "OPENBLAS_NUM_THREADS=1" "OMP_NUM_THREADS=1")
   add_executable(tf_owner_observer test/headless/tf_owner_observer.cpp)
   ament_target_dependencies(tf_owner_observer rclcpp tf2_msgs)
   target_link_libraries(tf_owner_observer CycloneDDS::ddsc)
