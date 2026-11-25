@@ -13,6 +13,7 @@ base -> utlidar_lidar: base_to_utlidar_lidar_static_tf
 URDF fixed edges (base -> imu/radar/front_camera 및 다리 고정 링크):
 robot_state_publisher. 관절 TF는 joint-state 입력 없이 발행하지 않는다.
 /clock: go2_mujoco_lidar만 발행한다. static TF와 scan은 stage45가 한 번 소유한다.
+mapping=true는 정규 navigation mapping 진입점으로 위임해 overlay·gate를 동일 적용한다.
 """
 
 import os
@@ -55,6 +56,13 @@ def _start(context):
         )
     }
     lidar_arguments["model_path"] = str(world)
+    if LaunchConfiguration("mapping").perform(context).lower() == "true":
+        return [include("go2_mujoco_lidar", "go2_sim_navigation.launch.py", {
+            "simulator_pid": LaunchConfiguration("simulator_pid").perform(context),
+            "mode": "mapping",
+            **{name: lidar_arguments[name] for name in (
+                "horizontal_samples", "vertical_samples", "vertical_min", "vertical_max")},
+        })]
     actions = [
         LogInfo(msg=f"simulator/raycast world={world} sha256={digest} domain={domain}"),
         RegisterEventHandler(OnProcessExit(
@@ -62,10 +70,6 @@ def _start(context):
         include("go2_mujoco_lidar", "go2_mujoco_stage45.launch.py", lidar_arguments),
         include("go2_inputs", "go2_odometry_adapter.launch.py", {"use_sim_time": "true"}),
     ]
-    if LaunchConfiguration("mapping").perform(context).lower() == "true":
-        actions.append(include("go2_nav2", "go2_slam_mapping.launch.py", {
-            "start_inputs": "false", "use_sim_time": "true",
-        }))
     return actions
 
 

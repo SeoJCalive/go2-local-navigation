@@ -1,3 +1,5 @@
+<!-- 목적: 단위 안정화 실험의 입력·결과·한계 탐색. 링크를 통해 당시 증거로 이동하며
+현재 실행 절차는 root README/SIM_SESSION을 따른다. -->
 # 2026년 11월 simulation 안정화 기록
 
 변경 이유, 당시 검증 결과와 남은 경계를 조회할 때 사용한다.
@@ -18,6 +20,8 @@
 | [F05_GUI_REPAIRS](F05_GUI_REPAIRS.md) | 실제 관절 TF·mesh-free 표시·durable 지도 reset·단일 종료 명령 |
 | [G02_WALL_HUG](G02_WALL_HUG.md) | 벽 근접 오연결 재현·gate 비교·수정 중단과 제품 복원 |
 | [G02_FORMAL_TESTS](G02_FORMAL_TESTS.md) | 하니스 정식 pytest/CTest 편입·기록 재생·자료 고정과 검증 경계 |
+| [G02_COUNTERFACTUAL_REPLAY](G02_COUNTERFACTUAL_REPLAY.md) | 격리 Karto/Ceres·12개 raw dataset·motion/yaw gate·robust loss 비교와 잔여 이중벽 진단 |
+| [G02_RUNTIME_GATE](G02_RUNTIME_GATE.md) | built SDK 24회 동등성·거리 1 m GUI FAIL·정상 loop 거부 전체와 reader 판정 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

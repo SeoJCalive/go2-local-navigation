@@ -1,0 +1,105 @@
+목적: slam_toolbox 2.6.10의 fine 수락 직전에 원본 odometry 거리 gate를 적용한다.
+흐름: configure parameter → linked barycenter anchor 선택 → 거리 초과만 거부.
+입출력: ROS double parameter, 거부 ID/거리 stdout, 기존 graph/지도.
+주의: 0은 비활성; 비직렬화 필드로 기존 지도 형식을 보존한다. 관측은 G02 env로만 켠다.
+
+diff --git a/lib/karto_sdk/include/karto_sdk/Mapper.h b/lib/karto_sdk/include/karto_sdk/Mapper.h
+--- a/lib/karto_sdk/include/karto_sdk/Mapper.h
++++ b/lib/karto_sdk/include/karto_sdk/Mapper.h
+@@ -2417,2 +2417,8 @@
+-public:
+-  /* Abstract methods for parameter setters and getters */
++private:
++  // 실행 설정은 기존 posegraph archive의 직렬화 순서에 추가하지 않는다.
++  double m_loopClosureMaxOdomDistance = 0.0;
++
++public:
++  double getParamLoopClosureMaxOdomDistance() const {return m_loopClosureMaxOdomDistance;}
++  void setParamLoopClosureMaxOdomDistance(double value) {m_loopClosureMaxOdomDistance = value;}
++  /* Abstract methods for parameter setters and getters */
+diff --git a/src/slam_mapper.cpp b/src/slam_mapper.cpp
+--- a/src/slam_mapper.cpp
++++ b/src/slam_mapper.cpp
+@@ -96,1 +96,10 @@
+-  bool use_scan_matching = true;
++  // 목적/흐름: ROS 실행 설정을 Karto gate에 전달한다. 0은 upstream 수락을 유지한다.
++  // 입력은 odometry XY 상한(m), 출력은 Mapper 설정이다. archive에는 저장하지 않는다.
++  double loop_closure_max_odom_distance = 0.0;
++  if (!node->has_parameter("loop_closure_max_odom_distance")) {
++    node->declare_parameter("loop_closure_max_odom_distance", loop_closure_max_odom_distance);
++  }
++  node->get_parameter("loop_closure_max_odom_distance", loop_closure_max_odom_distance);
++  mapper_->setParamLoopClosureMaxOdomDistance(loop_closure_max_odom_distance);
++
++  bool use_scan_matching = true;
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -49,2 +49,4 @@
+-namespace karto
+-{
++namespace karto
++{
++// 목적: 실제 로딩된 runtime SDK 식별. 입력 없음, 출력 ABI receipt version.
++extern "C" int go2RuntimeGateVersion() {return 1;}
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1639,2 +1639,19 @@
+-      } else {
+-        m_pMapper->FireBeginLoopClosure("Closing loop...");
++      } else {
++        // linked anchor는 LinkChainToScan과 같은 proposed barycenter에서 선택한다.
++        // 원본 base odometry XY만 사용하며 pose/edge/solve 변경 전에 거부한다.
++        const double limit = m_pMapper->getParamLoopClosureMaxOdomDistance();
++        if (limit > 0.0) {
++          tmpScan.SetSensorPose(bestPose);
++          auto anchor = GetClosestScanToPose(candidateChain,
++            tmpScan.GetReferencePose(m_pMapper->m_pUseScanBarycenter->GetValue()));
++          const double distance = std::sqrt(anchor->GetOdometricPose().GetPosition().
++            SquaredDistance(pScan->GetOdometricPose().GetPosition()));
++          if (distance > limit) {
++            std::cout << std::setprecision(17) << "LOOP_ODOM_GATE_REJECT from="
++                      << anchor->GetStateId() << " to=" << pScan->GetStateId()
++                      << " distance_m=" << distance << " limit_m=" << limit << std::endl;
++            candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
++            continue;
++          }
++        }
++        m_pMapper->FireBeginLoopClosure("Closing loop...");
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1554,1 +1554,1 @@
+-  std::cout << "G02_LOOP event=scan_begin scan=" << pScan->GetStateId()
++  if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=scan_begin scan=" << pScan->GetStateId()
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1650,1 +1650,1 @@
+-        std::cout << "G02_LOOP event=accepted scan=" << pScan->GetStateId()
++        if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=accepted scan=" << pScan->GetStateId()
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1658,1 +1658,1 @@
+-  std::cout << "G02_LOOP event=scan_end scan=" << pScan->GetStateId()
++  if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=scan_end scan=" << pScan->GetStateId()
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1576,1 +1576,1 @@
+-    std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++    if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1599,1 +1599,1 @@
+-      std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++      if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -1636,1 +1636,1 @@
+-        std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++        if (std::getenv("G02_EDGE_EVIDENCE")) std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()

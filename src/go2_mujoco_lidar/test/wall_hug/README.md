@@ -96,6 +96,125 @@ GT로 읽으며 다른 MJCF 구성에 대한 일반성은 미확인이다.
 - 이 진입점은 **고정 후보의 관측 데이터 재생**이다. Karto/Ceres로 raw scan을 다시
   매칭·최적화하는 engine 재생이나 gate를 바꾼 counterfactual graph 검증은 포함하지 않는다.
 
+## Counterfactual 엔진 재생
+
+2026-11-25 후속 승인 범위의 진입점은 `counterfactual_replay.py`다.
+기존 `replay.py`의 고정 후보 재판정과 별도로, 매 gate마다 빈 Karto graph에서
+원본 range와 odometry를 순서대로 입력하고 Ceres를 다시 푼다. 거부는 실제 scan의
+pose 변경·edge 삽입·최적화보다 앞에서 일어나므로 이후 candidate와 지도도 바뀐다.
+GT와 과거 corrected pose·prior·수락 결정은 엔진에 입력하지 않는다.
+
+```bash
+source /opt/ros/humble/setup.bash
+PREFIX="$PWD/.omo/evidence/loop-gate-replay/engine"
+# 최초 한 번만 실행한다. 기존 prefix는 덮어쓰지 않는다.
+bash src/go2_mujoco_lidar/test/wall_hug/counterfactual/build.sh "$PREFIX"
+ENGINE="$PREFIX/build/engine_replay"
+OUT="$PWD/.omo/evidence/loop-gate-replay/runs-isolated"
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --baseline --jobs 3
+# 위 기준 재현을 통과한 뒤에만 sweep을 실행한다.
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --sweep --jobs 3
+# X/K/C는 sweep 결과에서 고른 두 gate의 교집합이다.
+# 10개 dataset에서 선택한 거리 1 m와 5%D+.3 m 조합:
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --combined 1 .05 .3 --jobs 3
+python3 -m pytest -q src/go2_mujoco_lidar/test/test_wall_hug_counterfactual.py
+```
+
+- `counterfactual/build.sh`는 원본 `8293d21...`을 전용 prefix에 복제하고 관찰 patch와
+  `karto-gate.patch`만 적용한다. 제품 build/install과 공유 source·SLAM YAML은 바꾸지 않는다.
+- Karto와 Ceres는 각각 worker 1개로 고정한다. native executable의 강한 patch-version
+  symbol과 전용 SDK 우선 RPATH가 공유 SDK의 우발적 선택을 오류로 드러낸다.
+- `fixtures/counterfactual-datasets.json`은 모든 `.data`·qpos·world·parameter SHA256을
+  고정한다. 기본 `.data`는 당시 mapper가 처리한 raw range와 원래 odometry를 보존한다.
+  당시 movement filter에서 버린 원래 ROS scan 전체를 보존한다는 뜻은 아니다.
+- G02 6차는 독립 physics qpos와 비교한다. 9월 자료는 직렬화된 simulation odometry를
+  truth로 쓴다. 이 simulation pose는 실물 wheel/leg odometry의 drift 모델이 아니며,
+  독립 qpos 파일을 갖춘 실험과 구별한다.
+- 정상 loop는 immutable LinkInfo 상대 측정의 GT XY 오차 ≤0.10 m, yaw 오차 ≤5°다.
+  `correct_loops_lost`는 gate=none의 정상 **동일 node pair가 부재한 개수**다.
+  바뀐 matcher가 다른 정상 anchor를 선택한 경우도 포함하므로 새 정상 삽입 수도 함께 본다.
+- 거리 gate는 두 linked node odometry 위치 간 **직선거리** ≤X다. 누적 arc와 다르다.
+  correction gate는 현재 fine pose의 XY 보정 ≤kD+c이며 D는 처음 scan 또는 마지막
+  실제 새 loop 삽입부터 원본 odometry를 누적한 arc다. 거부·기존 edge callback은 reset하지 않는다.
+- sigma는 3.0만 허용한다. map은 동일 Karto occupancy 생성, 0.05 m·min pass 2·
+  occupancy .1로 만들고 기존 `geometry.evaluate`를 호출한다. 정렬은 원래 world odom
+  좌표의 identity다. 최종 graph에 맞춰 GT를 다시 정렬하지 않는다.
+- 결과는 새 graph·PGM/YAML·immutable factor·모든 gate 결정·scan별 online/final pose·
+  GT overlay·지도 지표·summary와 aggregate JSON이다. 실패한 실험 산출물은 덮어쓰지 않는다.
+- 기준 재현은 첫 오류 `140→275`/201.302 s와 역사적 map p95 ±0.22 m,
+  doubled ±4·ghost ±20·online 최대 pose 오차 ±0.55 m를 요구한다.
+  후반 일부 node pair 차이는 보존하며 과거 전체 edge를 강제하는 prior hook은 금지한다.
+- 정식 pytest는 실제 첫 350 scan에서 none/거리 1.5 m·3%D+.1·10%D+.3 gate의
+  삽입·D reset·downstream pose를 검사한다. 거리 gate는 정상 loop 최적화 후의
+  edge·factor·pose·PGM byte 일치까지 확인한다. native engine이나
+  대형 원본이 없는 CI에서는 이유를 적고 이 native 검사만 skip한다.
+- [전체 10개 dataset 비교와 실물 drift 경계](../../../../docs/stabilization-2026-11/G02_COUNTERFACTUAL_REPLAY.md)를
+  최종 수치와 선택 근거로 사용한다.
+- G02 7차는 raw scan은 있지만 원본 odometry가 없어 실제 odometry 재생에서 제외한다.
+  qpos를 엔진 입력으로 대체해 odometry gate의 검증 결과로 제시하지 않는다.
+
+## 현재 graph motion gate·robust loss 후속 비교
+
+후속 비교는 `engine-motion-v2`처럼 **새 전용 prefix**를 사용한다. 원래 10개에
+9월 21일 archive의 `sep21-1800`, `sep21-variance022` 두 raw dataset을 추가했다.
+원래 10개 집계와 추가 두 반례의 결과는 분리해서 읽는다. 0.22 실행의 원본 scan도
+이번에는 같은 sigma 3.0에서 재생하므로 과거 0.22 실행의 정확 재현을 주장하지 않는다.
+
+```bash
+source /opt/ros/humble/setup.bash
+PREFIX="$PWD/.omo/evidence/loop-gate-replay/engine-motion-v2"
+bash src/go2_mujoco_lidar/test/wall_hug/counterfactual/build.sh "$PREFIX"
+ENGINE="$PREFIX/build/engine_replay"
+OUT="$PWD/.omo/evidence/loop-gate-replay/motion-robust"
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --baseline --jobs 3
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 \
+  src/go2_mujoco_lidar/test/wall_hug/counterfactual_replay.py \
+  --engine "$ENGINE" --output "$OUT" --motion-robust --jobs 3
+# motion-selection.json의 best_motion k/a와 best_robust loss를 사용한다.
+# --motion-combined K A LOSS로 최선 둘의 조합을 같은 12개에 재생한다.
+GO2_COUNTERFACTUAL_ENGINE="$ENGINE" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  python3 -m pytest -q src/go2_mujoco_lidar/test/test_wall_hug_counterfactual.py
+python3 src/go2_mujoco_lidar/test/wall_hug/counterfactual_profiles.py \
+  --runs "$OUT" --world ../go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml \
+  --output "$OUT/profiles-final"
+```
+
+- motion gate의 D는 **현재 corrected base pose**의 연속 odometry-chain 길이와
+  실제 삽입된 loop edge 길이로 구성한 무방향 graph 최단거리다. 새 후보 edge는
+  아직 포함하지 않는다. 일반적인 local proximity link는 shortcut에 넣지 않는다.
+- 매 후보마다 현재 scan pose에서 chain prefix를 다시 계산한다. anchor·query·
+  유지 loop 끝점 사이 branch 없는 chain을 압축한 뒤 Dijkstra를 수행한다.
+  V개 scan·L개 유지 loop에서 평균 O(V + L log L) 시간과 O(V + L) 공간이며,
+  최적화 전 길이를 cache해 다음 후보에 재사용하지 않는다.
+- `theta_max=(aD+b)*pi/180`, XY 보정 ≤kD+.2+D*theta_max와
+  `abs(wrap(dyaw))≤theta_max`를 동시에 요구한다. 요청의 최종 명시식인
+  **D*theta_max**를 사용했으며 sin(theta)로 치환하거나 각도를 degree로 곱하지 않는다.
+  k=.03/.05, a=.5/1 deg/m, b=2 deg 전체 네 조합을 실행한다.
+- `ceres_loss_function`은 설치된 2.6.10의 parameter·plugin symbol과 같은 버전
+  source에서 확인했다. HuberLoss/CauchyLoss는 scale .7로 **모든 covariance로
+  whiten한 XY/yaw constraint residual block**에 적용되며 loop 전용 outlier 제거기가
+  아니다. replay process의 NodeOptions override만 사용한다.
+- `result-decisions.jsonl`은 dyaw·D·XY/yaw bound와 압축 경로 graph를 보존한다.
+  Python이 별도 Dijkstra로 전 후보의 D와 수락식을 검사한다. 엔진 로그의
+  `path_searches/path_total_us/path_max_us`는 최단경로 계산 비용이며 map·로그 I/O는 제외한다.
+- 새 motion 네 조합은 앞선 정상 loop가 있는 `sep21-1800`, loss 두 조합은 G02의
+  고정 raw scan으로 두 번씩 350 scan을 처리해
+  edge·factor·online/final pose·decision·PGM byte 결정성을 검사한다.
+  motion .03/.5와 CauchyLoss 조합도 `sep21-1800`의 두 반복에서 검사한다.
+  기존 재최적화 회귀도 유지한다. 늘어난 실제 엔진 실행량에 맞춰 CTest 한도는 900초다.
+- baseline의 horizontal/fullclean/wallboth는 기존 관찰 patch로 raw scan을 추가 보존한다.
+  `counterfactual_profiles.py`는 원래 per-wall count와 정확 일치를 먼저 확인하고,
+  각 doubled run의 normal interval·최종 graph/odometry endpoint 분포·시각별 이동을
+  출력한다. metric 정의와 지도를 수정하지 않는다.
+
 ## Karto 관찰 patch
 
 `karto-observation.patch`는 slam_toolbox 2.6.10 commit

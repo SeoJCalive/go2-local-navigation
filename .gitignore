@@ -1,3 +1,6 @@
+# 목적: ROS/Python 및 private dependency 산출물을 source Git에서 분리한다.
+# 흐름/입출력: 경로 패턴 → Git 추적 제외. 고유 실행 증거는 별도 보존 규칙을 따른다.
+# 주의: ignore는 파일 삭제나 증거 폐기 승인이 아니다.
 # ROS 2 and Python build products
 /build/
 /install/
@@ -5,6 +8,9 @@
 /third_party/tf2/build/
 /third_party/tf2/install/
 /third_party/tf2/log/
+/third_party/slam_toolbox/build/
+/third_party/slam_toolbox/install/
+/third_party/slam_toolbox/log/
 /runs/
 **/__pycache__/
 **/.pytest_cache/

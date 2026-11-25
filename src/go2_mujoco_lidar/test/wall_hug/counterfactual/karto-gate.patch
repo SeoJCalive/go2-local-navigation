@@ -1,0 +1,56 @@
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -49,6 +49,12 @@
+ namespace karto
+ {
+
++// Repo-only offline replay callbacks, supplied by the replay executable.
++extern "C" int go2ReplayPatchVersion() {return 2;}
++extern "C" bool go2ReplayGate(LocalizedRangeScan *, LocalizedRangeScan *,
++  double, double) __attribute__((weak));
++extern "C" void go2ReplayRetained(LocalizedRangeScan *, LocalizedRangeScan *) __attribute__((weak));
++
+ // Observation only: selected raw scans and actual graph edges, without changing
+ // matching, acceptance, covariances, graph structure, or optimization.
+ namespace
+@@ -1637,11 +1643,28 @@
+                   << " time=" << pScan->GetTime() << " info=REJECTED!" << std::endl;
+       } else {
++        // Select exactly the anchor LinkChainToScan will use, including the
++        // scan-barycenter transform at the proposed pose. Rejection precedes
++        // mutation of the real scan, edge insertion and graph optimization.
++        tmpScan.SetSensorPose(bestPose);
++        auto anchor = GetClosestScanToPose(candidateChain,
++          tmpScan.GetReferencePose(m_pMapper->m_pUseScanBarycenter->GetValue()));
++        const double correction = std::sqrt(
++          g02PriorPose.GetPosition().SquaredDistance(bestPose.GetPosition()));
++        if (go2ReplayGate && !go2ReplayGate(anchor, pScan, correction,
++          math::NormalizeAngle(bestPose.GetHeading() - g02PriorPose.GetHeading()))) {
++          candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
++          continue;
++        }
++        const auto edgesBefore = GetEdges().size();
+         m_pMapper->FireBeginLoopClosure("Closing loop...");
+
+         pScan->SetSensorPose(bestPose);
+         g02LoopLinkActive = true;
+         LinkChainToScan(candidateChain, pScan, bestPose, covariance);
+         g02LoopLinkActive = false;
++        if (GetEdges().size() > edgesBefore && go2ReplayRetained) {
++          go2ReplayRetained(anchor, pScan);
++        }
+         CorrectPoses();
+
+         m_pMapper->FireEndLoopClosure("Loop closed!");
+diff --git a/solvers/ceres_solver.cpp b/solvers/ceres_solver.cpp
+--- a/solvers/ceres_solver.cpp
++++ b/solvers/ceres_solver.cpp
+@@ -127,5 +127,6 @@
+   options_.max_consecutive_nonmonotonic_steps =
+     options_.max_num_consecutive_invalid_steps;
+-  options_.num_threads = 50;
++  // Offline deterministic replay; no change to the installed solver.
++  options_.num_threads = 1;
+   options_.use_nonmonotonic_steps = true;
+   options_.jacobi_scaling = true;
