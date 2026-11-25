@@ -13,6 +13,13 @@
 namespace go2_mujoco_lidar
 {
 
+// Unitree LowState motor order, shared by raycasting and JointState output.
+inline constexpr std::array<const char *, 12> kMotorJointNames{
+  "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
+  "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
+  "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
+  "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint"};
+
 struct BaseState
 {
   std::array<double, 3> position;

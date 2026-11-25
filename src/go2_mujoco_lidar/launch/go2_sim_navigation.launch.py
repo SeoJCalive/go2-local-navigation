@@ -24,6 +24,7 @@ from launch.logging import get_logger
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from go2_mujoco_lidar.sim_session import simulation_domain, simulator_world
 from go2_nav2.sim_session import initial_pose, map_selection, mode_owners, session_lock, tf2_library
@@ -81,7 +82,11 @@ def _start(context):
         actions.append(Node(
             package="slam_toolbox", executable="async_slam_toolbox_node",
             name="slam_toolbox", prefix=prefix, output="screen",
-            parameters=[str(share / "config/slam_mapping.yaml"), {"use_sim_time": True}]))
+            parameters=[str(share / "config/slam_mapping.yaml"), {
+                "use_sim_time": True,
+                "debug_logging": ParameterValue(
+                    LaunchConfiguration("slam_debug_logging", default="false"), value_type=bool),
+            }]))
     else:
         for package, executable, name, overrides in [
             ("nav2_map_server", "map_server", "map_server", {"yaml_filename": selected["yaml"]}),
@@ -135,5 +140,6 @@ def generate_launch_description():
         DeclareLaunchArgument("vertical_samples", default_value="8"),
         DeclareLaunchArgument("vertical_min", default_value="-0.2617993877991494"),
         DeclareLaunchArgument("vertical_max", default_value="0.2617993877991494"),
+        DeclareLaunchArgument("slam_debug_logging", default_value="false"),
         OpaqueFunction(function=_start),
     ])

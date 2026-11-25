@@ -124,7 +124,7 @@ bridge build와 FIFO 입력 절차는 형제 저장소의 README를 따른다.
 bridge의 legacy Nav2 launch를 동시에 시작하지 않는다.
 별도 RViz는 같은 ROS 환경에서 실행하고 tf2가 필요하면
 프로젝트 루트에서
-`LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2`로 pin을 적용한다.
+`LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2 -d "$PWD/src/go2_mujoco_lidar/config/simulation.rviz" --ros-args -p use_sim_time:=true`로 pin과 simulation 설정을 적용한다.
 Nav2/SLAM native child의 pin은 세션 launch가 강제하고 `TF2_LOADED`로 확인한다.
 
 ## 지도 저장과 재로딩

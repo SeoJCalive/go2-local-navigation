@@ -29,7 +29,7 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
     )
     import rclpy
     from nav_msgs.msg import Odometry
-    from sensor_msgs.msg import PointCloud2
+    from sensor_msgs.msg import PointCloud2, JointState
     from unitree_go.msg import LowState, SportModeState
 
     simulator = Path(os.environ["UNITREE_MUJOCO_ROOT"])
@@ -40,12 +40,15 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
     # the supplied IMU position. Rz(+90) maps (x,y,z) to (-y,x,z).
     x, y, z = (float(value) for value in site.attrib["pos"].split())
     low = LowState()
+    for index in range(12):
+        low.motor_state[index].q = index * 0.03125
     sport = SportModeState()
     sport.position = [1.0 - y, 2.0 + x, 1.0 + z]
     sport.imu_state.quaternion = [math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5)]
     sport.velocity = [0.0, 2.0, 0.0]
     clouds = {}
     odometry = {}
+    joints = {}
     rclpy.init(args=[])
     node = rclpy.create_node("w02_odometry_contract")
 
@@ -59,6 +62,9 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
         node.create_subscription(
             Odometry, "/w02_contract/odom",
             lambda message: odometry.update({stamp(message): message}), 10),
+        node.create_subscription(
+            JointState, "/w02_contract/joints",
+            lambda message: joints.update({stamp(message): message}), 10),
     ]
     low_pub = node.create_publisher(LowState, "/w02_contract/lowstate", 10)
     sport_pub = node.create_publisher(SportModeState, "/w02_contract/sport", 10)
@@ -75,6 +81,7 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
         ("/simulation/utlidar/cloud_self_filtered", "/w02_contract/filtered"),
         ("/simulation/utlidar/cloud_planar_selected", "/w02_contract/planar"),
         ("/clock", "/w02_contract/clock"),
+        ("/joint_states", "/w02_contract/joints"),
     ):
         command += ["-r", f"{source}:={target}"]
     process = None
@@ -84,7 +91,8 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
                 command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             deadline = time.monotonic() + 10
             step = 0
-            while time.monotonic() < deadline and not (clouds.keys() & odometry.keys()):
+            while time.monotonic() < deadline and not (
+                    clouds.keys() & odometry.keys() & joints.keys()):
                 assert process.poll() is None, (tmp_path / "lidar.log").read_text()
                 low.tick = 1000 + step * 2
                 sport.stamp.sec = low.tick // 1000
@@ -93,7 +101,7 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
                 sport_pub.publish(sport)
                 rclpy.spin_once(node, timeout_sec=0.02)
                 step += 1
-            common = clouds.keys() & odometry.keys()
+            common = clouds.keys() & odometry.keys() & joints.keys()
             assert common, (tmp_path / "lidar.log").read_text()
             output = odometry[min(common)]
             assert output.header.frame_id == "odom"
@@ -105,6 +113,13 @@ def test_given_mujoco_state_when_cloud_is_published_then_matching_source_odometr
             ) < 1e-6
             assert abs(output.twist.twist.linear.x - 2.0) < 1e-6
             assert abs(output.twist.twist.linear.y) < 1e-6
+            joint = joints[min(common)]
+            assert joint.name == [
+                "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
+                "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
+                "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
+                "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint"]
+            assert list(joint.position) == [index * 0.03125 for index in range(12)]
     finally:
         if process is not None:
             if process.poll() is None:

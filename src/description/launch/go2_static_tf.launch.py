@@ -10,6 +10,17 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 from description.static_tf_profiles import load_static_tf_profile
+from description.visual_model import collision_visual_model
+
+
+def _robot_node(context, *, urdf):
+    use_sim_time = LaunchConfiguration("use_sim_time").perform(context).lower() == "true"
+    return [Node(
+        package="robot_state_publisher", executable="robot_state_publisher",
+        name="robot_state_publisher", parameters=[{
+            "robot_description": collision_visual_model(urdf) if use_sim_time else urdf,
+            "use_sim_time": use_sim_time,
+        }])]
 
 
 def _sensor_tf_node(context: LaunchContext, profile_path: str) -> list[Node]:
@@ -67,20 +78,7 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("execution_mode", default_value="onboard"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
-            Node(
-                package="robot_state_publisher",
-                executable="robot_state_publisher",
-                name="robot_state_publisher",
-                parameters=[
-                    {
-                        "robot_description": robot_description,
-                        "use_sim_time": ParameterValue(
-                            LaunchConfiguration("use_sim_time"),
-                            value_type=bool,
-                        ),
-                    }
-                ],
-            ),
+            OpaqueFunction(function=_robot_node, kwargs={"urdf": robot_description}),
             OpaqueFunction(
                 function=_sensor_tf_node,
                 kwargs={"profile_path": str(profile_path)},

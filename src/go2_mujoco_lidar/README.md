@@ -30,6 +30,9 @@ runtime은 실물 후보와 `go2_validation`에 의존하지 않는다.
   `odom -> base_link`이고 pose는 base 원점의 world 좌표, twist는 base 원점/축이다.
   orientation·angular velocity는 같은 `SportModeState.imu_state`에서 온다.
   `LowState`는 관절각에만 사용한다. `/clock`은 Sport callback에서 갱신한다.
+- 같은 matched pair의 motor q를 Unitree FR·FL·RR·RL hip/thigh/calf 순서로
+  `/joint_states`에 발행한다. 다리 TF는 기존 robot_state_publisher가 소유하며
+  이 node는 TF를 직접 발행하지 않는다.
 - base의 자손 body에 맞은 점만 자기반사로 판정해
   `/simulation/utlidar/cloud_self_filtered`에서 제외한다.
 - 기존 ray를 base 좌표계로 회전해 각 base 방위각에서 절대 수직각이 가장 작은 ray

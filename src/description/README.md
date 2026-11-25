@@ -11,6 +11,13 @@ canonical model은 `urdf/go2_description.urdf` 하나이며, 공식·프로젝�
 `base`다. 이 파일에는 Go2 본체의 visual·collision·inertial·관절과 공식 native
 sensor link인 `imu`, `radar`, `front_camera`가 함께 들어 있다.
 
+simulation(`use_sim_time=true`)에서는 외부 `go2_description/dae` 없이 RViz를
+사용하도록 canonical collision primitive를 visual로 복사한 모델을 발행한다.
+canonical 파일·관절·fixed TF geometry는 변경하지 않는다. 단순 형상은 외관 mesh의
+대체 표시이며 충돌 모델 수정이 아니다. simulation LiDAR가 matched LowState의
+실제 12개 motor q를 `/joint_states`에 공급하고 기존 robot_state_publisher가
+움직이는 다리 TF도 소유한다.
+
 ## 현재 승인된 정적 TF 계약
 
 - 공식 고정 edge `base → imu`와 `base → radar`의 geometry는 canonical URDF를

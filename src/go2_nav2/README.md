@@ -22,6 +22,7 @@ SLAM Toolbox·저장 지도 AMCL·Nav2 설정과 simulation 세션의 guard를 �
 | `go2_nav2/sim_session.py` | 지도·초기 pose·mode·flock·tf2 prefix 검증 |
 | `go2_nav2/sim_session_guard.py` | AMCL 초기화 수락·소유권 감시·종료 FINALIZED 확인 |
 | `go2_nav2/tf2_exec.py` | native process preload와 실제 loaded tf2 검사 |
+| `go2_nav2/sim_stop.py` | 여섯 FINALIZED 확인 후 지정 launch PID만 종료하는 단일 명령 |
 
 `sim_session_guard`는 이 패키지의 설치 실행 파일이다. 개발 검증 runner는
 `tools/go2_validation`에 있으며, controller preview/costmap-only와

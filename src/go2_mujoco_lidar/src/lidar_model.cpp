@@ -19,12 +19,6 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr std::array<double, 3> kLidarTranslation{0.28945, 0.0, -0.046825};
 constexpr double kLidarPitch = 2.8782;
 
-const std::array<const char *, 12> kMotorJointNames{
-  "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
-  "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
-  "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
-  "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint"};
-
 std::array<double, 3> rotate(
   const std::array<double, 4> & quaternion, const std::array<double, 3> & point)
 {

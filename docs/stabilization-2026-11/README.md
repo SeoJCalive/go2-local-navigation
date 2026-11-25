@@ -15,6 +15,7 @@
 | [F02_MAPPING](F02_MAPPING.md) | 정책 제어 하한·13점 경로·긴 epoch와 세 번의 수용 |
 | [F03_RUNTIME](F03_RUNTIME.md) | 영구 dependency·기본 install 경로와 임시 산출물 정리 |
 | [F04_GUI_CLOCK](F04_GUI_CLOCK.md) | 공유 GUI 정수 epoch clock·mutex와 장시간 pairing 검증 |
+| [F05_GUI_REPAIRS](F05_GUI_REPAIRS.md) | 실제 관절 TF·mesh-free 표시·durable 지도 reset·단일 종료 명령 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

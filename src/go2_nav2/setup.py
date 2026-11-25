@@ -42,5 +42,6 @@ setup(
     extras_require={"test": ["pytest", "PyYAML"]},
     entry_points={"console_scripts": [
         "sim_session_guard = go2_nav2.sim_session_guard:main",
+        "sim_stop = go2_nav2.sim_stop:main",
     ]},
 )

@@ -5,6 +5,8 @@
 // the executor to main's non-zero exit; a successful scan clears that budget.
 // This node has no physical command interface.
 // Default raster: 720 x 8, +/-15 degrees; scan consumes base-planar selection.
+// Matched LowState motor positions also drive /joint_states; the existing
+// robot_state_publisher alone owns the corresponding moving leg TF edges.
 #include "go2_mujoco_lidar/lidar_model.hpp"
 #include "go2_mujoco_lidar/step_pairing.hpp"
 
@@ -12,6 +14,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rosgraph_msgs/msg/clock.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <unitree_go/msg/low_state.hpp>
 #include <unitree_go/msg/sport_mode_state.hpp>
@@ -132,6 +135,8 @@ public:
       kPlanarTopic, publisher_qos);
     odometry_publisher_ = create_publisher<nav_msgs::msg::Odometry>(
       kOdomTopic, publisher_qos);
+    joint_publisher_ = create_publisher<sensor_msgs::msg::JointState>(
+      "/joint_states", publisher_qos);
     clock_publisher_ = create_publisher<rosgraph_msgs::msg::Clock>("/clock", rclcpp::ClockQoS());
     low_state_subscription_ = create_subscription<unitree_go::msg::LowState>(
       declare_parameter<std::string>("low_state_topic", "/lowstate"), subscription_qos,
@@ -223,6 +228,11 @@ private:
       filtered_publisher_->publish(make_cloud(stamp, hits, true));
       planar_publisher_->publish(make_cloud(stamp, planar_hits, false));
       odometry_publisher_->publish(make_odometry(stamp, state));
+      sensor_msgs::msg::JointState joints;
+      joints.header.stamp = stamp;
+      joints.name.assign(kMotorJointNames.begin(), kMotorJointNames.end());
+      joints.position.assign(motors.begin(), motors.end());
+      joint_publisher_->publish(joints);
       consecutive_raycast_errors_ = 0;
       if (!first_scan_logged_) {
         RCLCPP_INFO(
@@ -252,6 +262,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr filtered_publisher_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr planar_publisher_;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_publisher_;
   rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock_publisher_;
   rclcpp::Subscription<unitree_go::msg::LowState>::SharedPtr low_state_subscription_;
   rclcpp::Subscription<unitree_go::msg::SportModeState>::SharedPtr sport_state_subscription_;

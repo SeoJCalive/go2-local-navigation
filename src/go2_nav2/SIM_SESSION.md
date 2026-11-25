@@ -45,8 +45,8 @@ vx `[-2,4]`, vy `[-1,1]`, yaw `[-2,2]`를 정규화한다. 다른 policy 선택�
 
 1. clean shell에서 자신이 관리하는 simulator를 `-s WORLD -i DOMAIN -n lo`로 시작한다.
    joystick device/FIFO도 이 simulator만 사용하는 경로를 선택한다.
-2. clean shell에서 `go2_ctrl -n lo -d DOMAIN`을 시작한다. 연결 후 LT+A, 3초 기립,
-   Start+D-pad Down 순서로 FixStand → Velocity_Down 진입을 확인한다.
+2. clean shell에서 `go2_ctrl -n lo -d DOMAIN`을 시작한다. 연결 후 LT를 먼저 누른 상태에서
+   A를 누르고, 3초 기립, Start+D-pad Down 순서로 FixStand → Velocity_Down 진입을 확인한다.
 3. ROS/Unitree와 선택한 local_navigation install을 source한 셸에서 아래 세션을 시작한다.
 4. 같은 격리 DDS 환경에서 bridge의 설치된 `twist_to_joystick`만 실행한다.
    `-p fifo_path:=OWN_FIFO`를 지정한다. bridge의 Nav2 launch는 중복 실행하지 않는다.
@@ -114,19 +114,35 @@ GUI 시험 전 simulator setup의 `0003-gui-integer-epoch.patch`를 적용한다
 
 1. simulator를 시작하기 전에 `/dev/input/js0`의 실제 Xbox 장치와 사용 중인 FD를
    확인한다. 전용 `unitree_mujoco/simulate/config.yaml`에서 `use_joystick: 1`,
-   `joystick_type: "xbox"`, `joystick_device: "/dev/input/js0"`를 선택한다.
+   `joystick_device: "/dev/input/js0"`를 선택한다. `joystick_type`은 제품명이 아니라
+   `jstest`로 확인한 축·버튼 배열로 정한다. simulator의 `xbox` 배열은 회전 axis 3,
+   LT axis 2, Start button 7이고 `switch` 배열은 회전 axis 2, LT axis 5, Start button 11이다.
    bootstrap 기본값은 `use_joystick: 0`이다. 수동 패드에는 FIFO bridge를 실행하지 않는다.
 2. 위 GUI simulator와 RL 명령을 clean shell에서 같은 nonzero domain·`lo`로 실행한다.
-   LT+A → 약 3초 기립 → Start+D-pad Down을 확인한 뒤 mapping launch를 실행한다.
-3. 같은 ROS/DDS 환경의 별도 셸에서
-   `LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2`를 실행한다.
-   Fixed Frame은 `map`, Global Options의 simulation time과 `/map`·`/scan`·TF를
-   확인하고 Xbox로 실내를 주행한다. 지도와 scan/robot pose의 일치를 육안 확인한다.
+   LT를 먼저 누른 상태에서 A를 누른다. LT와 A를 동시에 누르면 Passive에 남을 수 있다.
+   약 3초 기립 → Start+D-pad Down을 확인한 뒤 mapping launch를 실행한다.
+3. 같은 ROS/DDS 환경의 별도 셸에서 아래 명령을 실행한다. RViz Global Options에는
+   simulation time 항목이 없으므로 ROS parameter로 지정한다.
+   `LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2 -d "$PWD/src/go2_mujoco_lidar/config/simulation.rviz" --ros-args -p use_sim_time:=true`
+   Fixed Frame은 `map`, `/map`·`/scan`·TF를 확인하고 Xbox로 실내를 주행한다.
+   지도와 scan/robot pose의 일치를 육안 확인한다.
+   simulation RobotModel은 canonical URDF의 collision primitive를 visual로 사용한다.
+   외형 mesh와 달리 단순한 형상이지만 외부 `go2_description` 설치가 필요 없다.
+   LiDAR의 matched LowState가 `/joint_states`의 12개 관절을 공급하고 기존
+   robot_state_publisher만 다리 TF를 소유한다. RobotModel Status OK와 네 발 TF를 확인한다.
 4. 정지 후 위 CLI로 새 `runs/gui-map/route`를 저장한다. mapping ROS launch와
    owned child 종료를 확인하고 simulator/RL은 유지한다. 실제 현재 map pose로
    localization을 시작해 `INITIAL_POSE_ACCEPTED`와 `NAVIGATION_READY`를 확인한다.
 5. Nav2 goal 주행에는 전용 FIFO로 새 simulator/RL 세션을 준비하고 그 FIFO의 bridge를
-   같은 domain에서 시작한다. RViz의 `Nav2 Goal`로 목표를 순서대로 보내고
+   같은 domain에서 시작한다. bridge는 회전 axis 2를 쓰므로 새 세션의 전용 config는
+   `joystick_type: "switch"`와 그 FIFO의 `joystick_device`로 다시 설정한다. 이때 RL 기립
+   입력은 switch 배열의 LT axis 5·Start button 11이다. 기존 RViz를 유지했다면 세션 재시작 뒤
+   Map display 경고와 `/map` 표시를 다시 확인하고, 지도가 보이지 않으면 goal을 보내지 않는다.
+   제공 설정의 Map class는 `go2_mujoco_lidar/TransientMap`이다. Humble 기본 Map은
+   clock 역행 때 지도를 지우면서 구독을 유지해 일회 durable sample을 놓칠 수 있다.
+   제공 class는 reset 때 구독을 갱신해 저장된 sample을 다시 받는다.
+   기존 RViz 설정에서는 Map display를 이 class로 교체하고 Reliable·Transient Local을 선택한다.
+   RViz의 `Nav2 Goal`로 목표를 순서대로 보내고
    action `SUCCEEDED`, 화면의 도착 자세와 장애물 여유를 확인한다.
 6. 별도 시험 세션에서 physics reset 후 cloud/odom 새 epoch 복구를 확인한다.
    지도·AMCL·goal 재개는 보장하지 않으므로 전체 세션을 재시작한다.
@@ -141,19 +157,15 @@ localization의 costmap은 TF timeout에 ROS 시간을 사용하므로 `/clock` 
 보낸다. 제품 launch의 cooperative Shutdown hook이 Nav2 → localization 순서로
 SHUTDOWN하고 여섯 GetState FINALIZED를 확인한 뒤 입력의 종료를 진행한다.
 
-직접 terminal에서 실행한 세션은 같은 ROS/DDS 환경의 별도 shell에서 아래처럼
-먼저 lifecycle을 종료하고, 반환된 여섯 state가 4(FINALIZED)임을 확인한 뒤
-원래 terminal의 Ctrl+C로 process를 종료한다. terminal이 전체 foreground group에
-바로 보내는 SIGINT는 이미 모든 child에 전달되므로 launch hook의 순서와 다르다.
+직접 terminal에서 실행한 localization은 같은 ROS/DDS 환경의 별도 shell에서
+아래 단일 명령으로 종료한다. `ROS_LAUNCH_PID`는 이 세션의 `ros2 launch` PID다.
+여섯 FINALIZED를 확인한 뒤 launch PID에만 SIGINT를 보내고 종료까지 기다린다.
+실패하면 입력을 종료하지 않고 오류로 반환한다. bridge → RL → simulator는 그 뒤
+각자의 terminal에서 종료한다. terminal 전체 foreground group에 보내는 Ctrl+C는
+OS가 모든 child에 동시에 전달하므로 launch hook만으로 그 순서를 보장할 수 없다.
 
 ```bash
-python3 - <<'PY'
-from go2_nav2.sim_session_guard import shutdown_managed_nodes
-print(shutdown_managed_nodes([
-    ("navigation", ["planner_server", "controller_server", "behavior_server", "bt_navigator"]),
-    ("localization", ["map_server", "amcl"]),
-]))
-PY
+ros2 run go2_nav2 sim_stop --launch-pid "$ROS_LAUNCH_PID"
 ```
 
 이미 모두 FINALIZED인 group은 SHUTDOWN을 다시 보내지 않는다.
