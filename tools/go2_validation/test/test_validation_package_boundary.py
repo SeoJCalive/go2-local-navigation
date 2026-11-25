@@ -28,7 +28,7 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
     assert (VALIDATION_ROOT / "launch/go2_fault_acceptance.launch.py").is_file()
     assert (VALIDATION_ROOT / "launch/go2_integrated_preflight.launch.py").is_file()
     assert _children(NAV2_ROOT / "go2_nav2") == {
-        "__init__.py", "sim_session.py", "sim_session_guard.py", "tf2_exec.py",
+        "__init__.py", "sim_session.py", "sim_session_guard.py", "sim_stop.py", "tf2_exec.py",
     }
     assert _children(NAV2_ROOT / "launch") == {
         "go2_nav2_shadow.launch.py",
