@@ -21,6 +21,7 @@ FIFO bridge는 별도 process다. 현재 상태는 simulation `candidate`이며 
 
 - 운영 상세: [SIM_SESSION](src/go2_nav2/SIM_SESSION.md).
 - 반복 수용 시험: [acceptance](src/go2_mujoco_lidar/test/acceptance/README.md).
+- G02 단위 검사·기록 재생: [wall_hug](src/go2_mujoco_lidar/test/wall_hug/README.md).
 - 무중력·정지 입력 진단: [headless](src/go2_mujoco_lidar/test/headless/README.md).
 - 변경 이력: [안정화 색인](docs/stabilization-2026-11/README.md).
 - 과거 증거: [verification](verification/README.md), [보관 위치](verification/archive-index.md).

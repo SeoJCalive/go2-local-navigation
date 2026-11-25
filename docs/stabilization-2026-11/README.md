@@ -17,6 +17,7 @@
 | [F04_GUI_CLOCK](F04_GUI_CLOCK.md) | 공유 GUI 정수 epoch clock·mutex와 장시간 pairing 검증 |
 | [F05_GUI_REPAIRS](F05_GUI_REPAIRS.md) | 실제 관절 TF·mesh-free 표시·durable 지도 reset·단일 종료 명령 |
 | [G02_WALL_HUG](G02_WALL_HUG.md) | 벽 근접 오연결 재현·gate 비교·수정 중단과 제품 복원 |
+| [G02_FORMAL_TESTS](G02_FORMAL_TESTS.md) | 하니스 정식 pytest/CTest 편입·기록 재생·자료 고정과 검증 경계 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

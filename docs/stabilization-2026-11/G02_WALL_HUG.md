@@ -6,6 +6,10 @@
 motion gate는 구현하지 않았으며 새 gate 재생과 GUI를 추가 실행하지 않는다.
 이 문서는 simulation 결과이며 실장비 성능을 증명하지 않는다.
 
+2026-11-25 후속 승인으로 하니스 단위 검사와 고정 후보 기록 재생을 정식 테스트에
+편입했다. [편입 결과](G02_FORMAL_TESTS.md)와 [실행 방법](../../src/go2_mujoco_lidar/test/wall_hug/README.md)을 따른다.
+이 후속 작업은 새 gate 구현이나 새 graph/GUI 실행을 포함하지 않는다.
+
 증거의 기준 디렉터리는 [G02 증거](../../.omo/evidence/g02-wall-hug/README.md)다.
 아래 원시 파일은 이 저장소의 비추적 증거 경로로 연결하며 본문에 복제하지 않는다.
 
