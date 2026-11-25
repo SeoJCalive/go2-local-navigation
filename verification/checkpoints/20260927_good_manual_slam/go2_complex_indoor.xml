@@ -1,0 +1,49 @@
+<mujoco model="go2_nav2_complex_indoor">
+  <!-- Geometry-equivalent snapshot of the world used for this manual SLAM checkpoint. -->
+  <include file="/home/bi-agx1/go2_projects/shared/dependencies/unitree_mujoco/unitree_robots/go2/go2.xml" />
+  <compiler meshdir="/home/bi-agx1/go2_projects/shared/dependencies/unitree_mujoco/unitree_robots/go2/assets" />
+
+  <statistic center="0 0 0.3" extent="10" />
+  <visual>
+    <headlight diffuse="0.65 0.65 0.65" ambient="0.35 0.35 0.35" specular="0 0 0" />
+    <global azimuth="-90" elevation="-70" />
+  </visual>
+  <asset>
+    <material name="complex_floor" rgba="0.25 0.27 0.29 1" />
+    <material name="complex_outer_wall" rgba="0.82 0.84 0.88 1" />
+    <material name="complex_partition" rgba="0.58 0.64 0.70 1" />
+    <material name="complex_landmark" rgba="0.74 0.42 0.24 1" />
+  </asset>
+  <worldbody>
+    <light name="complex_ceiling_light" pos="0 0 8" dir="0 0 -1" directional="true" />
+    <geom name="complex_floor_16x12" type="plane" size="8 6 0.1" material="complex_floor" />
+    <geom name="outer_north" type="box" pos="0 5.95 0.75" size="8 0.05 0.75" material="complex_outer_wall" />
+    <geom name="outer_south" type="box" pos="0 -5.95 0.75" size="8 0.05 0.75" material="complex_outer_wall" />
+    <geom name="outer_east" type="box" pos="7.95 0 0.75" size="0.05 6 0.75" material="complex_outer_wall" />
+    <geom name="outer_west" type="box" pos="-7.95 0 0.75" size="0.05 6 0.75" material="complex_outer_wall" />
+    <geom name="north_band_west" type="box" pos="-4.60 2.40 0.75" size="3.40 0.06 0.75" material="complex_partition" />
+    <geom name="north_band_mid" type="box" pos="2.65 2.40 0.75" size="1.85 0.06 0.75" material="complex_partition" />
+    <geom name="north_band_east" type="box" pos="6.85 2.40 0.75" size="1.15 0.06 0.75" material="complex_partition" />
+    <geom name="south_band_west" type="box" pos="-6.70 -2.40 0.75" size="1.30 0.06 0.75" material="complex_partition" />
+    <geom name="south_band_mid" type="box" pos="-1.65 -2.40 0.75" size="2.45 0.06 0.75" material="complex_partition" />
+    <geom name="south_band_east" type="box" pos="5.10 -2.40 0.75" size="2.90 0.06 0.75" material="complex_partition" />
+    <geom name="west_spine_south" type="box" pos="-3.20 -4.75 0.75" size="0.06 1.25 0.75" material="complex_partition" />
+    <geom name="west_spine_lower" type="box" pos="-3.20 -1.50 0.75" size="0.06 0.70 0.75" material="complex_partition" />
+    <geom name="west_spine_upper" type="box" pos="-3.20 2.05 0.75" size="0.06 1.25 0.75" material="complex_partition" />
+    <geom name="west_spine_north" type="box" pos="-3.20 5.25 0.75" size="0.06 0.75 0.75" material="complex_partition" />
+    <geom name="east_spine_south" type="box" pos="3.20 -5.25 0.75" size="0.06 0.75 0.75" material="complex_partition" />
+    <geom name="east_spine_lower" type="box" pos="3.20 -2.00 0.75" size="0.06 1.20 0.75" material="complex_partition" />
+    <geom name="east_spine_upper" type="box" pos="3.20 1.60 0.75" size="0.06 0.80 0.75" material="complex_partition" />
+    <geom name="east_spine_room_lower" type="box" pos="3.20 2.90 0.75" size="0.06 0.50 0.75" material="complex_partition" />
+    <geom name="east_spine_room_upper" type="box" pos="3.20 5.40 0.75" size="0.06 0.60 0.75" material="complex_partition" />
+    <geom name="west_north_room_wall" type="box" pos="-5.60 4.20 0.75" size="1.20 0.06 0.75" material="complex_partition" />
+    <geom name="east_north_alcove_back" type="box" pos="5.50 4.80 0.75" size="1.00 0.06 0.75" material="complex_partition" />
+    <geom name="east_north_alcove_side" type="box" pos="4.50 4.10 0.75" size="0.06 0.70 0.75" material="complex_partition" />
+    <geom name="east_south_angled_wall" type="box" pos="5.20 -4.00 0.75" euler="0 0 0.523599" size="1.20 0.07 0.75" material="complex_partition" />
+    <geom name="pillar_central" type="cylinder" pos="1.45 1.05 0.75" size="0.30 0.75" material="complex_landmark" />
+    <geom name="pillar_north_west" type="cylinder" pos="-6.20 3.20 0.75" size="0.36 0.75" material="complex_landmark" />
+    <geom name="pillar_south_east" type="cylinder" pos="6.20 -1.20 0.75" size="0.26 0.75" material="complex_landmark" />
+    <geom name="island_south_west" type="box" pos="-5.20 -4.25 0.60" size="0.65 0.42 0.60" material="complex_landmark" />
+    <geom name="island_north_east" type="box" pos="5.70 1.00 0.60" size="0.48 0.82 0.60" material="complex_landmark" />
+  </worldbody>
+</mujoco>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- W02 only. ROS_LOCALHOST_ONLY=1 supplies the ROS interface; SDK adds lo explicitly.
+     Do not repeat Interfaces here: Humble RMW prepends its own loopback selection. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="1">
+    <General>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <Tag>go2-w02-state-contract-20261124</Tag>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+      <Peers><Peer Address="127.0.0.1" /></Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

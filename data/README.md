@@ -56,51 +56,6 @@
 `records/experiments/go2_local_navigation_trial_recorder_readonly_qa_20260827.yaml`을
 따른다. 두 JSON의 `unverified` 상태는 실제 물리 trial이 수행되지 않았음을 뜻한다.
 
-## DimOS 외부 replay custody
-
-`external/dimos_go2_indoor/`는 pinned DimOS fixture의 로컬 전용 보관 경계다. 이
-경로의 archive, 추출 MCAP, canonical bag과 실행 결과는 Git·release·재배포 대상이
-아니다. repository의 Apache-2.0 license와 dataset 권리는 구분하며 현재 dataset
-상태는 `dataset_license_unverified`다.
-
-여기서 `external`은 외장 센서가 아니라 외부 출처 dataset이라는 뜻이다. canonical
-short·full의 원본은 `source/go2_china_office_indoor.mcap`이다. topic·frame·rate와
-pinned DimOS Go2 코드에 근거해 센서 계열을 `go2_built_in_l1_ulidar`로 강하게
-추론하지만 hardware manifest가 없으므로 상태는 `unverified`다. 현재 프로젝트
-로봇과 동일한 물리 calibration이라는 뜻도 아니다.
-
-raw source는 `rt/utlidar/cloud`, `rt/utlidar/imu`, `rt/lowstate`,
-`rt/sportmodestate`, `rt/utlidar/robot_odom`, `rt/frontvideo`, `control_log`,
-`telemetry`의 8개 channel을 가진다. derived canonical short·full bag은 선택된
-`/utlidar/cloud`와 `/utlidar/robot_odom` 두 topic만 가진다.
-
-`source/recording_go2_mid360_2026-05-29_4-45pm-PST_corrected.db`는 같은 custody
-경계에 보관된 Mid-360·Point-LIO fixture지만 canonical short·full 변환에는 사용하지
-않았다. 파일이 같은 디렉터리에 있다는 사실을 데이터 계보로 해석하지 않는다.
-
-- `source/`: hash와 size를 통과해 승격된 archive와 단일 raw MCAP
-- `staging/`: bounded download와 secure extraction의 임시 파일
-- `derived/`: short·full canonical rosbag2 MCAP
-- `runs/`: acquisition·conversion 결과와 bag-info 근거
-
-source identity와 제한값은 `src/go2_validation/config/external_replay_sources.yaml`, 사람이
-확인할 provenance와 권리 경계는 지식 저장소의
-`sources/repositories/related/dimos_go2_replay_source_card.md`를 따른다. 네트워크,
-LFS 또는 최초 여유 공간 부족만 `deferred`이며, hash·size·tar member·CRC·schema·
-CDR·count 불일치는 `conflict`다.
-
-2026-08-27 canonical 변환과 ingress 결과는 다음 경로에 있다.
-
-- `external/dimos_go2_indoor/runs/conversion.json`: source checksum, selected channel,
-  short/full count와 tree checksum
-- `external/dimos_go2_indoor/derived/short`: cloud `1843`, odometry `18026`
-- `external/dimos_go2_indoor/derived/full`: cloud `17776`, odometry `173616`
-- `runs/fault_acceptance/stage11.json`: Domain 61 fault 10개 PASS
-- `runs/mapping_input/stage12-ingress.json`: 정지·external short ingress 모두 PASS
-
-이 자료는 local-only software evidence다. 외부 dataset을 ground truth로 간주하거나
-지도 정확도·실제 장애물 회피·목적지 도달 근거로 사용하지 않는다.
-
 ## Domain 63 SLAM mapping replay
 
 Todo 12 mapping 하위 작업의 최종 local-only 산출물은 다음 경로에 있다.
@@ -116,6 +71,83 @@ Todo 12 mapping 하위 작업의 최종 local-only 산출물은 다음 경로에
 최종 run은 residual node·process 0이지만 SIGINT 5초 뒤 SIGTERM으로 승격됐으므로
 순수 SIGINT graceful teardown으로 표현하지 않는다. 생성된 지도는 저장·재로딩
 검증용이며 지도 정확도·loop closure·localization의 합격 근거가 아니다.
+
+## Domain 0 live mapping shadow
+
+2026-08-31 Go2 ON·AGX 임시 배치·정지 조건의 local-only runtime artifact는 다음
+경로에 있다.
+
+- `runs/live_mapping/20260831_142854_todo12l_domain0_live_mapping/artifacts/`
+  - `occupancy.pgm`, `occupancy.yaml`
+  - `pose_graph.posegraph`, `pose_graph.data`
+
+onboard 기본 `project_default/raw_single/onboard_observe`, `use_sim_time=false`에서
+live `/scan`, `/odom`, `/map`, SLAM Toolbox 단독 `map → odom`, 저장·재로딩 service와
+단일 SIGINT clean teardown을 확인했다. 반복 수치·checksum·warning은
+`records/experiments/go2_local_navigation_domain0_live_mapping_shadow_20260831.yaml`을
+따른다. 저장 occupancy와 재로딩 직후 live map의 크기가 달랐으므로 이 artifact는
+연결성·service 검증용이며 지도 정확도나 저장 전후 픽셀 동일성의 합격 근거가 아니다.
+
+## Domain 0 live localization·no-goal Nav2 observer
+
+2026-08-31 Go2 ON·AGX 임시 배치·정지 조건에서 12-L 저장 지도를 실제 `/scan`·
+`/odom`과 연결한 local-only runtime artifact는 다음 경로에 있다.
+
+- `runs/live_navigation/20260831_151704_todo12l2-domain0-live/result.json`: stream,
+  AMCL·Nav2 lifecycle, costmap, TF owner, no-goal·command·teardown 최종 PASS
+- `runs/live_navigation/20260831_151704_todo12l2-domain0-live/launch.log`: Map Server,
+  AMCL, 네 Nav2 server와 종료 로그
+
+`use_sim_time=false`, onboard 기본 profile에서 `/scan` `948`, `/odom` `9286`, finite
+AMCL pose `1`, global/local costmap 각 `1`, AMCL 단독 `map → odom`과 전체 lifecycle
+active를 확인했다. action goal·path·non-zero inert velocity·ROS command publisher와
+종료 뒤 잔류 node·process는 모두 `0`이었다. 반복 수치·checksum·warning은
+`records/experiments/go2_local_navigation_domain0_live_localization_nav2_observer_20260831.yaml`을
+따른다. 초기 finite pose 하나와 정지 `18×65` 지도만 사용했으므로 localization
+정확도·실제 goal·목적지 도달 근거로 사용하지 않는다.
+
+## Domain 64 saved-map localization
+
+2026-08-31 Go2 OFF·loopback 조건의 최종 산출물은 다음 경로에 있다.
+
+- `runs/localization/stage13-freeze-domain64-max120/result.json`: stationary bag과
+  그 bag으로 만든 저장 지도를 Map Server·AMCL에 연결한 최종 PASS
+- `runs/localization/stage13-freeze-domain64-max120/launch.log`: Map Server, AMCL,
+  mapping scan과 odometry adapter 실행 로그
+- `runs/localization/stage13-freeze-domain64-max120/player.log`: paused rosbag
+  readiness·resume·playback 로그
+- `runs/localization/stage13-freeze-domain64/result.json`: 기본 participant-index
+  탐색 범위에서 실패한 첫 실행의 결과
+
+최종 run은 `/scan` `300`, `/odom` `2923`, finite AMCL pose `1`, active lifecycle,
+AMCL 단독 `map → odom`, command·control 0과 clean teardown을 통과했다. 첫 실행은
+Map Server·AMCL lifecycle 문제가 아니라 `mapping_cloud_gate`와 rosbag player가
+Domain 64 participant index를 얻지 못해 실패했다. 같은 source·map·bag에서
+CycloneDDS `ParticipantIndex=auto`, `MaxAutoParticipantIndex=120`만 명시하자 통과했다.
+이 조건은 software-only 재현 설정이며 production source 기본값으로 추가하지 않았다.
+
+## Domain 65 Nav2 shadow
+
+2026-08-31 합성 전체 Nav2의 최종 산출물은 다음 경로에 있다.
+
+- `runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json`: 여섯 시나리오
+  전체 PASS summary
+- 같은 디렉터리의 `success`, `cancel`, `blocked_goal`, `outside_map_goal`,
+  `planner_failure`, `no_progress`: 시나리오별 result와 fixture·Nav2 로그
+
+success는 `SUCCEEDED`, cancel은 `CANCELED`, 나머지 네 failure class는 기대한
+`ABORTED`였다. 모든 Nav2 lifecycle node가 active였고 fixture가 `/clock`,
+`map → odom`, `odom → base`를 단독 소유했다. 물리 command·Go2 control·Unitree
+node, 종료 뒤 잔류 process·node·TF owner는 모두 0이었다. 이 결과는 합성
+`NavigateToPose` 계약 검증이며 실제 주행 합격이 아니다.
+
+## Stage 13 software-only freeze
+
+동결 범위, runtime checksum, build/test 결과, warning과 deferred 항목은
+`verification/software_only_freeze.md`와
+`verification/structured/software_only_freeze.yaml`에서 해석한다. 재검증용
+SHA-256 목록은 `verification/software_only_freeze.sha256`이며 manifest 자기 자신은
+목록에서 제외한다.
 
 ## DimOS static TF profile A/B
 

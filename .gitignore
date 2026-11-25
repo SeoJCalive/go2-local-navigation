@@ -2,6 +2,10 @@
 /build/
 /install/
 /log/
+/third_party/tf2/build/
+/third_party/tf2/install/
+/third_party/tf2/log/
+/runs/
 **/__pycache__/
 **/.pytest_cache/
 *.py[cod]

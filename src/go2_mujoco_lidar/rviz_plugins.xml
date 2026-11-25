@@ -1,0 +1,7 @@
+<library path="go2_sim_map_display">
+  <class name="go2_mujoco_lidar/TransientMap"
+         type="go2_mujoco_lidar::TransientMapDisplay"
+         base_class_type="rviz_common::Display">
+    <description>Durable map display which reacquires the map after simulation clock reset.</description>
+  </class>
+</library>

@@ -1,0 +1,5 @@
+<mujoco model="acceptance_clock">
+  <!-- Empty physics isolates publication time from gait and controller behavior. -->
+  <option timestep="0.002" />
+  <worldbody />
+</mujoco>

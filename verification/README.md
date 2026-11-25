@@ -1,9 +1,16 @@
 # 검증 진입점
 
-이 디렉터리는 `go2_local_navigation`의 각 모듈이 현재 어디까지 검증됐고,
+이 디렉터리는 `go2_local_navigation`의 과거 실물·replay 검증 수준과
 어떤 조건에서 무엇을 다시 확인해야 하는지 찾을 때 사용한다. 실제 측정값과 실행
 상세를 다시 기록하지 않고, 패키지별 contract와 로컬 실행 record를 연결하는
 반복 참조 인덱스 역할만 한다.
+
+현재 simulation 실행은 [루트 README](../README.md), 2026-11 안정화 결과는
+[안정화 색인](../docs/stabilization-2026-11/README.md)을 따른다.
+아래 단계와 8월 기록은 당시 증거이며 현재 source inventory와 구분한다.
+9월 미추적 실험은 [archive index](archive-index.md)에서 보존 위치와 manifest를 찾는다.
+`structured/project_manifest.yaml`의 package inventory만 현재 source 10개를
+반영하며 과거 8개/15개 실행 파일 결과는 별도 historical 필드로 보존한다.
 
 ## 파일 구조
 
@@ -12,11 +19,14 @@ verification/
 ├── README.md
 ├── final_mount_integration.md
 ├── limited_physical_motion_validation.md
+├── software_only_freeze.md
+├── software_only_freeze.sha256
 └── structured/
     ├── project_manifest.yaml
     ├── acceptance_matrix.yaml
     ├── final_mount_acceptance.yaml
-    └── limited_physical_motion_acceptance.yaml
+    ├── limited_physical_motion_acceptance.yaml
+    └── software_only_freeze.yaml
 ```
 
 | 파일 | 역할 |
@@ -24,10 +34,13 @@ verification/
 | `README.md` | 검증 수준, 판정 상태, 읽는 순서와 갱신 기준을 설명한다. |
 | `final_mount_integration.md` | 14단계 최종 장착·배선·전원·열·footprint 확인 절차를 설명한다. |
 | `limited_physical_motion_validation.md` | 15단계 축별 물리 시험, 승인·StopMove·측정 record 절차를 설명한다. |
+| `software_only_freeze.md` | 12단계 software 결과와 13단계 동결 범위, 실행 조건, warning·deferred를 설명한다. |
+| `software_only_freeze.sha256` | 동결 대상 present 파일을 재검증하는 SHA-256 목록이다. 자기 자신은 포함하지 않는다. |
 | `structured/project_manifest.yaml` | 프로젝트 범위, 현재 완료 단계, 안전 비목표와 근거 위치를 구조화한다. |
 | `structured/acceptance_matrix.yaml` | 모듈 ID, 입출력, 현재 검증 수준, 근거 ID, 합격 조건, 보류 시험과 재검증 조건을 구조화한다. |
 | `structured/final_mount_acceptance.yaml` | 14단계 준비 완료와 실제 장착 보류 항목을 구조화한다. |
 | `structured/limited_physical_motion_acceptance.yaml` | 15단계 준비·recorder 상태와 실제 trial 보류 항목을 구조화한다. |
+| `structured/software_only_freeze.yaml` | Git 기준점, runtime·fixture checksum, 검증 요약과 미승격 경계를 구조화한다. |
 
 ## 읽는 순서
 
@@ -88,7 +101,75 @@ verification/
 기록한다. 그 결과가 현재 주장 범위를 바꿀 때만 중앙 매트릭스의 근거와 상태를
 갱신한다. 실행 로그나 수치를 중앙 매트릭스에 반복 복사하지 않는다.
 
-## 현재 단계
+## MuJoCo 수동 SLAM 재실행 gate
+
+MuJoCo의 조이스틱 구현은 시작할 때 `joystick_device`의
+`/dev/input/js0`를 한 번 열고 이후 같은 file descriptor에서만 입력을 읽는다.
+실행 중 Bluetooth가 끊겼다가 다시 연결되면 Linux는 새 `js0` 장치를 만들지만,
+MuJoCo는 이를 자동으로 다시 열지 않는다. 이때 MuJoCo process가
+`/dev/input/event*`를 열고 있거나 Bluetooth가 `Connected: yes`여도 로봇 제어
+입력은 동작하지 않을 수 있다.
+
+수동 주행 runtime은 다음 순서와 gate를 모두 통과한 뒤 준비 완료로 판정한다.
+
+1. 기존 MuJoCo·RL controller(`go2_ctrl`)·LiDAR·odometry·SLAM·RViz를 종료하고
+   중복 publisher가 없는지 확인한다.
+2. Xbox controller를 먼저 연결하고 `/dev/input/js0`가 생성된 상태를 확인한다.
+3. 연결 직후 장치 교체를 피하기 위해 `js0`가 연속 확인에서 유지된 뒤 MuJoCo를 시작한다.
+   MuJoCo는 ROS용 `CYCLONEDDS_URI`·`RMW_IMPLEMENTATION`을 상속하지 않는 clean
+   environment에서 `DISPLAY=:0`만 지정해 먼저 실행한다. ROS 환경과 loopback URI는
+   이후 LiDAR·odometry·SLAM·RViz process에만 적용한다.
+4. MuJoCo가 현재 `js0` 자체를 열었는지 다음과 같이 확인한다.
+
+   ```bash
+   mujoco_pid="$(pgrep -n -x unitree_mujoco)"
+   js_fd="$(find "/proc/${mujoco_pid}/fd" -lname '/dev/input/js0' -print -quit)"
+   test -n "${js_fd}"
+   test "$(stat -Lc '%t:%T:%i' /dev/input/js0)" = \
+     "$(stat -Lc '%t:%T:%i' "${js_fd}")"
+   ```
+
+5. MuJoCo와 같은 loopback·Domain 1에서 새 RL controller를 시작하고 로그의
+   `Connected to robot`과 `FSM: Start Passive`를 확인한다. 오래 남아 있던
+   `go2_ctrl` process를 다음 실행에 재사용하지 않는다.
+6. LiDAR·odometry·SLAM·RViz를 시작한 뒤 위 inode 검사를 다시 실행한다.
+7. `/scan`, `/odom`, `/map`, `/wirelesscontroller` publisher가 각각 하나이고,
+   `/lowcmd` publisher와 subscriber가 각각 하나인지 마지막으로 확인한다.
+
+다음 상태는 모두 실패로 판정한다.
+
+- MuJoCo FD가 `/dev/input/js0 (deleted)`를 가리킴
+- 현재 `/dev/input/js0`와 MuJoCo FD의 inode가 다름
+- `/dev/input/event*`만 열려 있고 현재 `js0`가 열리지 않음
+- MuJoCo process가 ROS용 `CYCLONEDDS_URI` 또는 `RMW_IMPLEMENTATION`을 상속함
+
+실행 중 controller 연결이 한 번이라도 끊기면 MuJoCo는 새 `js0`를 자동으로
+재개방하지 않는다. MuJoCo만 다시 시작하면 simulation clock과 pose가 초기화되어
+진행 중인 SLAM과 불일치할 수 있으므로, 현재 지도는 폐기하고 MuJoCo와 RL
+controller를 포함한 전체 수동 SLAM runtime을 깨끗하게 다시 시작한다.
+
+`joystick_type`은 제품명이 아니라 Linux가 노출한 버튼·축 번호를 해석하는
+profile이다. 현재 Bluetooth `Xbox Wireless Controller`는 2026-09-20 AGX 실측에서
+A/B/X/Y `0/1/3/4`, Back/Start `10/11`, 오른쪽 스틱 `axis 2/3`, RT/LT
+`axis 4/5`로 관찰됐으며 MuJoCo의 `SwitchJoystick` 배열과 일치한다. 따라서 이
+장치를 사용하는 수동 실행은 다음 설정으로 고정한다.
+
+```yaml
+use_joystick: 1
+joystick_type: "switch"
+joystick_device: "/dev/input/js0"
+joystick_bits: 16
+```
+
+다른 controller를 사용할 때만 해당 장치의 축·버튼 mapping을 별도로 확인하고
+profile을 바꾼다. 장치 제품명만 보고 `xbox` profile로 바꾸지 않는다. 실제로
+`xbox` profile을 적용했을 때 무입력 상태에서 `/wirelesscontroller.ry`가 약
+`0.99997`로 포화되어 LT·오른쪽 스틱 해석이 잘못되는 것을 확인했다.
+이 네 설정과 장치·inode gate는 실행자가 자동으로 확인하며 매 실행마다 사용자에게
+스틱 조작 확인을 요구하지 않는다. 설정을 통과했는데도 무반응이 보고된 경우에만
+`/wirelesscontroller`의 축·키 변화를 별도 진단한다.
+
+## 2026-08 검증 단계
 
 - 9단계 `integrated_non_actuating_preflight`: `completed`
 - 10단계 `stationary_smoke_and_soak`: `completed_with_warning`
@@ -97,10 +178,21 @@ verification/
 - soak: `20260827_151053_stage10_soak`, 46 PASS·1 WARN
 - 11단계 `software_fault_recovery`: `completed`
 - 11단계 근거: `data/runs/fault_acceptance/stage11.json`, fault 10개 모두 PASS
-- 12단계 `mapping_localization_and_nav2_shadow`: `software_replay_continuity_resolved_pose_cause_confirmed_occupancy_root_cause_classified_no_candidate_localization_and_nav2_pending`
+- 12단계 `mapping_localization_and_nav2_shadow`: `completed_software_only`
 - 12단계 입력 근거: `data/runs/mapping_input/stage12-ingress.json`, 정지·external short 모두 PASS
 - 12단계 mapping 근거: `data/runs/mapping/stage12.json`, 정지·external full 모두 PASS
 - 12단계 mapping record: `go2-local-navigation-slam-mapping-replay-20260827`
+- 12-L Domain 0 live mapping supplement: `completed_stationary_onboard_with_warning`
+- 12-L 근거: `go2-local-navigation-domain0-live-mapping-shadow-20260831`, live scan
+  `15.394 Hz`·721 beams·NaN 0, 정지 `/map` `0.5 Hz`, SLAM Toolbox 단독
+  `map → odom`, occupancy·pose graph 저장·재로딩 응답과 clean teardown 확인
+- 12-L2 Domain 0 live localization·no-goal Nav2 observer:
+  `completed_stationary_onboard_connectivity_with_warning`
+- 12-L2 근거:
+  `go2-local-navigation-domain0-live-localization-nav2-observer-20260831`, 실제 `/scan`
+  `948`·`/odom` `9286`, finite AMCL pose `1`, global/local costmap 각 `1`, 여섯
+  lifecycle node active, AMCL 단독 `map → odom`, goal·path·non-zero inert velocity·
+  ROS command publisher·residual `0` 확인
 - 역사적 TF continuity failed/open: `go2-local-navigation-dimos-tf-profile-ab-20260828`, 같은 120초 bag의
   `project_default`·`dimos_replay` 모두 translation·yaw step 기준 실패
 - 후속 runtime: `data/runs/mapping_tf_ab/20260828_dimos_tf_ab_retry1/summary.json`,
@@ -159,14 +251,35 @@ verification/
 - sweep runner 추가 뒤 AGX targeted gate: `go2_validation` 157개 수집, 154 passed·3 skipped·0 failures·0 errors,
   현재 executable `go2_validation=11`, `go2_nav2=0`
 - 외부 replay 변환 근거: `data/external/dimos_go2_indoor/runs/conversion.json`
-- 13단계 `software_only_freeze`: `deferred_until_stages_11_12_complete`
+- Domain 64 saved-map localization:
+  `data/runs/localization/stage13-freeze-domain64-max120/result.json`, PASS,
+  `/scan=300`, `/odom=2923`, finite AMCL pose `1`, AMCL 단독 `map → odom`,
+  command/control·residual·teardown owner `0`
+- Domain 64 첫 실패:
+  `data/runs/localization/stage13-freeze-domain64/result.json`, 기본 CycloneDDS
+  participant-index 탐색 범위 부족으로 cloud gate와 player가 participant 생성 실패
+- Domain 65 Nav2 shadow:
+  `data/runs/nav2_shadow/stage13-freeze-domain65-max120/summary.json`, 여섯 시나리오
+  전체 PASS, success `SUCCEEDED`, cancel `CANCELED`, 나머지 네 시나리오 `ABORTED`
+- Domain 65 안전 경계: physical command·control·Unitree node `0`, fixture·launch
+  exit `0/0`, residual process·node·teardown owner `0`
+- 12단계 한계: Domain 64 localization 연결성과 Domain 65 합성 Nav2 action 계약은
+  software-only다. 12-L은 정지 live mapping, 12-L2는 live saved-map localization·
+  no-goal Nav2 lifecycle 연결성만 확인했다. 지도·위치 추적 정확도, 실제 goal·장애물
+  회피·목적지 도달은 미검증
+- 13단계 `software_only_freeze`: `completed_software_only_freeze`
+- 13단계 근거: `software_only_freeze.md`,
+  `structured/software_only_freeze.yaml`, `software_only_freeze.sha256`
+- Stage 13 동결 당시 Domain 0 live shadow: Go2 OFF 조건으로 `deferred`
+- 현재 Domain 0 상태: live scan·정지 SLAM mapping은 12-L, live saved-map
+  localization·no-goal Nav2 observer 연결성은 12-L2에서 보완 완료
 - 14단계 `final_mount_integration`: `preparation_completed_execution_deferred`
 - 15단계 `limited_physical_motion_validation`: `preparation_completed_execution_deferred`
 - recorder 근거: `go2-local-navigation-trial-recorder-readonly-qa-20260827`
 
 10단계 경고는 30분 정지 yaw 누적 drift이며 중앙 매트릭스에서 warning으로 유지한다.
 12단계에서는 PointCloud2→LaserScan 입력, replay provenance, 합성 map·BT·scenario
-자산과 Domain 63 SLAM map 생성·저장·pose graph 재로딩까지 완료했다. 후속 canonical
+자산과 Domain 63 SLAM map 생성·저장·pose graph 재로딩을 완료했다. 후속 canonical
 resolution은 emit3 delivery와 profile-scoped coarse `0.1745`에서 map-correction
 continuity를 통과했다. candidate cloud accounting은 `1843/1842/614`, intrinsic drop
 `1`, overflow/pending/regression `0/0/0`이고 artifact 저장·재로딩과 clean teardown,
@@ -176,12 +289,18 @@ lower-band `0~4°` 5값 sweep은 모두 통과했다. lower-band에서는 `0°`�
 이 해결은 Go2 OFF·physical execution false·command publication
 false인 exact bag/profile의 replay 범위다. 앞선 TF/10-frame A/B failed/open 관찰은
 조건부 superseded된 역사적 근거로 보존한다. live hardware와 physical mount, map
-ground truth, saved-map localization, 전체 Nav2·NavigateToPose는 미검증이다. 후속
-causal A/B는 최초 pose 열화를 sequential matcher에 귀속했다. 후속 고정 pose 분석은
+ground truth는 미검증이다. Domain 64는 저장 지도와 AMCL 연결성·단일 owner를,
+Domain 65는 합성 Nav2 여섯 action terminal과 비물리 경계를 통과했다. 이 결과는
+localization 정확도나 실제 주행 근거가 아니다. 후속 causal A/B는 최초 pose 열화를
+sequential matcher에 귀속했다. 후속 고정 pose 분석은
 occupancy 결함이 node `30` 또는 그 이전부터 지속됨을 확인했지만, 수치 winner가 blind
 visual QA에서 회귀해 후보 없이 `root-cause-classified`로 닫혔다. matcher 내부의 잘못된
 correction 선택 조건과 후보의 fan/streak 확산 원인, occupancy 품질 해결은 남아 있다.
-다음 software 단계도 continuity, corrected pose와 occupancy map 품질을 별도로 판정한다.
+13단계는 이 software-only 상태를 checksum과 source/runtime provenance로 동결했다.
+동결 당시 Go2 OFF로 보류된 Domain 0 가운데 live scan·정지 SLAM mapping은 후속
+12-L, live saved-map localization·no-goal Nav2 observer 연결성은 12-L2에서 보완했다.
+이는 최종 고정, 지도·localization 정확도 또는 실제 goal 수행을 의미하지 않으며,
+다음 물리 실행 단계는 계속 14단계다.
 14·15단계의 준비 완료는 실제 장착·전원·물리 command·축·StopMove 검증 완료를
 의미하지 않는다. 재개 조건은 각 단계 Markdown과 YAML에서 확인한다.
 

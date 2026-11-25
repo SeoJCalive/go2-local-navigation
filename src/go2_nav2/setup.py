@@ -1,3 +1,5 @@
+"""Nav2 설정·launch·BT와 sim AMCL session guard를 ament install에 배포한다."""
+
 from glob import glob
 from typing import Final
 
@@ -31,11 +33,15 @@ setup(
             glob("behavior_trees/*.xml"),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "PyYAML"],
     zip_safe=True,
     maintainer="Go2 project maintainers",
     maintainer_email="bi-agx1@invalid.example",
     description="Go2 비동작 Nav2 runtime asset",
     license="Apache-2.0",
     extras_require={"test": ["pytest", "PyYAML"]},
+    entry_points={"console_scripts": [
+        "sim_session_guard = go2_nav2.sim_session_guard:main",
+        "sim_stop = go2_nav2.sim_stop:main",
+    ]},
 )

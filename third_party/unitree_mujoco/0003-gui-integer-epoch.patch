@@ -1,0 +1,168 @@
+diff --git a/simulate/src/simulation_step.h b/simulate/src/simulation_step.h
+new file mode 100644
+--- /dev/null
++++ b/simulate/src/simulation_step.h
+@@ -0,0 +1,20 @@
++// Purpose: publish physics time from integer epoch steps instead of accumulated
++// double additions. Both GUI stepping sites and the acceptance driver use this.
++// An external reset/history seek changes data->time; rebase the counter before
++// advancing. Call with the simulation mutex held when data is shared with UI.
++// Input/output: model timestep, mutable data and caller-owned epoch counter.
++#pragma once
++#include <cmath>
++#include <cstdint>
++#include <mujoco/mujoco.h>
++
++inline void step_epoch(const mjModel *model, mjData *data, std::uint64_t &steps)
++{
++  if (data->time != static_cast<double>(steps) * model->opt.timestep) {
++    steps = static_cast<std::uint64_t>(
++      std::llround(data->time / model->opt.timestep));
++  }
++  mj_step(model, data);
++  data->time = static_cast<double>(++steps) * model->opt.timestep;
++}
++
+diff --git a/simulate/src/unitree_sdk2_bridge.h b/simulate/src/unitree_sdk2_bridge.h
+--- a/simulate/src/unitree_sdk2_bridge.h
++++ b/simulate/src/unitree_sdk2_bridge.h
+@@ -42,6 +42,7 @@ public:
+     }
+ 
+     virtual void start() {}
++    virtual void run() {}
+ 
+     void printSceneInformation()
+     {
+@@ -182,6 +183,10 @@ public:
+     virtual void run()
+     {
+         if(!mj_data_) return;
++        // GUI holds the physics/UI mutex for this whole snapshot. Derive both
++        // DDS stamps from the same integer epoch time, including after reset.
++        const auto simulation_nanoseconds = static_cast<std::uint64_t>(
++            std::llround(mj_data_->time * 1.0e9));
+         if(lowstate->joystick) { lowstate->joystick->update(); }
+         // lowcmd
+         {
+@@ -225,13 +230,11 @@ public:
+                 lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[imu_acc_adr_ + 2];
+             }
+             
+-            lowstate->msg_.tick() = std::round(mj_data_->time / 1e-3);
++            lowstate->msg_.tick() = simulation_nanoseconds / 1000000ULL;
+             lowstate->unlockAndPublish();
+         }
+         // highstate
+         if(highstate->trylock()) {
+-            const auto simulation_nanoseconds = static_cast<std::uint64_t>(
+-                std::llround(mj_data_->time * 1.0e9));
+             highstate->msg_.stamp().sec() = simulation_nanoseconds / 1000000000ULL;
+             highstate->msg_.stamp().nanosec() = simulation_nanoseconds % 1000000000ULL;
+             if(imu_quat_adr_ >= 0) {
+diff --git a/simulate/src/main.cc b/simulate/src/main.cc
+--- a/simulate/src/main.cc
++++ b/simulate/src/main.cc
+@@ -33,6 +33,7 @@
+ #include "simulate.h"
+ #include "array_safety.h"
+ #include "unitree_sdk2_bridge.h"
++#include "simulation_step.h"
+ #include "param.h"
+ 
+ #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
+@@ -99,6 +100,7 @@ namespace
+   // model and data
+   mjModel *m = nullptr;
+   mjData *d = nullptr;
++  mj::Simulate *active_sim = nullptr;
+ 
+   // control noise variables
+   mjtNum *ctrlnoise = nullptr;
+@@ -329,6 +331,7 @@ namespace
+     // cpu-sim syncronization point
+     std::chrono::time_point<mj::Simulate::Clock> syncCPU;
+     mjtNum syncSim = 0;
++    std::uint64_t epoch_steps = 0;
+ 
+     // ChannelFactory::Instance()->Init(0);
+     // UnitreeDds ud(d);
+@@ -461,7 +464,7 @@ namespace
+               sim.speed_changed = false;
+ 
+               // run single step, let next iteration deal with timing
+-              mj_step(m, d);
++              step_epoch(m, d, epoch_steps);
+               stepped = true;
+             }
+ 
+@@ -502,7 +505,7 @@ namespace
+                 }
+ 
+                 // call mj_step
+-                mj_step(m, d);
++                step_epoch(m, d, epoch_steps);
+                 stepped = true;
+ 
+                 // break if reset
+@@ -572,14 +575,18 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
+ 
+ void *UnitreeSdk2BridgeThread(void *arg)
+ {
++  auto *sim = static_cast<mj::Simulate *>(arg);
+   // Wait for mujoco data
+   while (true)
+   {
+-    if (d)
+-    {
+-      std::cout << "Mujoco data is prepared" << std::endl;
+-      break;
++    {
++      const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
++      if (d)
++      {
++        std::cout << "Mujoco data is prepared" << std::endl;
++        break;
++      }
+     }
+     usleep(500000);
+   }
+ 
+@@ -617,10 +622,16 @@ void *UnitreeSdk2BridgeThread(void *arg)
+     std::cout << "Using unitree_go DDS IDL for robot " << param::config.robot << std::endl;
+     interface = std::make_unique<Go2Bridge>(m, d);
+   }
+-  interface->start();
+   
+-  while (true)
++  // Serialize the entire DDS snapshot with physics and the GUI reset/history.
++  // A separate recurrent callback would read different steps for the two states.
++  while (!sim->exitrequest.load())
+   {
+-    sleep(1);
++    {
++      const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
++      interface->run();
++    }
++    usleep(1000);
+   }
++  return nullptr;
+ }
+@@ -661,5 +672,6 @@ void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
+     }
+     if(key==GLFW_KEY_BACKSPACE) {
++      const std::unique_lock<std::recursive_mutex> lock(active_sim->mtx);
+       mj_resetData(m, d);
+       mj_forward(m, d);
+     }
+@@ -696,8 +706,9 @@ int main(int argc, char **argv)
+   auto sim = std::make_unique<mj::Simulate>(
+     std::make_unique<mj::GlfwAdapter>(),
+     &cam, &opt, &pert, /* is_passive = */ false);
++  active_sim = sim.get();
+ 
+-  std::thread unitree_thread(UnitreeSdk2BridgeThread, nullptr);
++  std::thread unitree_thread(UnitreeSdk2BridgeThread, sim.get());
+ 
+   // start physics thread
+   std::thread physicsthreadhandle(&PhysicsThread, sim.get(), param::config.robot_scene.c_str());

@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""설치된 sim_save_map CLI를 실행한다. 입력과 저장 계약은 해당 module에 있다."""
+from go2_mujoco_lidar.sim_save_map import main
+
+if __name__ == "__main__":
+    main()

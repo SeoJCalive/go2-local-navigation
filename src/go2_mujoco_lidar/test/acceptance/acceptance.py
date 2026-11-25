@@ -1,0 +1,466 @@
+"""실제 중력/RL/FIFO 주행, 지도 저장, AMCL 목표와 reset 수용 시험.
+
+실행 전 기존 PID/start tick을 저장하고 자신이 만든 process group만 종료한다.
+별도 driver의 qpos를 ROS odometry와 독립적인 base ground truth로 사용한다.
+런타임 산출물은 지정한 새 output에 보존하며 기본 install에는 쓰지 않는다.
+"""
+
+import argparse
+import csv
+import json
+import math
+import os
+from pathlib import Path
+import signal
+import struct
+import subprocess
+import time
+import traceback
+
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.parameter import Parameter
+from rclpy.signals import SignalHandlerOptions
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
+from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
+from go2_inputs.simulation_epoch import watch_simulation_epoch
+from lifecycle_msgs.msg import State
+from nav2_msgs.action import NavigateToPose
+from nav_msgs.msg import OccupancyGrid, Odometry
+from sensor_msgs.msg import PointCloud2
+from tf2_ros import Buffer, TransformListener
+
+from owned_processes import OwnedProcesses, existing_stack, snapshot
+from ament_index_python.packages import get_package_prefix
+
+PROJECT = Path(__file__).resolve().parents[4]
+HERE = Path(__file__).resolve().parent
+SIM_DEPS = Path(os.environ.get(
+    "SIM_DEPS", str(Path.home() / ".local/share/go2-local-navigation-sim")))
+CONTROLLER_DIR = SIM_DEPS / "acceptance-build/rlroot/deploy/robots/go2/build"
+
+
+def yaw(q):
+    return math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y*q.y + q.z*q.z))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--domain", type=int, required=True)
+    parser.add_argument("--goals", type=Path, default=HERE / "goals.json")
+    parser.add_argument("--route", type=Path, default=HERE / "route.json")
+    parser.add_argument("--simulator", type=Path,
+                        default=SIM_DEPS / "acceptance-build/acceptance_simulator")
+    parser.add_argument("--controller", type=Path, default=CONTROLLER_DIR / "go2_ctrl")
+    parser.add_argument("--controller-cwd", type=Path, default=CONTROLLER_DIR)
+    parser.add_argument("--world", type=Path,
+                        default=PROJECT.parent / "go2_nav2_mujoco_bridge/worlds/go2_complex_indoor.xml")
+    parser.add_argument("--tf-observer", type=Path,
+                        default=Path(get_package_prefix("go2_mujoco_lidar"))
+                        / "lib/go2_mujoco_lidar/tf_owner_observer")
+    parser.add_argument("--tf2-prefix", type=Path,
+                        default=PROJECT / "third_party/tf2/install")
+    parser.add_argument("--dds-config", type=Path, default=HERE / "cyclonedds.xml")
+    args = parser.parse_args()
+    for executable_path in (args.simulator, args.controller, args.tf_observer):
+        if not executable_path.is_file():
+            parser.error(f"missing executable: {executable_path}; "
+                         "run BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh "
+                         "and colcon build --packages-select go2_mujoco_lidar")
+    output = Path(args.output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    config = args.dds_config.resolve()
+    if args.domain == 0 or args.domain == 42:
+        raise ValueError("Use an isolated nonzero domain; Domain 42 is reserved")
+    if (os.environ.get("ROS_DOMAIN_ID") != str(args.domain)
+            or os.environ.get("ROS_LOCALHOST_ONLY") != "1"
+            or os.environ.get("CYCLONEDDS_URI") != config.as_uri()):
+        raise ValueError("domain/localhost/DDS environment does not match arguments")
+    goals = json.loads(args.goals.read_text())
+    route_points = json.loads(args.route.read_text())
+    for points in (goals, route_points):
+        if not points or any(len(p) != 2 or not all(math.isfinite(v) for v in p) for p in points):
+            raise ValueError("goals and route must contain finite [x,y] pairs")
+    baseline = existing_stack(PROJECT)
+    (output / "preexisting.json").write_text(json.dumps(baseline, indent=2))
+    result = {"domain": args.domain, "goals": [], "preexisting": baseline, "criteria": {}}
+    result["paths"] = {
+        name: str(getattr(args, name).resolve()) for name in (
+            "simulator", "controller", "controller_cwd", "world", "tf_observer",
+            "tf2_prefix", "goals", "route", "dds_config")}
+    result["observer_tf2"] = sorted({
+        line.split()[-1] for line in Path("/proc/self/maps").read_text().splitlines()
+        if "libtf2.so" in line})
+    logs = []
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    def interrupted(signum, _frame):
+        raise RuntimeError(f"acceptance interrupted by signal {signum}")
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
+    node = rclpy.create_node("go2_sim_acceptance", parameter_overrides=[
+        Parameter("use_sim_time", value=True)])
+    buffer = Buffer()
+    # Humble's Python Buffer does not attach a clock jump callback itself.
+    node._epoch_reset = watch_simulation_epoch(node, buffer.clear)
+    listener = TransformListener(buffer, node)
+    samples = {"cloud": [], "odom": [], "amcl": [], "maps": []}
+    commands = []
+    costmaps = {}
+    subscriptions = [
+        node.create_subscription(PointCloud2, "/utlidar/cloud", lambda m: samples["cloud"].append(
+            [m.header.stamp.sec, m.header.stamp.nanosec]), qos_profile_sensor_data),
+        node.create_subscription(Odometry, "/odom", lambda m: samples["odom"].append(
+            [m.header.stamp.sec, m.header.stamp.nanosec, m.pose.pose.position.x,
+             m.pose.pose.position.y]), 20),
+        node.create_subscription(PoseWithCovarianceStamped, "/amcl_pose",
+                                 lambda m: samples["amcl"].append(m), 10),
+        node.create_subscription(OccupancyGrid, "/map",
+                                 lambda m: samples["maps"].append(m),
+                                 QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)),
+        node.create_subscription(Twist, "/go2_nav2/shadow_cmd_vel", lambda m: commands.append(
+            [node.get_clock().now().nanoseconds, m.linear.x, m.angular.z]), 100),
+    ]
+    for name in ("global_costmap", "local_costmap"):
+        subscriptions.append(node.create_subscription(
+            OccupancyGrid, f"/{name}/costmap",
+            lambda m, key=name: costmaps.update({key: m}),
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)))
+
+    def checkpoint():
+        (output / "result.json").write_text(json.dumps(result, indent=2) + "\n")
+
+    def pump():
+        # Drain ready callbacks for a bounded executor quantum before the next
+        # /proc audit. One callback per full process scan starves the TF reader.
+        end = time.monotonic() + 0.02
+        rclpy.spin_once(node, timeout_sec=0.02)
+        while time.monotonic() < end:
+            rclpy.spin_once(node, timeout_sec=0)
+
+    manager = OwnedProcesses(pump)
+    processes = manager.processes
+
+    def executable(package, name):
+        return str(Path(get_package_prefix(package)) / "lib" / package / name)
+
+    def start(name, command, env=None, cwd=None):
+        log = (output / f"{name}.log").open("w")
+        logs.append(log)
+        return manager.start(command, stdout=log, stderr=subprocess.STDOUT, env=env, cwd=cwd)
+
+    def stop(process):
+        return manager.stop(process)
+
+    def until(predicate, timeout, running=()):
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            for p in running:
+                if p.poll() is not None:
+                    raise RuntimeError(f"owned process {p.pid} exited {p.returncode}")
+            rclpy.spin_once(node, timeout_sec=0.05)
+            if predicate():
+                return
+        raise TimeoutError("condition timed out; inspect phase logs")
+
+    def advance(seconds, running=()):
+        # Joystick input pulse/stand trajectory duration is simulation time,
+        # not an assumed wall delay for asynchronous readiness.
+        end = truth()["sim_time"] + seconds
+        until(lambda: truth()["sim_time"] >= end, seconds + 5, running)
+
+    def text(name):
+        return (output / f"{name}.log").read_text()
+
+    def truth():
+        rows = list(csv.DictReader((output / "truth.csv").read_text().splitlines()))
+        row = rows[-1]
+        return {key: float(value) for key, value in row.items()}
+
+    def edge_owner(logfile, expected):
+        identities, guids = set(), {}
+        for line in logfile.read_text().splitlines():
+            fields = line.split("\t")
+            if fields[0] == "TF_OWNER" and fields[1:3] == ["map", "odom"]:
+                identities.add(fields[3])
+            if fields[0] == "GID_MAP":
+                guids[fields[1]] = fields[2]
+        endpoints = {bytes(e.endpoint_gid).hex(): e.node_name
+                     for e in node.get_publishers_info_by_topic("/tf")}
+        return (len(identities) == 1 and
+                all(endpoints.get(guids.get(handle)) == expected for handle in identities))
+
+    fifo = output / "joystick.fifo"
+    os.mkfifo(fifo)
+    writer = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
+
+    def event(kind, number, value):
+        os.write(writer, struct.pack("<IhBB", int(time.monotonic()*1000) & 0xffffffff,
+                                     value, kind, number))
+
+    try:
+        native = os.environ.copy()
+        native.pop("LD_LIBRARY_PATH", None)
+        world = args.world.resolve()
+        sim = start("simulator", [str(args.simulator.resolve()), "-s", str(world),
+                                  "-i", str(args.domain), "-n", "lo", "--dds-config", str(config),
+                                  "--fifo", str(fifo), "--output", str(output)], native)
+        ctrl_dir = args.controller_cwd.resolve()
+        ctrl = start("controller", ["stdbuf", "-oL", "-eL", str(args.controller.resolve()), "-n", "lo", "-d", str(args.domain)],
+                     native, ctrl_dir)
+        until(lambda: "FSM: Start Passive" in text("controller"), 20, [sim, ctrl])
+        event(2, 5, 32767)
+        # Switch LT and receiver LT are smoothed axes. Establish LT.pressed
+        # before the single A.on_pressed edge used by the configured transition.
+        advance(0.25, [sim, ctrl])
+        event(1, 0, 1)
+        advance(0.3, [sim, ctrl])
+        event(1, 0, 0)
+        event(2, 5, 0)
+        until(lambda: "to FixStand" in text("controller"), 10, [sim, ctrl])
+        advance(3, [sim, ctrl])
+        event(1, 11, 1)
+        event(2, 7, 32767)
+        advance(0.3, [sim, ctrl])
+        event(1, 11, 0)
+        event(2, 7, 0)
+        until(lambda: "to Velocity_Down" in text("controller"), 10, [sim, ctrl])
+        result["walking_mode"] = True
+        print("WALKING_MODE_READY", flush=True)
+        base = ["ros2", "launch", "go2_mujoco_lidar", "go2_sim_navigation.launch.py",
+                f"simulator_pid:={sim.pid}"]
+        if args.tf2_prefix.resolve() != PROJECT / "third_party/tf2/install":
+            base.append(f"tf2_prefix:={args.tf2_prefix.resolve()}")
+        tap = start("mapping_tf", [str(args.tf_observer.resolve())])
+        mapping = start("mapping", base + ["mode:=mapping"])
+        until(lambda: samples["maps"] and edge_owner(output / "mapping_tf.log", "slam_toolbox"),
+              45, [sim, ctrl, mapping, tap])
+        bridge = start("bridge", [executable("go2_nav2_mujoco_bridge", "twist_to_joystick"),
+                                  "--ros-args", "-p", f"fifo_path:={fifo}"])
+        until(lambda: "simulation bridge ready" in text("bridge"), 10, [bridge])
+        selected_map, map_base, map_odom = map_route(
+            output, start, stop, until, advance, text, truth, buffer, node,
+            samples, base, sim, ctrl, bridge, mapping, tap, result, checkpoint,
+            route_points, executable)
+        tap = start("localization_tf", [str(args.tf_observer.resolve())])
+        localization = start("localization", base + [
+            "mode:=localization", f"map:={selected_map}",
+            "initial_pose:="+",".join(map(str, map_base))])
+        result["localization_initial_pose"] = map_base
+        until(lambda: "NAVIGATION_READY" in text("localization") and
+              edge_owner(output / "localization_tf.log", "amcl"), 100,
+              [sim, ctrl, bridge, localization, tap])
+        result["localization_owner"] = "amcl"
+        result["tf2_loaded"] = [line for line in text("localization").splitlines()
+                                if "TF2_LOADED" in line]
+        print("LOCALIZATION_READY", flush=True)
+        action = ActionClient(node, NavigateToPose, "/navigate_to_pose")
+        if not action.wait_for_server(timeout_sec=10):
+            raise TimeoutError("NavigateToPose server missing")
+        dx, dy, angle = map_odom
+        ca, sa = math.cos(angle), math.sin(angle)
+        for index, (x,y) in enumerate(goals, 1):
+            gx, gy = dx+ca*x-sa*y, dy+sa*x+ca*y
+            goal = NavigateToPose.Goal()
+            goal.pose.header.frame_id = "map"
+            goal.pose.header.stamp = node.get_clock().now().to_msg()
+            goal.pose.pose.position.x, goal.pose.pose.position.y = gx, gy
+            goal.pose.pose.orientation.z = math.sin(angle/2)
+            goal.pose.pose.orientation.w = math.cos(angle/2)
+            started = time.monotonic()
+            future = action.send_goal_async(goal)
+            until(future.done, 10, [sim, ctrl, bridge, localization])
+            handle = future.result()
+            row = {"index":index, "world_goal":[x,y], "map_goal":[gx,gy], "accepted":handle.accepted}
+            if handle.accepted:
+                response = handle.get_result_async()
+                try:
+                    until(response.done, 150, [sim, ctrl, bridge, localization])
+                    row["status"] = response.result().status
+                except TimeoutError:
+                    cancellation = handle.cancel_goal_async()
+                    until(cancellation.done, 10)
+                    row["status"] = "timeout"
+            else:
+                row["status"] = "rejected"
+            row["wall_sec"] = time.monotonic()-started
+            row["status_name"] = "SUCCEEDED" if row["status"] == 4 else str(row["status"])
+            row["truth"] = truth()
+            row["position_error_m"] = math.hypot(row["truth"]["x"]-x, row["truth"]["y"]-y)
+            if samples["amcl"]:
+                pose = samples["amcl"][-1]
+                row["amcl_sample"] = [pose.header.stamp.sec, pose.header.stamp.nanosec,
+                                      pose.pose.pose.position.x, pose.pose.pose.position.y,
+                                      yaw(pose.pose.pose.orientation)]
+            row["costmaps"] = {key: [value.info.width, value.info.height,
+                                     value.info.resolution] for key,value in costmaps.items()}
+            if row["status"] != 4 or row["position_error_m"] > .3:
+                for key,value in costmaps.items():
+                    (output / f"goal{index}_{key}.json").write_text(json.dumps({
+                        "width":value.info.width, "height":value.info.height,
+                        "resolution":value.info.resolution,
+                        "origin":[value.info.origin.position.x, value.info.origin.position.y],
+                        "data":list(value.data)}))
+            result["goals"].append(row)
+            checkpoint()
+            print("GOAL_RESULT "+json.dumps(row), flush=True)
+        before = {key:len(samples[key]) for key in ("cloud","odom")}
+        before_pids = {p.pid: sorted(pid for pid, row in snapshot().items()
+                                   if row["session"] == p.pid)
+                       for p in (localization, bridge)}
+        before_time = samples["odom"][-1][0]
+        before_cloud_stamp = samples["cloud"][-1]
+        (output / "reset.request").touch()
+        until(lambda: truth()["epoch"] == 1, 5, [sim, ctrl, bridge, localization])
+        until(lambda: all(len(samples[key]) > before[key]+3 for key in ("cloud","odom"))
+              and samples["odom"][-1][0] < before_time
+              and samples["cloud"][-1] < before_cloud_stamp,
+              15, [sim, ctrl, bridge, localization])
+        result["reset"] = {
+            "cloud_before": before["cloud"], "cloud_after": len(samples["cloud"]),
+            "odom_before": before["odom"], "odom_after": len(samples["odom"]),
+            "odom_stamp_before_sec": before_time, "odom_stamp_after": samples["odom"][-1][:2],
+            "cloud_stamp_before": before_cloud_stamp,
+            "cloud_stamp_after": samples["cloud"][-1],
+            "same_pids": before_pids == {
+                p.pid: sorted(pid for pid, row in snapshot().items()
+                              if row["session"] == p.pid)
+                for p in (localization, bridge)},
+        }
+        print("RESET_RECOVERED", flush=True)
+    except Exception:
+        result["failure"] = traceback.format_exc()
+        print(result["failure"], flush=True)
+    finally:
+        cleanup_errors = []
+        for p in reversed(processes):
+            try:
+                stop(p)
+            except Exception as error:
+                cleanup_errors.append(str(error))
+        result["cleanup_errors"] = cleanup_errors
+        result["shutdowns"] = manager.stops
+        for log in logs:
+            log.close()
+        os.close(writer)
+        fifo.unlink()
+        current = existing_stack(PROJECT)
+        result["preexisting_after"] = {pid: current.get(pid) for pid in baseline}
+        result["preexisting_unchanged"] = all(current.get(pid) == row for pid,row in baseline.items())
+        result["owned_pids"] = sorted(manager.identities)
+        result["owned_remaining"] = manager.remaining()
+        with (output / "commands.csv").open("w") as file:
+            writer_csv = csv.writer(file)
+            writer_csv.writerow(["stamp_ns", "vx", "wz"])
+            writer_csv.writerows(commands)
+        contact_file = output / "contacts.csv"
+        result["nonfloor_contacts"] = (
+            sum(1 for _ in csv.DictReader(contact_file.open()))
+            if contact_file.exists() else None)
+        result["sigkill_logs"] = [
+            path.name for path in output.glob("*.log")
+            if "escalating to 'SIGKILL'" in path.read_text(errors="replace")]
+        result["sigterm_logs"] = [
+            path.name for path in output.glob("*.log")
+            if "escalating to 'SIGTERM'" in path.read_text(errors="replace")]
+        localization_log = output / "localization.log"
+        shutdown_log = localization_log.read_text(errors="replace") if localization_log.exists() else ""
+        completed = [
+            line.split("MANAGED_SHUTDOWN_COMPLETE ", 1)[1]
+            for line in shutdown_log.splitlines() if "MANAGED_SHUTDOWN_COMPLETE " in line]
+        result["shutdown_states"] = json.JSONDecoder().raw_decode(completed[-1])[0] if completed else {}
+        result["shutdown_errors"] = [
+            line for line in shutdown_log.splitlines() if "MANAGED_SHUTDOWN_FAILED" in line]
+        result["samples"] = {key:len(value) for key,value in samples.items()}
+        result["criteria"] = {
+            "mapping": bool(result.get("route_completed")),
+            "mapping_no_stalls": result.get("mapping_stalls") == 0,
+            "zero_nonfloor_contacts": result["nonfloor_contacts"] == 0,
+            "save": bool(result.get("saved")),
+            "goals_succeeded": len(result["goals"]) == len(goals) and all(
+                row["status"] == 4 for row in result["goals"]),
+            "position_error": len(result["goals"]) == len(goals) and all(
+                row["position_error_m"] <= 0.3 for row in result["goals"]),
+            "reset_recovery": bool(result.get("reset", {}).get("same_pids")),
+            "zero_residue": not result["owned_remaining"] and not cleanup_errors,
+            "no_sigkill": not result["sigkill_logs"] and not any(
+                int(signal.SIGKILL) in stop["signals"] for stop in manager.stops),
+            "no_escalation": not result["sigterm_logs"] and not result["sigkill_logs"] and all(
+                set(stop["signals"]) <= {int(signal.SIGINT)} for stop in manager.stops),
+            "managed_shutdown": not result["shutdown_errors"] and set(result["shutdown_states"]) == {
+                "planner_server", "controller_server", "behavior_server", "bt_navigator",
+                "map_server", "amcl",
+            } and all(value == State.PRIMARY_STATE_FINALIZED
+                      for value in result["shutdown_states"].values()),
+            "preexisting_unchanged": result["preexisting_unchanged"],
+        }
+        result["passed"] = not result.get("failure") and all(result["criteria"].values())
+        checkpoint()
+        node.destroy_node()
+        rclpy.shutdown()
+        print("ACCEPTANCE_FINISHED "+str(output / "result.json"), flush=True)
+    if not result["passed"]:
+        raise RuntimeError("Acceptance failed; inspect result.json")
+
+
+def map_route(output, start, stop, until, advance, text, truth, buffer, node,
+              samples, base, sim, ctrl, bridge, mapping, tap, result, checkpoint, route, executable):
+        """이미 통과한 매핑 단계를 저장 지도 재시험과 분리한다."""
+        runner = start("route", [executable("go2_nav2_mujoco_bridge", "waypoint_runner"),
+            "--ros-args", "-p", "waypoints_x:="+str([float(x) for x,y in route]),
+            "-p", "waypoints_y:="+str([float(y) for x,y in route]),
+            "-p", "timeout:=600.0", "-p", "stall_timeout:=10.0"])
+        started = time.monotonic()
+        result["mapping_start_sim_time"] = truth()["sim_time"]
+        result["route"] = route
+        print("MAPPING_ROUTE_STARTED", flush=True)
+        until(lambda: any(s in text("route") for s in
+                          ("status=completed", "status=timeout", "status=stalled")),
+              620, [sim, ctrl, mapping, bridge, runner])
+        route_log = text("route")
+        result["route_completed"] = "status=completed" in route_log
+        result["mapping_wall_sec"] = time.monotonic() - started
+        result["mapping_end_sim_time"] = truth()["sim_time"]
+        result["mapping_stalls"] = route_log.count("status=stalled")
+        result["mapping_contacts"] = sum(
+            1 for _ in csv.DictReader((output / "contacts.csv").open()))
+        stop(runner)
+        checkpoint()
+        if not result["route_completed"]:
+            raise RuntimeError("mapping route did not complete")
+        last_stamp = samples["odom"][-1][:2]
+        until(lambda: samples["odom"][-1][:2] > last_stamp,
+              10, [sim, ctrl, mapping, bridge])
+        stamp = samples["odom"][-1][:2]
+        saved_time = rclpy.time.Time(nanoseconds=stamp[0] * 10**9 + stamp[1])
+        until(lambda: buffer.can_transform("map", "base", saved_time),
+              10, [sim, ctrl, mapping, bridge])
+        result["mapping_truth"] = truth()
+        result["mapping_map_base"] = None
+        t = buffer.lookup_transform("map", "base", saved_time)
+        q = t.transform.rotation
+        map_base = [t.transform.translation.x, t.transform.translation.y, yaw(q)]
+        result["mapping_map_base"] = map_base
+        t = buffer.lookup_transform("map", "odom", saved_time)
+        map_odom = [t.transform.translation.x, t.transform.translation.y, yaw(t.transform.rotation)]
+        result["map_odom_transform_at_save"] = map_odom
+        result["mapping_owner"] = "slam_toolbox"
+        m = samples["maps"][-1]
+        result["map_shape"] = [m.info.width, m.info.height, m.info.resolution]
+        save = start("save", [executable("go2_mujoco_lidar", "sim_save_map"),
+                             "--simulator-pid", str(sim.pid), "--output", str(output / "saved")])
+        until(lambda: save.poll() is not None, 35, [sim, ctrl, mapping, bridge])
+        if save.returncode != 0:
+            raise RuntimeError(text("save"))
+        stop(save)
+        result["saved"] = json.loads((output / "saved.session.json").read_text())
+        checkpoint()
+        print("MAPPING_SAVED", flush=True)
+        stop(mapping)
+        stop(tap)
+        until(lambda: "slam_toolbox" not in node.get_node_names(), 10, [sim, ctrl, bridge])
+        return str(output / "saved.yaml"), map_base, map_odom
+
+
+if __name__ == "__main__":
+    main()

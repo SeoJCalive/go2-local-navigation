@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- W03 dedicated discovery. RMW supplies lo via ROS_LOCALHOST_ONLY=1;
+     the native SDK driver adds its own lo selection, without ROS overlay libs. -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain id="41">
+    <General><AllowMulticast>false</AllowMulticast></General>
+    <Discovery>
+      <Tag>go2-w03-bringup-20261124</Tag>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+      <Peers><Peer Address="127.0.0.1" /></Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>

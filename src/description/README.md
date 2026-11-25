@@ -1,9 +1,22 @@
 # `description`
 
+W04부터 static TF 실행과 profile parser도 이 패키지가 소유한다.
+`ros2 launch description go2_static_tf.launch.py`를 사용한다.
+`description.static_tf_profiles`는 같은 YAML·기본값을, `description.dds_environment`는
+기존 W06 XML 판정을 제공한다. URDF·센서 geometry는 변경하지 않았다.
+실물 조합과 sim 입력이 이 계층을 소비하며 bringup/validation을 import하지 않는다.
+
 이 패키지는 공식 Go2 전체 URDF와 프로젝트의 정적 TF 계약을 보관한다.
 canonical model은 `urdf/go2_description.urdf` 하나이며, 공식·프로젝트 root는
 `base`다. 이 파일에는 Go2 본체의 visual·collision·inertial·관절과 공식 native
 sensor link인 `imu`, `radar`, `front_camera`가 함께 들어 있다.
+
+simulation(`use_sim_time=true`)에서는 외부 `go2_description/dae` 없이 RViz를
+사용하도록 canonical collision primitive를 visual로 복사한 모델을 발행한다.
+canonical 파일·관절·fixed TF geometry는 변경하지 않는다. 단순 형상은 외관 mesh의
+대체 표시이며 충돌 모델 수정이 아니다. simulation LiDAR가 matched LowState의
+실제 12개 motor q를 `/joint_states`에 공급하고 기존 robot_state_publisher가
+움직이는 다리 TF도 소유한다.
 
 ## 현재 승인된 정적 TF 계약
 
@@ -13,10 +26,10 @@ sensor link인 `imu`, `radar`, `front_camera`가 함께 들어 있다.
 - 사용자가 설치 센서의 물리 정렬을 확인했으므로, 프로젝트는 공식
   `radar_joint` geometry를 direct `base → utlidar_lidar` transform으로 수용한다.
   이는 독립 온보드 calibration이 아니라 프로젝트 통합 결정이다.
-- direct edge의 owner는 bringup을 통한
+- direct edge의 owner는 description launch를 통한
   `tf2_ros/static_transform_publisher`다. geometry는 translation
   `[0.28945, 0.0, -0.046825]`, rpy `[0.0, 2.8782, 0.0]`다.
-- 정적 TF bringup은 bringup에서 구현되었고, 2026-08-23 AGX에서 launch와
+- 정적 TF launch는 원래 bringup에서 구현되었고, 2026-08-23 AGX에서 launch와
   runtime TF 조회를 완료했다. `/tf_static`에는 두 publisher가 있었고 세 핵심
   edge가 해석됐다. `robot_state_publisher`가 `/tf` publisher와
   `/joint_states` subscription을 광고하는 것은 확인했지만, `/tf` message와

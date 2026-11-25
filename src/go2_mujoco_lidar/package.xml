@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>go2_mujoco_lidar</name>
+  <version>0.1.0</version>
+  <description>Project-owned MuJoCo ray-cast LiDAR for the official Unitree Go2 model.</description>
+  <maintainer email="bi-agx1@invalid.example">Go2 project maintainers</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <depend>ament_index_python</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>rosgraph_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>unitree_go</depend>
+  <depend>rviz_default_plugins</depend>
+  <depend>pluginlib</depend>
+  <depend>qtbase5-dev</depend>
+
+  <exec_depend>description</exec_depend>
+  <exec_depend>go2_inputs</exec_depend>
+  <exec_depend>go2_nav2</exec_depend>
+  <exec_depend>nav2_amcl</exec_depend>
+  <exec_depend>nav2_behaviors</exec_depend>
+  <exec_depend>nav2_bt_navigator</exec_depend>
+  <exec_depend>nav2_controller</exec_depend>
+  <exec_depend>nav2_lifecycle_manager</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>nav2_planner</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>lifecycle_msgs</test_depend>
+  <test_depend>rclpy</test_depend>
+  <test_depend>rmw_cyclonedds_cpp</test_depend>
+  <test_depend>rcl_interfaces</test_depend>
+  <test_depend>tf2_msgs</test_depend>
+  <test_depend>tf2_ros</test_depend>
+  <test_depend>tf2_tools</test_depend>
+  <test_depend>cyclonedds</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

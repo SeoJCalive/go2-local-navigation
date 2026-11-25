@@ -1,0 +1,37 @@
+diff --git a/simulate/src/unitree_sdk2_bridge.h b/simulate/src/unitree_sdk2_bridge.h
+index 7c13289..98d9e92 100644
+--- a/simulate/src/unitree_sdk2_bridge.h
++++ b/simulate/src/unitree_sdk2_bridge.h
+@@ -10,6 +10,8 @@
+ #include <unitree/idl/hg/IMUState_.hpp>
+ 
+ #include <iostream>
++#include <cmath>
++#include <cstdint>
+ 
+ #include "param.h"
+ #include "physics_joystick.h"
+@@ -227,6 +229,23 @@ public:
+         }
+         // highstate
+         if(highstate->trylock()) {
++            const auto simulation_nanoseconds = static_cast<std::uint64_t>(
++                std::llround(mj_data_->time * 1.0e9));
++            highstate->msg_.stamp().sec() = simulation_nanoseconds / 1000000000ULL;
++            highstate->msg_.stamp().nanosec() = simulation_nanoseconds % 1000000000ULL;
++            if(imu_quat_adr_ >= 0) {
++                for(int axis = 0; axis < 4; ++axis) {
++                    highstate->msg_.imu_state().quaternion()[axis] =
++                        mj_data_->sensordata[imu_quat_adr_ + axis];
++                }
++            }
++            if(imu_gyro_adr_ >= 0) {
++                for(int axis = 0; axis < 3; ++axis) {
++                    highstate->msg_.imu_state().gyroscope()[axis] =
++                        mj_data_->sensordata[imu_gyro_adr_ + axis];
++                }
++                highstate->msg_.yaw_speed() = mj_data_->sensordata[imu_gyro_adr_ + 2];
++            }
+             if(frame_pos_adr_ >= 0) {
+                 highstate->msg_.position()[0] = mj_data_->sensordata[frame_pos_adr_ + 0];
+                 highstate->msg_.position()[1] = mj_data_->sensordata[frame_pos_adr_ + 1];
