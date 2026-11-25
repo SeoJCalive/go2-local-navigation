@@ -3,6 +3,7 @@
 # Outputs: package executables, assets and CTest/pytest results.
 # External contracts: third_party/unitree_mujoco/README.md and test/wall_hug/README.md.
 # G02 diagnostics stay in the repo; no Karto patch or dataset is installed.
+# Drift regression checks pair arc/diagnostic overrides without GUI or product changes.
 cmake_minimum_required(VERSION 3.16)
 project(go2_mujoco_lidar)
 
@@ -92,6 +93,8 @@ if(BUILD_TESTING)
     ENV "OPENBLAS_NUM_THREADS=1" "OMP_NUM_THREADS=1")
   # 목적: built runtime SDK의 재생 동등성/결정성. native 자산 없는 CI는 명시 skip.
   ament_add_pytest_test(wall_hug_runtime test/test_wall_hug_runtime.py TIMEOUT 600
+    ENV "OPENBLAS_NUM_THREADS=1" "OMP_NUM_THREADS=1")
+  ament_add_pytest_test(wall_hug_drift test/test_wall_hug_drift.py TIMEOUT 300
     ENV "OPENBLAS_NUM_THREADS=1" "OMP_NUM_THREADS=1")
   add_executable(tf_owner_observer test/headless/tf_owner_observer.cpp)
   ament_target_dependencies(tf_owner_observer rclcpp tf2_msgs)

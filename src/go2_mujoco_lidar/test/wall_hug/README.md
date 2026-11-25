@@ -1,3 +1,5 @@
+<!-- 목적: G02 단위·기록·native 재생과 drift 진단의 실행 계약을 안내한다.
+입력은 고정 raw/GT이며 제품 설정·실물 실행과 구분한다. 지도 기준은 유지한다. -->
 # G02 하니스 단위 검사와 오프라인 재생
 
 벽 근접 오연결 조사에서 GUI를 다시 오래 돌리기 전에 제어·관측·판정 경계를
@@ -237,3 +239,61 @@ native mapper의 실행은 이번에 하지 않았다. sigma 3.0과 제품 SLAM 
 `gui_run.py` 전체 운영 orchestration, route 생성, physics preload/카메라 hook,
 이전 listener `test_loop_events.py`, engine replay builder/prior hook은 보존 증거다.
 이번 작업은 물리 주행·25분 GUI·false-loop 수정·새 graph 수락을 수행하지 않았다.
+
+## Attempt 9 확장과 drift 진단
+
+`drift_replay.py`는 기존 12개 manifest를 그대로 읽고 별도
+`fixtures/drift-datasets.json`의 attempt 9를 13번째 cohort로 추가한다.
+결과 JSON은 `original_12`, `attempt_9`, `all_13`을 분리한다.
+고정 startup world→map transform을 사용하며 최종 graph에 맞추지 않는다.
+
+```bash
+source /opt/ros/humble/setup.bash
+H=src/go2_mujoco_lidar/test/wall_hug
+E="$PWD/.omo/evidence/loop-gate-drift"
+export TMPDIR="$E/tmp" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+mkdir -p "$TMPDIR"
+cmake -S "$H/counterfactual" -B "$E/engine" \
+  -DENGINE_SOURCE="$PWD/.omo/evidence/loop-gate-replay/engine-motion-v2/source"
+cmake --build "$E/engine" --target engine_replay -j2
+timeout 5400 python3 -u "$H/drift_replay.py" \
+  --engine "$E/engine/engine_replay" --output "$E/runs" --compare --jobs 3
+timeout 2400 python3 -u "$H/drift_replay.py" \
+  --engine "$E/engine/engine_replay" --output "$E/runs" --sensitivity --jobs 3
+python3 -u "$H/drift_replay.py" --engine "$E/engine/engine_replay" \
+  --output "$E/runs" --profiles
+GO2_COUNTERFACTUAL_ENGINE="$E/engine/engine_replay" python3 -m pytest -q \
+  src/go2_mujoco_lidar/test/test_wall_hug_drift.py
+```
+
+위 `ENGINE_SOURCE`는 고정 2.6.10에 기존 관찰·replay patch를 적용한 격리 source다.
+없으면 앞 절의 `counterfactual/build.sh`로 새 prefix를 준비한다.
+ROS setup은 `set -u`와 호환되지 않으므로 nounset을 켠 셸에서 source하지 않는다.
+새 output directory에서 실행하고 완료 산출물을 덮어쓰지 않는다.
+민감도 실행은 같은 output의 `none` 기준을 사용하므로 비교 뒤에 실행한다.
+집계는 native node ID를 원본 source ID로 복원하므로 movement filter가 node를
+건너뛴 경우도 동일 pair를 비교한다. 완료 raw 재생의 집계만 다시 만들 때는
+`--summarize comparison` 또는 `--summarize sensitivity`를 사용한다.
+중단 후 `--resume`은 dataset·정책·최종 판정 필드가 일치하는 완료 case만 재사용한다.
+동일 engine binary와 입력을 유지한 중단 batch에만 사용한다.
+미완료 directory는 덮어쓰지 않는다. Native가 거부한 파라미터 대조는 실패 원문을
+남긴 별도 이름으로 보존하고 유효한 새 조합은 새 case 이름으로 실행한다.
+해상도 .005 m의 smear 허용 범위는 [.0025,.05] m이므로 .03 m를 함께 지정한다.
+해상도 효과는 `.01/.03`의 `smear-fine`과 `.005/.03`을 비교한다.
+
+- `pair-k-c`는 fine pose의 XY 보정량 ≤ `k*D+c`이며 D는 linked anchor와 query
+  사이 **원본 odometry arc**다. `GO2_REPLAY_ARC=pair`로만 켜지는 진단 정책이다.
+- 과거 `(a)`는 마지막 실제 유지 loop 이후 arc다. `retained-0.05-0.2`를 따로
+  실행한다. node 간 arc와 같은 정의로 표기하지 않는다.
+- 거부된 정상 후보는 실제 native decision과 같은 fine candidate/anchor를
+  시간·순서로 연결하고, sensor extrinsic을 제거한 상대 base 측정을 GT와 비교한다.
+  `correct_candidates_rejected`는 실제 거부 횟수이며 `correct_loops_lost`는
+  none의 정상 동일 pair 부재이므로 서로 바꿔 쓰지 않는다.
+- `GO2_REPLAY_ROS_ARGS`는 replay NodeOptions에만 전달한다. scan matching,
+  movement filter, correlation, link/match, buffer와 odometry penalty를
+  통제하며 공유 YAML·runtime SDK·지도 평가식·수용 threshold는 변경하지 않는다.
+- 저장 Dataset에는 이미 movement filter를 통과한 scan만 있다. 낮은
+  minimum travel 재생은 원래 버린 ROS scan의 복원이나 더 조밀한 취득 검증이 아니다.
+- `wall_hug_drift` CTest는 cohort/grid/extrinsic 계약과 선택적 실제 native
+  pair-arc 결정성·matching-off 대조를 검사한다. CI에 native 자산이 없으면 그
+  native 검사만 명시 skip하며 simulation 합격으로 승격하지 않는다.

@@ -1,0 +1,21 @@
+{
+  "_comment": "목적: 기존 12개 입력을 변경하지 않고 runtime attempt9를 13번째 cohort로 확장한다. 고정 startup transform이며 최종 graph 정렬이 아니다.",
+  "base_manifest": "counterfactual-datasets.json",
+  "files": {
+    ".omo/evidence/g02-wall-hug/maps/attempt9-final.data": "8b6d0d6e8779fd35207463dfcc5e8a21d85e58c236264caa43a3cb4d8fe2d854",
+    ".omo/evidence/loop-gate-runtime/g02-attempt9/physics-truth.csv": "ccfb4e6f735b7dc8e31f7c580225b8e3341cef967d5006e01e63984528440521",
+    ".omo/evidence/loop-gate-runtime/g02-attempt9/result.json": "28924a1e891a469fc4782aa0c9aa08f8bd21314706f26e3e479a41dd39e1b737",
+    ".omo/evidence/loop-gate-runtime/g02-attempt9/mapping-trace.json": "c64b43eb91ba202a2196d266b9fa16f21eaf1b67346058be8839cc03718d1b73",
+    ".omo/evidence/loop-gate-runtime/g02-attempt9/karto-scans.jsonl": "e87c4684537ae2ffb09f9b618c0c3a3ce534b2305b75c8c211474f31bac9108c",
+    ".omo/evidence/loop-gate-runtime/g02-attempt9/route.json": "8b9cbeb85a44c795137447e8350b46aadba1fd21288497dbb1ec12a88207246e"
+  },
+  "datasets": [
+    {
+      "name": "g02-9",
+      "data": ".omo/evidence/g02-wall-hug/maps/attempt9-final.data",
+      "truth": ".omo/evidence/loop-gate-runtime/g02-attempt9/physics-truth.csv",
+      "world_to_map": [0.000008348973992542905, -0.00020476422346491022, 0.0000050100740033366155],
+      "cohort": "runtime-attempt9"
+    }
+  ]
+}

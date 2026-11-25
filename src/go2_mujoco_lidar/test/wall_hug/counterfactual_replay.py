@@ -5,6 +5,8 @@ is loaded only after the process exits. No prior/pose/edge hint is injected.
 The manifest pins all numerical inputs. Baselines precede the gate sweep, with
 an explicit attempt-6 reproduction check. Outputs live outside tracked source.
 See README.md for correctness, lost-edge and simulation-GT definitions.
+진단 확장은 선택적 관측/ROS override와 고정 world→map transform만 전달한다.
+기존 12개 manifest·기본 gate·지도 평가식과 제품 parameter는 유지한다.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -116,10 +118,25 @@ def classify_factors(edges, factors, truth):
     return result
 
 
-def pose_error(rows, truth):
-    return max(float(np.linalg.norm(np.array(r["pose"][:2]) -
-                                   replay.at(truth, r["time"])[:2]))
-               for r in rows if r.get("accepted", True))
+def pose_error(rows, truth, percentile=100):
+    return float(np.percentile([
+        float(np.linalg.norm(np.array(r["pose"][:2]) -
+                             replay.at(truth, r["time"])[:2]))
+        for r in rows if r.get("accepted", True)], percentile))
+
+
+def dataset_truth(project, dataset, inputs):
+    """Use recorded truth and its fixed startup transform; never fit final poses."""
+    if dataset["truth"] == "serialized-simulation-odometry":
+        truth = np.array([[r["time"], *r["odom"]] for r in inputs])
+        truth[:, 3] = np.unwrap(truth[:, 3])
+    else:
+        truth = replay.truth(project / dataset["truth"])
+    yaw, tx, ty = dataset.get("world_to_map", (0., 0., 0.))
+    c, s = math.cos(yaw), math.sin(yaw)
+    truth[:, 1:3] = truth[:, 1:3] @ np.array([[c, s], [-s, c]]) + [tx, ty]
+    truth[:, 3] += yaw
+    return truth
 
 
 def lost_correct(baseline, current):
@@ -184,6 +201,14 @@ def run_one(engine, project, manifest, dataset, gate, output):
     if gate["name"] == "none" and dataset["name"] in (
             "sep-horizontal", "sep-wallfullclean", "sep-wallboth"):
         environment["GO2_REPLAY_SCAN_EVIDENCE"] = str(prefix) + "-scans.jsonl"
+    if gate.get("observations"):
+        environment["GO2_REPLAY_SCAN_EVIDENCE"] = str(prefix) + "-scans.jsonl"
+        environment["GO2_REPLAY_CANDIDATE_EVIDENCE"] = str(prefix) + "-candidates.jsonl"
+    if gate.get("arc") == "pair":
+        environment["GO2_REPLAY_ARC"] = "pair"
+    if gate.get("parameters"):
+        environment["GO2_REPLAY_ROS_ARGS"] = " ".join(
+            f"-p {name}:={json.dumps(value)}" for name, value in gate["parameters"].items())
     # Inherit ROS loader paths but never any recorded-prior preload.
     if environment.get("LD_PRELOAD"):
         raise ValueError("LD_PRELOAD must be unset for causal replay")
@@ -191,11 +216,7 @@ def run_one(engine, project, manifest, dataset, gate, output):
         subprocess.run(command, env=environment, stdout=log, stderr=subprocess.STDOUT,
                        check=True, timeout=1200)
     inputs = list(replay.records(Path(str(prefix) + "-inputs.jsonl")))
-    if dataset["truth"] == "serialized-simulation-odometry":
-        truth = np.array([[r["time"], *r["odom"]] for r in inputs])
-        truth[:, 3] = np.unwrap(truth[:, 3])
-    else:
-        truth = replay.truth(project / dataset["truth"])
+    truth = dataset_truth(project, dataset, inputs)
     if inputs[0]["time"] < truth[0, 0] or inputs[-1]["time"] > truth[-1, 0]:
         raise ValueError("ground truth does not bracket all input scans")
     loops = classify_factors(
@@ -211,7 +232,8 @@ def run_one(engine, project, manifest, dataset, gate, output):
     # Map coordinates are initialized from the input world-coordinate odometry.
     # No fitted final transform can hide a bad closure.
     metrics = geometry.evaluate(project / manifest["world"], str(prefix) + ".yaml",
-                                (0., 0., 0.), directory / "gt-overlay.png")
+                                dataset.get("world_to_map", (0., 0., 0.)),
+                                directory / "gt-overlay.png")
     (directory / "map-metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     summary = dict(dataset=dataset["name"], gate=gate, truth=dataset["truth"],
                    inputs=len(inputs), accepted_scans=len(final),
@@ -223,6 +245,7 @@ def run_one(engine, project, manifest, dataset, gate, output):
                    doubled_walls=metrics["doubled_wall_components"],
                    ghost_components=metrics["ghost_wall_components"],
                    pose_error_max_m=pose_error(online, truth),
+                   pose_error_p95_m=pose_error(online, truth, 95),
                    final_graph_pose_error_max_m=pose_error(final, truth),
                    command=command)
     (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

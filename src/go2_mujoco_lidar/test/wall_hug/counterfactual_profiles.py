@@ -5,6 +5,8 @@ Reproduce geometry.py's exact per-wall normal profiles, then compare raw endpoin
 placed by sequential scan matching versus odometry at each doubled run. JSON keeps
 the intervals, timestamps, pose errors and histograms needed to inspect causes.
 No matcher, map, test threshold or configuration is modified.
+진단 확장은 고정 startup transform과 명시적 scan 입력을 지원한다. loop가 있는
+최종 graph의 배치는 순차 matcher만의 효과로 해석하지 않으며 기본 no-loop 검사는 유지한다.
 """
 import argparse
 import json
@@ -49,19 +51,27 @@ def endpoints(scans, inputs, vertices):
     return np.concatenate(corrected), np.concatenate(odometry), np.concatenate(times), np.concatenate(errors)
 
 
-def diagnose(directory, world):
+def diagnose(directory, world, *, scans_path=None, transform=(0., 0., 0.),
+             require_no_loops=True):
     spec = yaml.safe_load((directory / "result.yaml").read_text())
     occupied = np.asarray(Image.open(directory / spec["image"])) < 80
     resolution = spec["resolution"]
     ox, oy, _ = spec["origin"]
     geoms = geometry.obstacles(world)
     current, odom, times, errors = endpoints(
-        replay.records(directory / "result-scans.jsonl"),
+        replay.records(scans_path if scans_path is not None else directory / "result-scans.jsonl"),
         replay.records(directory / "result-inputs.jsonl"),
         replay.records(directory / "result-vertices.jsonl"))
     edges = list(replay.records(directory / "result-edges.jsonl"))
-    assert not any(e["loop"] and e["new_edge"] for e in edges), (
-        "select a no-loop baseline to isolate sequential scan matching")
+    loop_count = sum(e["loop"] and e["new_edge"] for e in edges)
+    if require_no_loops:
+        assert not loop_count, "select a no-loop baseline to isolate sequential scan matching"
+    yaw, tx, ty = transform
+    rotation = np.array([[math.cos(yaw), -math.sin(yaw)],
+                         [math.sin(yaw), math.cos(yaw)]])
+    if any(transform):
+        current = (current - [tx, ty]) @ rotation
+        odom = (odom - [tx, ty]) @ rotation
     online = list(replay.records(directory / "result-online.jsonl"))
     assert all(row["accepted"] for row in online), "diagnostic cohort must not filter scans"
     profiles = []
@@ -77,6 +87,7 @@ def diagnose(directory, world):
         direction = np.array([math.cos(angle), math.sin(angle)]) if sx >= sy else np.array(
             [-math.sin(angle), math.cos(angle)])
         normal = np.array([-direction[1], direction[0]])
+        endpoint_normal_delta = (current - odom) @ normal
         offsets = np.arange(-minor-.35, minor+.351, resolution/4)
         rows, active, runs = [], [], []
         others = [g for g in geoms if g["name"] != geom["name"]]
@@ -85,8 +96,9 @@ def diagnose(directory, world):
             if float(geometry.distance(center, others)) < minor+.35:
                 continue
             points = center + offsets[:, None]*normal
-            columns = np.floor((points[:, 0]-ox)/resolution).astype(int)
-            image_rows = occupied.shape[0]-1-np.floor((points[:, 1]-oy)/resolution).astype(int)
+            mapped = points @ rotation.T + [tx, ty] if any(transform) else points
+            columns = np.floor((mapped[:, 0]-ox)/resolution).astype(int)
+            image_rows = occupied.shape[0]-1-np.floor((mapped[:, 1]-oy)/resolution).astype(int)
             valid = ((columns >= 0) & (columns < occupied.shape[1]) &
                      (image_rows >= 0) & (image_rows < occupied.shape[0]))
             hits = np.zeros(len(points), dtype=bool)
@@ -134,6 +146,11 @@ def diagnose(directory, world):
                     n=len(values), normal_histogram=histogram.tolist(), bin_edges_m=edges.tolist(),
                     normal_quantiles_m=[float(np.percentile(values, p)) for p in (5, 50, 95)]
                     if len(values) else None, time_quarters=buckets,
+                    matched_minus_odometry_normal_quantiles_m=[
+                        float(np.percentile(endpoint_normal_delta[selected], p))
+                        for p in (5, 50, 95)] if len(values) else None,
+                    matched_minus_odometry_normal_abs_max_m=float(
+                        np.abs(endpoint_normal_delta[selected]).max()) if len(values) else None,
                     sensor_xy_error_max_m=float(errors[selected].max()) if selected.any() else None)
             evidence.append(item)
         profiles.append(dict(geom=geom["name"], half_thickness_m=minor,
@@ -143,7 +160,17 @@ def diagnose(directory, world):
     for profile, reference in zip(profiles, expected["wall_profiles"]):
         assert (profile["geom"], profile["doubled_runs_ge_020m"]) == (
             reference["geom"], reference["doubled_runs_ge_020m"])
-    return dict(dataset=directory.parent.name, loop_edges=0, map_metrics=expected,
+    surfaces = {}
+    for name, points in (("scan_matched", current), ("odometry", odom)):
+        distances = np.abs(geometry.distance(points, geoms))
+        selected = distances[distances <= .25]
+        surfaces[name] = dict(
+            n=len(selected), p95_m=float(np.percentile(selected, 95)),
+            max_m=float(selected.max()), comparison_band_m=.25)
+    return dict(dataset=directory.parent.name, loop_edges=loop_count,
+                placement="final graph; sequential-only attribution requires no-loop A/B",
+                raw_endpoint_surface_distance=surfaces,
+                map_metrics=expected,
                 profiles=profiles)
 
 

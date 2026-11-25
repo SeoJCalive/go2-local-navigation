@@ -9,6 +9,9 @@
 // OUTPUT_PREFIX must have an existing parent. See ../README.md for input pins.
 // GO2_RUNTIME_REPLAY는 built runtime SDK/configure를 사용한다. X는 ROS parameter로
 // 전달하고 callback gate는 호출하지 않는다. 결정론적 offline solver만 공유한다.
+// 진단 전용 GO2_REPLAY_ARC=pair는 linked node 사이 원본 odometry arc를 사용한다.
+// GO2_REPLAY_ROS_ARGS는 ROS parameter override, CANDIDATE_EVIDENCE는 관측 경로다.
+// 기본 retained-arc 계약과 제품/runtime SDK는 변경하지 않는다.
 #include "karto_sdk/Mapper.h"
 #include "solvers/ceres_solver.hpp"
 #include "slam_toolbox/slam_mapper.hpp"
@@ -21,6 +24,7 @@
 #include <limits>
 #include <map>
 #include <queue>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -35,6 +39,8 @@ namespace
 double distanceLimit, fraction, constant, arc = 0., retainedArc = 0.;
 double yawRate = -1., yawConstant = 0., searchMicros = 0., maxSearchMicros = 0.;
 size_t searches = 0;
+bool pairArc = false;
+std::unordered_map<int, double> odometryArcs;
 karto::Mapper * activeMapper;
 std::vector<std::pair<karto::LocalizedRangeScan *, karto::LocalizedRangeScan *>> loops;
 std::ofstream decisions;
@@ -45,7 +51,8 @@ extern "C" bool go2ReplayGate(karto::LocalizedRangeScan * anchor,
 {
   const double separation = std::sqrt(anchor->GetOdometricPose().GetPosition().
     SquaredDistance(query->GetOdometricPose().GetPosition()));
-  double distance = arc - retainedArc;
+  const double pairDistance = arc - odometryArcs.at(anchor->GetStateId());
+  double distance = pairArc ? pairDistance : arc - retainedArc;
   // Compress the current corrected odometry chain at query, anchor and retained
   // loop endpoints. Between these vertices the chain has no branch, so replacing
   // it with its arc length preserves exactly the full chain+loop shortest path.
@@ -120,10 +127,13 @@ extern "C" bool go2ReplayGate(karto::LocalizedRangeScan * anchor,
     << ",\"to_scan_id\":" << query->GetStateId() << ",\"time\":" << query->GetTime()
     << ",\"separation_m\":" << separation << ",\"correction_m\":" << correction
     << ",\"distance_since_retained_m\":" << arc - retainedArc
+    << ",\"odometry_pair_arc_m\":" << pairDistance
+    << ",\"gate_distance_m\":" << distance
+    << ",\"xy_bound_m\":" << xyBound
     << ",\"yaw_correction_rad\":" << yawCorrection;
   if (yawRate >= 0.) {
     decisions << ",\"graph_distance_m\":" << distance
-      << ",\"chain_distance_m\":" << chainDistance << ",\"xy_bound_m\":" << xyBound
+      << ",\"chain_distance_m\":" << chainDistance
       << ",\"yaw_bound_rad\":" << theta << ",\"retained_loops\":" << loops.size()
       << ",\"path_graph\":[";
     bool first = true;
@@ -175,6 +185,12 @@ int main(int argc, char ** argv)
   constant = std::stod(argv[6]);
   // argv[7] is a maximum input count for bounded regression probes; 0 means all.
   const auto maximum = std::stoul(argv[7]);
+  if (const char * mode = std::getenv("GO2_REPLAY_ARC")) {
+    if (std::string(mode) != "pair") {
+      throw std::runtime_error("GO2_REPLAY_ARC supports pair only; unset for retained");
+    }
+    pairArc = true;
+  }
   const std::string loss = argc == 11 ? argv[10] : "None";
   if (loss != "None" && loss != "HuberLoss" && loss != "CauchyLoss") {
     throw std::runtime_error("unsupported Ceres loss function");
@@ -186,18 +202,27 @@ int main(int argc, char ** argv)
   }
   decisions.open(output + "-decisions.jsonl");
   decisions << std::setprecision(17);
+  // A matching-off diagnostic has zero edges; keep its event stream valid and empty.
+  std::ofstream(output + "-edges.jsonl").close();
   setenv("G02_EDGE_EVIDENCE", (output + "-edges.jsonl").c_str(), 1);
   // Reuse the observation patch for opt-in per-wall raw endpoint diagnostics.
   const char * rawScans = std::getenv("GO2_REPLAY_SCAN_EVIDENCE");
   if (rawScans) {setenv("G02_SCAN_EVIDENCE", rawScans, 1);}
   else {unsetenv("G02_SCAN_EVIDENCE");}
-  unsetenv("G02_CANDIDATE_EVIDENCE");
+  const char * candidates = std::getenv("GO2_REPLAY_CANDIDATE_EVIDENCE");
+  if (candidates) {setenv("G02_CANDIDATE_EVIDENCE", candidates, 1);}
+  else {unsetenv("G02_CANDIDATE_EVIDENCE");}
   // Match and solve with one worker to avoid parallel floating point reductions.
   tbb::global_control workers(tbb::global_control::max_allowed_parallelism, 1);
   int ros_argc = 1;
   rclcpp::init(ros_argc, argv);
   rclcpp::NodeOptions options;
-  options.arguments({"--ros-args", "--params-file", argv[2]});
+  std::vector<std::string> arguments{"--ros-args", "--params-file", argv[2]};
+  if (const char * overrides = std::getenv("GO2_REPLAY_ROS_ARGS")) {
+    std::istringstream stream(overrides);
+    for (std::string token; stream >> token;) {arguments.push_back(token);}
+  }
+  options.arguments(arguments);
   options.parameter_overrides({rclcpp::Parameter("debug_logging", false),
     rclcpp::Parameter("use_sim_time", true),
 #ifdef GO2_RUNTIME_REPLAY
@@ -255,6 +280,7 @@ int main(int argc, char ** argv)
     online << "{\"source_id\":" << source->GetStateId() << ",\"time\":"
       << source->GetTime() << ",\"accepted\":" << (accepted ? "true" : "false");
     if (accepted) {
+      odometryArcs[scan->GetStateId()] = arc;
       online << ",\"id\":" << scan->GetStateId() << ",\"pose\":";
       pose(online, scan->GetCorrectedPose());
     } else {
