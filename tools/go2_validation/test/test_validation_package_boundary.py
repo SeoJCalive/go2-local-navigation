@@ -48,6 +48,7 @@ def test_given_validation_extraction_when_package_layout_is_read_then_runtime_an
         "test_live_navigation_observer_configuration.py",
         "test_nav2_shadow_runtime_configuration.py",
         "test_sim_session.py",
+        "test_sim_stop.py",
         "test_mujoco_rotation.py",
     }
 
