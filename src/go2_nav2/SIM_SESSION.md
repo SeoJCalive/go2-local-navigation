@@ -124,12 +124,14 @@ GUI 시험 전 simulator setup의 `0003-gui-integer-epoch.patch`를 적용한다
 3. 같은 ROS/DDS 환경의 별도 셸에서 아래 명령을 실행한다. RViz Global Options에는
    simulation time 항목이 없으므로 ROS parameter로 지정한다.
    `LD_LIBRARY_PATH="$PWD/third_party/tf2/install/tf2/lib:$LD_LIBRARY_PATH" rviz2 -d "$PWD/src/go2_mujoco_lidar/config/simulation.rviz" --ros-args -p use_sim_time:=true`
-   Fixed Frame은 `map`, `/map`·`/scan`·TF를 확인하고 Xbox로 실내를 주행한다.
+   Fixed Frame은 `map`, Map·LaserScan·RobotModel을 확인하고 Xbox로 실내를 주행한다.
    지도와 scan/robot pose의 일치를 육안 확인한다.
    simulation RobotModel은 canonical URDF의 collision primitive를 visual로 사용한다.
    외형 mesh와 달리 단순한 형상이지만 외부 `go2_description` 설치가 필요 없다.
    LiDAR의 matched LowState가 `/joint_states`의 12개 관절을 공급하고 기존
    robot_state_publisher만 다리 TF를 소유한다. RobotModel Status OK와 네 발 TF를 확인한다.
+   제공 설정에는 별도의 TF display가 없다. TF tree를 직접 표시하려면 Displays에서
+   TF를 추가하고, 변환 연결 자체는 RobotModel 상태나 별도 `tf2_echo`로 확인한다.
 4. 정지 후 위 CLI로 새 `runs/gui-map/route`를 저장한다. mapping ROS launch와
    owned child 종료를 확인하고 simulator/RL은 유지한다. 실제 현재 map pose로
    localization을 시작해 `INITIAL_POSE_ACCEPTED`와 `NAVIGATION_READY`를 확인한다.
@@ -137,7 +139,8 @@ GUI 시험 전 simulator setup의 `0003-gui-integer-epoch.patch`를 적용한다
    같은 domain에서 시작한다. bridge는 회전 axis 2를 쓰므로 새 세션의 전용 config는
    `joystick_type: "switch"`와 그 FIFO의 `joystick_device`로 다시 설정한다. 이때 RL 기립
    입력은 switch 배열의 LT axis 5·Start button 11이다. 기존 RViz를 유지했다면 세션 재시작 뒤
-   Map display 경고와 `/map` 표시를 다시 확인하고, 지도가 보이지 않으면 goal을 보내지 않는다.
+   Map·RobotModel Status와 `/map` 표시를 다시 확인하고, 지도가 보이지 않으면 goal을 보내지 않는다.
+   유지한 RViz의 `use_sim_time`도 true인지 확인한다.
    제공 설정의 Map class는 `go2_mujoco_lidar/TransientMap`이다. Humble 기본 Map은
    clock 역행 때 지도를 지우면서 구독을 유지해 일회 durable sample을 놓칠 수 있다.
    제공 class는 reset 때 구독을 갱신해 저장된 sample을 다시 받는다.
@@ -149,6 +152,19 @@ GUI 시험 전 simulator setup의 `0003-gui-integer-epoch.patch`를 적용한다
 7. 별도 셸에서 Domain 0 launch와 실제 simulator `-s`와 다른 `model_path`의
    bringup을 각각 실행해 node 생성 전 거부되는지 확인한다. 실제 world·domain은
    바꾸지 않는다. 종료는 아래 FINALIZED 확인 뒤 ROS → bridge → RL → simulator다.
+
+## 벽 근접 매핑의 알려진 제한
+
+일반 mapping과 simulation은 공유 `config/slam_mapping.yaml`을 사용한다.
+G02의 분산 .19 실험은 다른 confident 오연결을 막지 못해 철회했으며 소스와
+설치본 모두 원래 `loop_match_maximum_variance_coarse: 3.0`이다.
+Karto setter가 제곱하므로 내부 분산 한계는 9 m²다.
+탐색 폭 8 m·후보 거리 3 m·응답 .35/.45·최소 chain 10과 inflation은 유지한다.
+
+벽 근접 perceptual aliasing은 미해결이다. 소유자 지시로 분석에서 종료했고
+motion gate 구현·추가 GUI·G02 합격 지도와 근접 Nav2 목표 검증은 수행하지 않았다.
+조건·실패·후보 비교와 복원 범위는
+[G02 결과](../../docs/stabilization-2026-11/G02_WALL_HUG.md)를 따른다.
 
 ## 종료 순서
 

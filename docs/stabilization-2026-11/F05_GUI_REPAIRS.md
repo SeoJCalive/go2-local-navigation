@@ -22,6 +22,9 @@ clock 역행으로 RViz가 display를 reset하면 texture가 지워지지만 기
 DDS historical sample을 다시 받는다. 새로운 지도·TF 발행자는 추가하지 않았다.
 
 - 기본 RViz 설정: `src/go2_mujoco_lidar/config/simulation.rviz`.
+- 이 설정은 별도 TF display를 제거한 상태다. RobotModel의 연결 상태를 확인하는
+  절차와 TF 축을 그리는 display는 다르다. 문서는 필요 시 TF display를 추가하거나
+  `tf2_echo`로 확인하도록 명시한다.
 - GUI 시작 순서: RViz 먼저 3회, Map Server 먼저 3회, 총 6/6 표시 성공.
 - retained RViz: simulator/ROS를 새 epoch로 다시 시작한 추가 1회에서도 지도 재표시 성공.
 - 화면·원시 로그: `.omo/evidence/g02-wall-hug/{shots,live,f05-*.log}`.
@@ -32,6 +35,9 @@ launch hook이 lifecycle service를 호출할 때 native child가 이미 종료�
 G01에서는 8.9초 뒤 `MANAGED_SHUTDOWN_FAILED`가 발생했다.
 group을 유지한 상태에서 launch hook만으로 OS signal의 선행 전달을 되돌릴 수 없다.
 정규 수동 종료는 다음 한 명령을 사용한다.
+
+따라서 plain group Ctrl+C 자체가 고쳐진 것은 아니다. 8.9초 failure 경로를
+합격으로 처리하거나 오류 기록을 숨기지 않았고, 아래 단일 종료 명령이 검증된 대안이다.
 
 ```bash
 ros2 run go2_nav2 sim_stop --launch-pid "$ROS_LAUNCH_PID"
@@ -52,6 +58,8 @@ FINALIZED로 만든 뒤 launch PID만 SIGINT로 종료한다. simulator/RL/bridg
 - reset: 같은 PID에서 cloud/odom stamp가 318초에서 0.142초로 바뀐 뒤 다시 수신됐다.
 - 수락 종료: 여섯 lifecycle state 4, shutdown error 0, SIGTERM/SIGKILL 0, 잔류 0.
 - 수락 원문: `runs/f05-acceptance/result.json`, 모든 12 criteria와 `passed`가 true.
+- 이 수락은 F05 수정 뒤 수행한 결과다. G02에서는 합격 지도·최종 수정이 없어
+  별도 post-G02 acceptance를 실행하지 않았으며 F05 결과를 G02 합격으로 전용하지 않는다.
 - reset 경계의 관찰자에는 이전 epoch TF의 `TF_OLD_DATA` 경고가 남았고,
   recovery criterion과 stamp 변화·수신 재개는 별도로 통과했다.
 
