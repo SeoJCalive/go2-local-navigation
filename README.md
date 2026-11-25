@@ -1,3 +1,5 @@
+<!-- 목적: simulation workspace 준비·실행·검증 진입점. 고정 dependency와 ROS 입력을
+mapping/localization 결과로 연결한다. 실물 실행 승인과 성능 보증은 제공하지 않는다. -->
 # go2_local_navigation
 
 Unitree Go2의 MuJoCo 상태에서 LiDAR·odometry를 만들고, SLAM mapping과 저장 지도
@@ -15,7 +17,7 @@ FIFO bridge는 별도 process다. 현재 상태는 simulation `candidate`이며 
 | `src/go2_mujoco_lidar` | MuJoCo 센서·공개 sim launch·지도 저장 |
 | `optional/real_robot` | sensor/state-estimation/perception/control/bringup 5개 실물 후보 |
 | `tools/go2_validation` | fault·shadow·preflight 등 개발 검증 패키지 |
-| `third_party` | simulator/SDK/MuJoCo와 tf2의 고정 버전 설치 절차 |
+| `third_party` | simulator/SDK/MuJoCo·tf2·simulation SLAM의 고정 버전 설치 절차 |
 | `verification` | 추적 checkpoint와 과거 검증 인덱스 |
 | `docs/stabilization-2026-11` | 안정화 변경 이력과 검증 결과 |
 
@@ -31,7 +33,8 @@ FIFO bridge는 별도 process다. 현재 상태는 simulation `candidate`이며 
 Ubuntu 22.04·ROS Humble·Unitree ROS 메시지 overlay가 필요하다.
 시스템 의존성과 새 환경의 설치 계약은
 [simulator bootstrap](third_party/unitree_mujoco/README.md)과
-[tf2 bootstrap](third_party/tf2/README.md)을 따른다.
+[tf2 bootstrap](third_party/tf2/README.md)과
+[SLAM runtime overlay](third_party/slam_toolbox/README.md)를 따른다.
 아래 명령은 AGX 프로젝트 루트에서 실행한다. 기존 공유 checkout 대신 전용
 dependency root와 프로젝트 기본 build/install/log를 사용한다.
 
@@ -46,10 +49,12 @@ export MUJOCO_ROOT="$SIM_DEPS/mujoco-3.3.6"
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
 bash third_party/tf2/setup.sh
+bash third_party/slam_toolbox/setup.sh
+source third_party/slam_toolbox/install/local_setup.bash
 df -h .
 colcon build --base-paths src \
   --cmake-args -DCMAKE_BUILD_TYPE=Release --event-handlers console_direct+
-source install/setup.bash
+source install/local_setup.bash
 ```
 
 core는 4개다. 전체 10개를 빌드할 때는 `--base-paths src optional/real_robot
@@ -94,7 +99,8 @@ Start+D-pad Down으로 FixStand → Velocity_Down을 선택한다.
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
-source /home/bi-agx1/go2_projects/projects/go2_local_navigation/install/setup.bash
+source /home/bi-agx1/go2_projects/projects/go2_local_navigation/third_party/slam_toolbox/install/local_setup.bash
+source /home/bi-agx1/go2_projects/projects/go2_local_navigation/install/local_setup.bash
 export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # 실제 XML의 lo-only interface와 loopback peer로 제한한다.
 export CYCLONEDDS_URI="file:///home/bi-agx1/go2_projects/projects/go2_local_navigation/src/go2_mujoco_lidar/config/cyclonedds_loopback.xml"
@@ -107,6 +113,9 @@ ros2 launch go2_mujoco_lidar go2_sim_navigation.launch.py \
 mapping:=false`를 사용한다. mapping을 포함한 정규 운영은 tf2 pin을 적용하는
 `go2_sim_navigation.launch.py`를 사용한다.
 world는 simulator의 `-s`에서 읽어 raycast에 전달하고 경로·SHA-256을 기록한다.
+simulation mapping만 원래 linked-node odometry XY 거리가 1.0 m를 넘는 loop를
+수락 전에 거부한다. 기본 0.0과 실물 mapping YAML은 유지하며, launch는 workspace
+순서로 선택된 전용 SLAM overlay가 없으면 준비 명령을 포함한 오류로 종료한다.
 기본 센서는 `720×8`, 수직 `±15°`이며 base 방위각별 최소 절대 elevation ray를
 고르는 planar-selected cloud가 `/scan` 입력이다. sensor-frame 단일 수평 layer와
 다르므로 기본 실행에서 raster override를 생략한다.

@@ -1,3 +1,5 @@
+<!-- 목적: 독립 simulation 수용 절차. 고정 route/goal과 native 입력을 결과·잔여물
+판정으로 연결한다. 실제 로봇 동작·전체 지도 정확도는 이 절차의 검증 범위 밖이다. -->
 # MuJoCo 수용 시험
 
 자신의 simulator·RL controller·FIFO bridge를 시작해 mapping → 지도 저장 →
@@ -31,12 +33,14 @@ BUILD_ACCEPTANCE=1 bash third_party/unitree_mujoco/setup.sh "$SIM_DEPS"
 source /opt/ros/humble/setup.bash
 source /home/bi-agx1/unitree_ros2/cyclonedds_ws/install/setup.bash
 bash third_party/tf2/setup.sh
+bash third_party/slam_toolbox/setup.sh
+source third_party/slam_toolbox/install/local_setup.bash
 export UNITREE_MUJOCO_ROOT="$SIM_DEPS/unitree_mujoco"
 export MUJOCO_ROOT="$SIM_DEPS/mujoco-3.3.6"
 df -h .
 colcon build --packages-select go2_nav2 go2_mujoco_lidar \
   --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-source install/setup.bash
+source install/local_setup.bash
 source ../go2_nav2_mujoco_bridge/install/local_setup.bash
 export A="$PWD/src/go2_mujoco_lidar/test/acceptance"
 export ROS_DOMAIN_ID=41 ROS_LOCALHOST_ONLY=1 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp

@@ -5,6 +5,7 @@ reader fix). Lines holds partial frames. PoseMonitor interpolates bracketed GT,
 transforms world to map and associates only new inserted loops. The CLI replays
 a prepared directory to JSON; no pad, ROS or simulator is opened. See README.md
 and G02_WALL_HUG.md; this is telemetry evidence, not a SLAM correctness proof.
+CLI replay uses the same complete-line framing for native shutdown suffixes.
 """
 import bisect
 import json
@@ -97,13 +98,18 @@ class PoseMonitor:
 def replay(root, transform):
     import csv
     root=Path(root)
+    def framed(name):
+        reader=Lines(root/name)
+        try:
+            yield from reader.read()
+        finally:
+            reader.close()
     def records(name):
-        with (root/name).open() as stream:
-            return [json.loads(line) for line in stream if line.endswith("\n")]
-    with (root/"physics-truth.csv").open() as stream:
-        truth=[tuple(float(r[k]) for k in ("time","x","y")) for r in csv.DictReader(stream)]
-    with (root/"slam-pose.csv").open() as stream:
-        poses=[tuple(float(r[k]) for k in ("time","x","y")) for r in csv.DictReader(stream)]
+        return [json.loads(line) for line in framed(name)]
+    truth=[tuple(float(r[k]) for k in ("time","x","y"))
+           for r in csv.DictReader(framed("physics-truth.csv"))]
+    poses=[tuple(float(r[k]) for k in ("time","x","y"))
+           for r in csv.DictReader(framed("slam-pose.csv"))]
     monitor=PoseMonitor(transform)
     monitor.feed(truth,poses,records("karto-edges.jsonl"),records("driver-trace.jsonl"))
     if monitor.pending:

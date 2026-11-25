@@ -7,6 +7,8 @@
 // A>=0 selects current-graph distance and XY/yaw drift bounds (A deg/m, B deg).
 // LOSS is None/HuberLoss/CauchyLoss, a process-only Ceres parameter override.
 // OUTPUT_PREFIX must have an existing parent. See ../README.md for input pins.
+// GO2_RUNTIME_REPLAY는 built runtime SDK/configure를 사용한다. X는 ROS parameter로
+// 전달하고 callback gate는 호출하지 않는다. 결정론적 offline solver만 공유한다.
 #include "karto_sdk/Mapper.h"
 #include "solvers/ceres_solver.hpp"
 #include "slam_toolbox/slam_mapper.hpp"
@@ -22,7 +24,11 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#ifdef GO2_RUNTIME_REPLAY
+extern "C" int go2RuntimeGateVersion();
+#else
 extern "C" int go2ReplayPatchVersion();
+#endif
 
 namespace
 {
@@ -151,9 +157,15 @@ static void pose(std::ostream & out, const karto::Pose2 & value)
 
 int main(int argc, char ** argv)
 {
+#ifdef GO2_RUNTIME_REPLAY
+  if (go2RuntimeGateVersion() != 1) {
+    throw std::runtime_error("built runtime Karto library is not loaded");
+  }
+#else
   if (go2ReplayPatchVersion() != 2) {
     throw std::runtime_error("repo-only Karto replay patch is not loaded");
   }
+#endif
   if (argc != 8 && argc != 11) {
     throw std::runtime_error("engine_replay DATA YAML PREFIX X K C MAX_INPUTS [A B LOSS]");
   }
@@ -188,6 +200,9 @@ int main(int argc, char ** argv)
   options.arguments({"--ros-args", "--params-file", argv[2]});
   options.parameter_overrides({rclcpp::Parameter("debug_logging", false),
     rclcpp::Parameter("use_sim_time", true),
+#ifdef GO2_RUNTIME_REPLAY
+    rclcpp::Parameter("loop_closure_max_odom_distance", distanceLimit),
+#endif
     rclcpp::Parameter("ceres_loss_function", loss)});
   auto node = rclcpp::Node::make_shared("slam_toolbox", options);
   node->declare_parameter("debug_logging", false);
@@ -195,6 +210,11 @@ int main(int argc, char ** argv)
   configured.configure(node);
   auto & mapper = *configured.getMapper();
   activeMapper = &mapper;
+#ifdef GO2_RUNTIME_REPLAY
+  if (mapper.getParamLoopClosureMaxOdomDistance() != distanceLimit) {
+    throw std::runtime_error("runtime ROS parameter did not reach Karto");
+  }
+#endif
   if (mapper.getParamLoopMatchMaximumVarianceCoarse() != 3.) {
     throw std::runtime_error("counterfactual contract requires unchanged sigma 3.0");
   }
