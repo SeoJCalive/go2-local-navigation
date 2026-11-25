@@ -1,0 +1,177 @@
+diff --git a/lib/karto_sdk/src/Mapper.cpp b/lib/karto_sdk/src/Mapper.cpp
+index e969404..949dca7 100644
+--- a/lib/karto_sdk/src/Mapper.cpp
++++ b/lib/karto_sdk/src/Mapper.cpp
+@@ -22,6 +22,9 @@
+ #include <boost/serialization/vector.hpp>
+ #include <sstream>
+ #include <fstream>
++#include <iomanip>
++#include <cstdlib>
++#include <cmath>
+ #include <stdexcept>
+ #include <queue>
+ #include <set>
+@@ -46,6 +49,52 @@ BOOST_CLASS_EXPORT(karto::Mapper)
+ namespace karto
+ {
+
++// Observation only: selected raw scans and actual graph edges, without changing
++// matching, acceptance, covariances, graph structure, or optimization.
++namespace
++{
++thread_local bool g02LoopLinkActive = false;
++
++void g02RecordScan(LocalizedRangeScan * scan)
++{
++  const char * path = std::getenv("G02_SCAN_EVIDENCE");
++  if (path == nullptr) {return;}
++  static std::ofstream out(path);
++  const auto laser = scan->GetLaserRangeFinder();
++  const auto pose = scan->GetSensorPose();
++  out << std::setprecision(17) << "{\"scan_id\":" << scan->GetStateId()
++      << ",\"time\":" << scan->GetTime()
++      << ",\"sensor_pose\":[" << pose.GetX() << "," << pose.GetY() << ","
++      << pose.GetHeading() << "],\"angle_min\":" << laser->GetMinimumAngle()
++      << ",\"angle_increment\":" << laser->GetAngularResolution()
++      << ",\"range_min\":" << laser->GetMinimumRange()
++      << ",\"range_max\":" << laser->GetRangeThreshold() << ",\"ranges\":[";
++  const auto ranges = scan->GetRangeReadings();
++  for (kt_int32u i = 0; i < scan->GetNumberOfRangeReadings(); ++i) {
++    if (i != 0) {out << ",";}
++    if (std::isfinite(ranges[i])) {out << ranges[i];} else {out << "null";}
++  }
++  out << "]}\n";
++  out.flush();
++}
++
++void g02RecordEdge(LocalizedRangeScan * from, LocalizedRangeScan * to,
++  const Pose2 & mean, bool isNew)
++{
++  const char * path = std::getenv("G02_EDGE_EVIDENCE");
++  if (path == nullptr) {return;}
++  static std::ofstream out(path);
++  out << std::setprecision(17) << "{\"from_scan_id\":" << from->GetStateId()
++      << ",\"from_time\":" << from->GetTime()
++      << ",\"to_scan_id\":" << to->GetStateId() << ",\"to_time\":" << to->GetTime()
++      << ",\"loop\":" << (g02LoopLinkActive ? "true" : "false")
++      << ",\"new_edge\":" << (isNew ? "true" : "false")
++      << ",\"match_sensor_pose\":[" << mean.GetX() << "," << mean.GetY() << ","
++      << mean.GetHeading() << "]}\n";
++  out.flush();
++}
++}
++
+ // enable this for verbose debug information
+ // #define KARTO_DEBUG
+
+@@ -1499,17 +1548,22 @@ void MapperGraph::AddEdges(LocalizedRangeScan * pScan, const Matrix3 & rCovarian
+
+ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSensorName)
+ {
++  g02RecordScan(pScan);
+   kt_bool loopClosed = false;
++  std::cout << "G02_LOOP event=scan_begin scan=" << pScan->GetStateId()
++            << " time=" << pScan->GetTime() << " info=" << std::endl;
+
+   kt_int32u scanIndex = 0;
+
+   LocalizedRangeScanVector candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
+
+   while (!candidateChain.empty()) {
++    const Pose2 g02PriorPose = pScan->GetSensorPose();
+     Pose2 bestPose;
+     Matrix3 covariance;
+     kt_double coarseResponse = m_pLoopScanMatcher->MatchScan(pScan, candidateChain,
+         bestPose, covariance, false, false);
++    const Matrix3 g02CoarseCovariance = covariance;
+
+     std::stringstream stream;
+     stream << "COARSE RESPONSE: " << coarseResponse <<
+@@ -1519,6 +1573,10 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
+       " (< " << m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue() << ")";
+
+     m_pMapper->FireLoopClosureCheck(stream.str());
++    std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++              << " time=" << pScan->GetTime() << " info=COARSE RESPONSE: "
++              << coarseResponse << " var: " << covariance(0, 0) << ", "
++              << covariance(1, 1) << std::endl;
+
+     if ((coarseResponse > m_pMapper->m_pLoopMatchMinimumResponseCoarse->GetValue()) &&
+       (covariance(0, 0) < m_pMapper->m_pLoopMatchMaximumVarianceCoarse->GetValue()) &&
+@@ -1538,17 +1596,57 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
+       stream1 << "FINE RESPONSE: " << fineResponse << " (>" <<
+         m_pMapper->m_pLoopMatchMinimumResponseFine->GetValue() << ")" << std::endl;
+       m_pMapper->FireLoopClosureCheck(stream1.str());
++      std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++                << " time=" << pScan->GetTime() << " info=FINE RESPONSE: "
++                << fineResponse << std::endl;
++      // Observation only. The same actual-data replay must reproduce native
++      // edges before these recovered candidate details can describe a past run.
++      const char * g02CandidatePath = std::getenv("G02_CANDIDATE_EVIDENCE");
++      if (g02CandidatePath != nullptr) {
++        static std::ofstream out(g02CandidatePath);
++        out << std::setprecision(17) << "{\"scan_id\":" << pScan->GetStateId()
++            << ",\"time\":" << pScan->GetTime() << ",\"chain_size\":"
++            << candidateChain.size() << ",\"prior_sensor_pose\":["
++            << g02PriorPose.GetX() << "," << g02PriorPose.GetY() << ","
++            << g02PriorPose.GetHeading() << "],\"coarse_response\":"
++            << coarseResponse << ",\"coarse_covariance\":[";
++        for (int i = 0; i < 3; ++i) {
++          for (int j = 0; j < 3; ++j) {
++            if (i != 0 || j != 0) {out << ",";}
++            out << g02CoarseCovariance(i, j);
++          }
++        }
++        out << "],\"fine_response\":" << fineResponse
++            << ",\"fine_sensor_pose\":[" << bestPose.GetX() << ","
++            << bestPose.GetY() << "," << bestPose.GetHeading()
++            << "],\"chain\":[";
++        for (size_t i = 0; i < candidateChain.size(); ++i) {
++          if (i != 0) {out << ",";}
++          const auto pose = candidateChain[i]->GetSensorPose();
++          out << "{\"scan_id\":" << candidateChain[i]->GetStateId()
++              << ",\"pose\":[" << pose.GetX() << "," << pose.GetY() << ","
++              << pose.GetHeading() << "]}";
++        }
++        out << "]}\n";
++        out.flush();
++      }
+
+       if (fineResponse < m_pMapper->m_pLoopMatchMinimumResponseFine->GetValue()) {
+         m_pMapper->FireLoopClosureCheck("REJECTED!");
++        std::cout << "G02_LOOP event=check scan=" << pScan->GetStateId()
++                  << " time=" << pScan->GetTime() << " info=REJECTED!" << std::endl;
+       } else {
+         m_pMapper->FireBeginLoopClosure("Closing loop...");
+
+         pScan->SetSensorPose(bestPose);
++        g02LoopLinkActive = true;
+         LinkChainToScan(candidateChain, pScan, bestPose, covariance);
++        g02LoopLinkActive = false;
+         CorrectPoses();
+
+         m_pMapper->FireEndLoopClosure("Loop closed!");
++        std::cout << "G02_LOOP event=accepted scan=" << pScan->GetStateId()
++                  << " time=" << pScan->GetTime() << " info=Loop closed!" << std::endl;
+
+         loopClosed = true;
+       }
+@@ -1557,6 +1655,9 @@ kt_bool MapperGraph::TryCloseLoop(LocalizedRangeScan * pScan, const Name & rSens
+     candidateChain = FindPossibleLoopClosure(pScan, rSensorName, scanIndex);
+   }
+
++  std::cout << "G02_LOOP event=scan_end scan=" << pScan->GetStateId()
++            << " time=" << pScan->GetTime() << " info="
++            << (loopClosed ? "accepted" : "no_accepted_closure") << std::endl;
+   return loopClosed;
+ }
+
+@@ -1626,6 +1727,7 @@ void MapperGraph::LinkScans(
+   if (pEdge == NULL) {
+     return;
+   }
++  g02RecordEdge(pFromScan, pToScan, rMean, isNewEdge);
+
+   // only attach link information if the edge is new
+   if (isNewEdge == true) {
