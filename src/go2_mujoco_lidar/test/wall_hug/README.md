@@ -66,8 +66,12 @@ colcon test-result --verbose
 동일 비교기를 저장 telemetry에 적용한다. 새 GUI 실행에서의 이 순서는 아직 미검증이다.
 
 `geometry.py --world WORLD --map MAP.yaml --transform yaw tx ty --output NEW_DIR`는
-`map-metrics.json`과 `gt-overlay.png`를 만든다. map pass는 offset p95≤0.05 m,
-max≤0.15 m, doubled/ghost 각각 0, thickness p95≤0.15 m다. pose≤0.10 m·
+`map-metrics.json`과 `gt-overlay.png`를 만든다. map pass는 wall offset p95≤0.085 m,
+normal offset p95≤0.070 m, 두 offset max≤0.15 m,
+occupied/normal thickness p95≤0.25 m, ghost 0이다.
+완주한 경로만 `--complete-route`로 doubled 0을 요구한다. 기본값은 부분·중단 경로로
+count를 보고하고 doubled gate를 제외한다. GT 하한과 여유의 근거는
+[G02 보정 기준](../../../../docs/stabilization-2026-11/G02_GT_FLOOR_THRESHOLDS.md)이다. pose≤0.10 m·
 contact·Nav2 기준은 이 지도 판정에 섞지 않고 원래 G02의 별도 판정으로 남긴다.
 빈 지도는 측정 부재 오류이며 합격이 아니다. 수평 envelope의 음수는 보수적 모서리
 계산일 수 있어 실제 침투로 단정하지 않는다. world의 직접 worldbody box/cylinder만

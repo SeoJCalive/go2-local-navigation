@@ -5,6 +5,7 @@ localization 지도와 pose를 검증한 뒤에만 node를 시작한다. domain 
 수명 동안 유지한다. mode 전환은 이전 launch의 완전 종료 후 새 launch로 수행한다.
 localization 종료는 Nav2 → localization lifecycle을 먼저 FINALIZED로 만든다.
 mapping은 workspace source 순서로 선택된 전용 SLAM overlay에 1 m gate를 전달한다.
+simulation 순차 matcher smear만 .03 m로 줄인다. 실물 공통 YAML은 유지한다.
 그 뒤 입력에 signal을 보내 /clock 중단 뒤 TF ROS-time timeout이 멈추는 일을 막는다.
 """
 
@@ -92,6 +93,7 @@ def _start(context):
             parameters=[str(share / "config/slam_mapping.yaml"), {
                 "use_sim_time": True,
                 "loop_closure_max_odom_distance": 1.0,
+                "correlation_search_space_smear_deviation": .03,
                 "debug_logging": ParameterValue(
                     LaunchConfiguration("slam_debug_logging", default="false"), value_type=bool),
             }]))
