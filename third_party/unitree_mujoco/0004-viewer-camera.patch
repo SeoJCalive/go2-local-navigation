@@ -1,0 +1,91 @@
+diff --git a/simulate/src/viewer_camera.h b/simulate/src/viewer_camera.h
+new file mode 100644
+--- /dev/null
++++ b/simulate/src/viewer_camera.h
+@@ -0,0 +1,42 @@
++// 목적: 모델 로딩 뒤 로봇 추적 카메라의 표시 기본값만 설정한다.
++// 입력: 모델 body 이름, GO2_VIEWER_DISTANCE(m, 기본 19.5),
++// GO2_VIEWER_ELEVATION(deg, 기본 -90). 출력: UI 카메라와 시작 로그.
++// Simulate::Load가 render thread의 모델 정렬을 마친 뒤 mutex 안에서 호출한다.
++// physics/model/data와 키보드·마우스의 이후 카메라 조작은 바꾸지 않는다.
++#pragma once
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <mujoco/mujoco.h>
++#include "simulate.h"
++
++inline double viewer_value(const char* name, double value, double low, double high)
++{
++  if (const char* text = std::getenv(name)) {
++    char* end = nullptr;
++    value = std::strtod(text, &end);
++    if (end == text || *end || !std::isfinite(value) || value < low || value > high) {
++      mju_error("Invalid %s: %s", name, text);
++    }
++  }
++  return value;
++}
++
++inline void configure_viewer(mujoco::Simulate& sim, const mjModel* model)
++{
++  const std::unique_lock<std::recursive_mutex> lock(sim.mtx);
++  int body = mj_name2id(model, mjOBJ_BODY, "base_link");
++  if (body < 0) body = mj_name2id(model, mjOBJ_BODY, "torso_link");
++  if (body < 0) mju_error("Viewer requires base_link or torso_link");
++  sim.cam.type = mjCAMERA_TRACKING;
++  sim.cam.trackbodyid = body;
++  sim.cam.fixedcamid = -1;
++  sim.cam.distance = viewer_value("GO2_VIEWER_DISTANCE", 19.5, mjMINVAL, 1000);
++  sim.cam.elevation = viewer_value("GO2_VIEWER_ELEVATION", -90, -90, 0);
++  sim.cam.azimuth = 90;
++  sim.camera = 1;
++  std::printf("GO2_VIEWER body=%d type=%d distance=%.3f azimuth=%.1f elevation=%.1f ui0=%d ui1=%d\n",
++              body, sim.cam.type, sim.cam.distance, sim.cam.azimuth,
++              sim.cam.elevation, sim.ui0_enable, sim.ui1_enable);
++  std::fflush(stdout);
++}
+diff --git a/simulate/src/main.cc b/simulate/src/main.cc
+--- a/simulate/src/main.cc
++++ b/simulate/src/main.cc
+@@ -33,6 +33,7 @@
+ #include "array_safety.h"
+ #include "unitree_sdk2_bridge.h"
+ #include "simulation_step.h"
++#include "viewer_camera.h"
+ #include "param.h"
+ 
+ #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
+@@ -375,6 +376,7 @@
+         if (dnew)
+         {
+           sim.Load(mnew, dnew, sim.dropfilename);
++          configure_viewer(sim, mnew);
+ 
+           mj_deleteData(d);
+           mj_deleteModel(m);
+@@ -405,6 +407,7 @@
+         if (dnew)
+         {
+           sim.Load(mnew, dnew, sim.filename);
++          configure_viewer(sim, mnew);
+ 
+           mj_deleteData(d);
+           mj_deleteModel(m);
+@@ -577,6 +580,7 @@
+     if (d)
+     {
+       sim->Load(m, d, filename);
++      configure_viewer(*sim, m);
+       mj_forward(m, d);
+ 
+       // allocate ctrlnoise
+@@ -746,6 +750,8 @@
+     std::make_unique<mj::GlfwAdapter>(),
+     &cam, &opt, &pert, /* is_passive = */ false);
+   active_sim = sim.get();
++  sim->ui0_enable = 0;
++  sim->ui1_enable = 0;
+ 
+   std::thread unitree_thread(UnitreeSdk2BridgeThread, sim.get());
+ 

@@ -17,6 +17,15 @@ patch와 설치 절차를 `third_party/unitree_mujoco/`에서 함께 관리한�
   step으로 시간을 계산한다. bridge는 physics/UI mutex 안에서 한 snapshot을 읽고
   Low tick과 Sport stamp를 같은 nanosecond 값에서 만든다. Backspace reset과
   history seek는 다음 step에서 counter를 재설정한다. acceptance도 같은 helper를 쓴다.
+- `0004-viewer-camera.patch`: 좌우 UI를 기본으로 숨기고 모델 로딩이 끝난 뒤
+  `base_link`(없으면 기존 simulator의 `torso_link`)를 추적한다.
+  기본 거리 19.5 m, 방위 90°, 고도 -90°(수직 하향)다.
+  `GO2_VIEWER_DISTANCE`(m, 양수), `GO2_VIEWER_ELEVATION`(deg, -90 이상 0 이하)로
+  실행마다 조정한다. Tab/Shift+Tab으로 패널을 표시할 수 있다.
+  G02 보존 camera hook의 6.5 m/-70°/90°에서 소유자가 선택한 거리 3배 수직 시점이며,
+  physics와 모델의 statistic/visual 값은 변경하지 않는다.
+  일반 upstream free camera는 scene extent 10의 1.5배인 15 m와
+  scene visual의 -90°/-70°에서 시작한다. G02는 별도 preload가 이를 덮어썼다.
 - `0002-agx-config-snapshot.patch`: 2026-11-24 AGX의 나머지 미커밋 변경을 보존한다.
   형제 bridge world 절대 경로와 joystick FIFO가 들어 있으므로 자동 설치에는 적용하지 않는다.
   해당 world/FIFO의 생성·실행은 별도 세션 설정이다.
@@ -82,7 +91,7 @@ APPLY_AGX_CONFIG=1 MUJOCO_DIST_ROOT="$SHARED/mujoco-dist" \
   bash third_party/unitree_mujoco/setup.sh "$SHARED"
 ```
 
-매 setup은 pinned simulator의 `git archive`로 만든 임시 clean tree에 0001·0003과
+매 setup은 pinned simulator의 `git archive`로 만든 임시 clean tree에 0001·0003·0004와
 선택한 0002를 적용하고 header·main·step helper·config를 `cmp`한다.
 `PINNED_PATCH_BYTE_COMPARE PASS`는 공유 수정본을 복사한 결과가 아닌 clean apply와의
 byte 일치다. 임시 tree는 종료 시 제거하며 공유 evidence 디렉터리는 보존한다.

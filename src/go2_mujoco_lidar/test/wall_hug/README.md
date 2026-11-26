@@ -40,6 +40,20 @@ colcon test-result --verbose
 
 ## 유지보수 경계
 
+`runtime_gui.py --g02 --record-video`는 기존 GUI 실행에 선택 녹화를 추가한다.
+기본은 꺼짐이다. `prepare()`가 `Xvfb -displayfd`로 받은 전용 DISPLAY를
+PNG 캡처와 녹화가 함께 사용한다(고정 `:0`이 아님).
+`record_video.py`는 root 화면을 10 fps, x264 ultrafast/zerolatency, encoder
+thread 1로 `live/video-*.mp4`에 기록한다. 종료 시 gst-launch의 `-e`와 SIGINT로
+EOS를 보내 MP4 index를 완성한 뒤 다른 GUI 프로세스를 정리한다.
+로그·파일·EOS 실패는 실행 오류로 보고하며 무음으로 녹화를 생략하지 않는다.
+독립 유휴 확인은 이미 실행 중인 DISPLAY에서 다음과 같이 한다.
+
+```bash
+python3 src/go2_mujoco_lidar/test/wall_hug/record_video.py \
+  --display :91 --output "$PWD/.omo/evidence/g02-wall-hug/live/idle.mp4" --duration 30
+```
+
 | 파일 | 입력 → 처리 → 출력 | 검사 |
 | --- | --- | --- |
 | `path_tracker.py` | 고정 waypoint·qpos → arc/lookahead → pad 축 명령 | 직선·코너·역행·종료 |
