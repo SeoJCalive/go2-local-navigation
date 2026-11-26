@@ -62,6 +62,15 @@ false-loop collapse 음성 대조로 바꾸어 해석하지 않았다. 모든 kn
 count는 양수이며, 과거 near=.20 m cutoff 밖의 추가 run도 측정하므로 일부는
 이전보다 늘었다. normal offset/폭의 기존 near 선택 범위는 바꾸지 않았다.
 
+2026-11-26 소유자가 known-bad 검증 기준을 정정하고 병합을 승인했다.
+`gate=none` 자체는 불량 지도라는 뜻이 아니다. `sep-wallboth`는 wrong loop 0,
+pose max .0698 m, wall p95 .032 m이며, [기존 원인 표](G02_COUNTERFACTUAL_REPLAY.md#오류-loop-0이어도-남는-이중벽의-원인)의
+465행에서 한 개의 이전 doubled를 실제 두 면·raster·중심선 교차 artifact로
+분류했다. 따라서 이 지도의 1→0과 지도 gate 통과는 올바른 양성 대조다.
+known-bad 집합은 wrong loop가 있거나 pose 오차가 큰 지도이며, 위 표의 해당
+지도는 모두 새 기준에서도 FAIL이다. 앞선 모든 none FAIL 요구에 따른 STOP은
+검증 기준의 오류였고 검출기 결함이 아니며, 다른 threshold 변경 없이 정정했다.
+
 ## 연속 GT node pose 이동
 
 run 10 독립 qpos GT의 2,123 scan 전체를 같은 Karto
