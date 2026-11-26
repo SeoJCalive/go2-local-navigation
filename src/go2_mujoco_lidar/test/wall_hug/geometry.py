@@ -7,6 +7,11 @@ GT floor: .05 m 셀에서 GT 6/9차 wall p95 .056019/.055566 m,
 부분 7차 normal p95 .041250 m에 반 셀 .025 m 이상 여유를 둔다.
 GT 6/7/9차 occupied 폭 p95 .20 m, normal 폭 최대 .20 m에
 한 셀 .05 m를 더해 두 폭 한계는 .25 m다. 부분 경로의 doubled는 보고만 한다.
+이중 벽은 각 occupied run 중심을 MJCF 실제 두 면 ±minor 중 가까운 면에
+한 번만 배정한다. 면 잔차 허용치는 기존 normal p95 한계 .070 m다.
+.05 m raster의 반 셀 .025 m를 제외한 이동 예산은 .045 m이며 별도 기준을
+완화하지 않는다. 분리된 run 중 이 허용치로 두 면 어느 쪽에도 설명되지 않는
+추가 run이 .20 m 이상 이어질 때만 이중 벽으로 센다.
 """
 import json
 import math
@@ -56,6 +61,22 @@ def distance(points, geoms):
     return best
 
 
+def face_assignment(centers, half_thickness):
+    """Assign each occupied run once to the nearest actual MJCF wall face."""
+    centers = np.asarray(centers, dtype=float)
+    faces = np.array([-half_thickness, half_thickness])
+    residuals = np.abs(centers[:, None] - faces)
+    assigned = np.argmin(residuals, axis=1)
+    return assigned, residuals[np.arange(len(centers)), assigned]
+
+
+def doubled_profile(centers, half_thickness):
+    """Two real faces explain runs only within the calibrated normal budget."""
+    _, residuals = face_assignment(centers, half_thickness)
+    return len(centers) > 1 and bool(np.any(
+        residuals > THRESHOLDS["normal_profile_offset_p95_m"]))
+
+
 def evaluate(world, map_yaml, transform, output):
     spec=yaml.safe_load(Path(map_yaml).read_text())
     image=np.array(Image.open(Path(map_yaml).parent/spec["image"]))
@@ -75,7 +96,7 @@ def evaluate(world, map_yaml, transform, output):
     offset=np.maximum(signed[occupied],0)
     if not len(offset):
         raise ValueError("map has no occupied wall measurements")
-    # Ghost/double components must extend >= .20m and lie > .15m from GT.
+    # Ghost components must extend >= .20m and lie > .15m from GT.
     ghosts=occupied&(np.abs(signed)>.15)
     labels,n=label(ghosts)
     sizes=np.bincount(labels.ravel())[1:]
@@ -136,12 +157,8 @@ def evaluate(world, map_yaml, transform, output):
                     offsets.append(abs(center_offset) if spans_wall else min(
                         abs(center_offset-minor),abs(center_offset+minor)))
                     widths.append(width)
-            sides=[[group for group in near if (
-                float(np.mean(normal_offsets[group]))) * sign >= 0 or (
-                    normal_offsets[group[0]]<0<normal_offsets[group[-1]])] for sign in (-1,1)]
-            has_double=any(len(side)>1 and max(
-                float(np.mean(normal_offsets[p])) for p in side)-min(
-                float(np.mean(normal_offsets[p])) for p in side)>.10 for side in sides)
+            has_double=doubled_profile(
+                [float(np.mean(normal_offsets[group])) for group in groups], minor)
             if has_double:
                 run+=1
             else:
