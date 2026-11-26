@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 목적: 전용 디렉터리에 고정 MuJoCo/SDK/simulator를 준비하고 Release로 빌드한다.
-# 흐름: upstream 고정 checkout -> 배포물 해시 검증 -> 상태 패치 -> SDK 설치 -> 빌드.
+# 흐름: upstream 고정 checkout -> 배포물 해시 검증 -> 상태·GUI 패치 -> SDK 설치 -> 빌드.
 # 입력: $1 설치 루트(기본 ~/.local/share/go2-local-navigation-sim), JOBS(기본 4).
 # BUILD_ACCEPTANCE=1이면 RL_ROOT의 기존 object로 전용 검증 driver도 만든다.
 # GitHub HTTPS 접근이 필요하다. 공유 갱신은 백업 후 APPLY_AGX_CONFIG=1로 명시한다.
@@ -53,8 +53,11 @@ fi
 
 patch="$patch_dir/0001-sport-state-simulation-time-imu.patch"
 epoch_patch="$patch_dir/0003-gui-integer-epoch.patch"
-# 0001 또는 0001+0003의 기존 설치를 인식한다. 임의 변경은 아래 byte 비교로 거부한다.
-if ! git -C "$root/unitree_mujoco" apply --reverse --check "$epoch_patch" 2>/dev/null; then
+viewer_patch="$patch_dir/0004-viewer-camera.patch"
+# 0004는 0003의 main context를 확장한다. 최종 패치부터 기존 설치를 인식한다.
+# 임의 변경은 아래 독립 clean apply와 byte 비교로 거부한다.
+if ! git -C "$root/unitree_mujoco" apply --reverse --check "$viewer_patch" 2>/dev/null &&
+   ! git -C "$root/unitree_mujoco" apply --reverse --check "$epoch_patch" 2>/dev/null; then
   if git -C "$root/unitree_mujoco" diff --quiet -- simulate/src/unitree_sdk2_bridge.h; then
     git -C "$root/unitree_mujoco" apply --check "$patch"
     git -C "$root/unitree_mujoco" apply "$patch"
@@ -63,6 +66,10 @@ if ! git -C "$root/unitree_mujoco" apply --reverse --check "$epoch_patch" 2>/dev
   fi
   git -C "$root/unitree_mujoco" apply --check "$epoch_patch"
   git -C "$root/unitree_mujoco" apply "$epoch_patch"
+fi
+if ! git -C "$root/unitree_mujoco" apply --reverse --check "$viewer_patch" 2>/dev/null; then
+  git -C "$root/unitree_mujoco" apply --check "$viewer_patch"
+  git -C "$root/unitree_mujoco" apply "$viewer_patch"
 fi
 if [[ "${APPLY_AGX_CONFIG:-0}" == 1 ]]; then
   config_patch="$patch_dir/0002-agx-config-snapshot.patch"
@@ -76,11 +83,12 @@ trap 'rm -rf -- "$reference"' EXIT
 git -C "$root/unitree_mujoco" archive "$sim_commit" | tar -x -C "$reference"
 git -C "$reference" apply "$patch"
 git -C "$reference" apply "$epoch_patch"
+git -C "$reference" apply "$viewer_patch"
 if [[ "${APPLY_AGX_CONFIG:-0}" == 1 ]]; then
   git -C "$reference" apply "$config_patch"
 fi
 for path in simulate/src/unitree_sdk2_bridge.h simulate/src/main.cc \
-  simulate/src/simulation_step.h simulate/config.yaml; do
+  simulate/src/simulation_step.h simulate/src/viewer_camera.h simulate/config.yaml; do
   cmp "$reference/$path" "$root/unitree_mujoco/$path"
 done
 git -C "$root/unitree_mujoco" diff --exit-code -- . \

@@ -84,6 +84,7 @@ if(BUILD_TESTING)
   target_link_libraries(wall_hug_clearance_test "${MUJOCO_LIBRARY}")
   ament_add_pytest_test(wall_hug_policy test/test_wall_hug_policy.py)
   ament_add_pytest_test(wall_hug_async test/test_wall_hug_async.py TIMEOUT 90)
+  ament_add_pytest_test(wall_hug_video test/test_wall_hug_video.py)
   ament_add_pytest_test(wall_hug_geometry test/test_wall_hug_geometry.py)
   ament_add_pytest_test(wall_hug_pose test/test_wall_hug_pose.py)
   ament_add_pytest_test(wall_hug_replay test/test_wall_hug_replay.py TIMEOUT 180

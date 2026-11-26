@@ -1,6 +1,7 @@
 """목적: 보존 G02 GUI 경로를 built runtime overlay로 한 번 재실행한다.
 
 흐름: 기존 orchestration의 SDK 주입만 제거하고 정식 driver/capture/contact를 연결한다.
+--record-video를 명시하면 같은 DISPLAY의 root 화면을 live/*.mp4에 녹화하고 EOS로 닫는다.
 입출력: 고정 route·GUI/physics assets → g02-wall-hug/live와 새 attempt 증거.
 주의: ROS/SLAM overlay source 후 --g02로 실행한다. 보정된 지도 기준만 공유한다.
 과거 evidence helper가 필요한 AGX 전용 runner이며 물리 로봇 실행은 지원하지 않는다.
@@ -22,6 +23,24 @@ def replace_once(source, old, new):
 
 
 source = (ROOT / "gui_run.py").read_text()
+source = replace_once(source, "capture_service=None",
+                      "capture_service=None\nvideo_service=None")
+source = replace_once(source, "global capture_service,pad_process",
+                      "global capture_service,pad_process,video_service")
+source = replace_once(
+    source, '    capture_service=AsyncCapture(ROOT,g["display"],g["owned"],g["RESULT"])',
+    '    capture_service=AsyncCapture(ROOT,g["display"],g["owned"],g["RESULT"])\n'
+    '    if "--record-video" in sys.argv:\n'
+    '        from record_video import VideoRecorder\n'
+    '        video_service=VideoRecorder(ROOT,g["display"],g["owned"],g["RESULT"])')
+source = replace_once(
+    source, "    if capture_service is not None:",
+    '    if video_service is not None:\n'
+    '        try:\n'
+    '            video_service.close()\n'
+    '        except Exception as error:\n'
+    '            g["RESULT"]["errors"].append("video cleanup "+str(error))\n'
+    '    if capture_service is not None:')
 source = replace_once(
     source, "벽면 근접 매핑 시작; 임계값 파일 고정",
     "1.0 m 게이트·smear .03 runtime 벽면 매핑 시작; GT 보정 기준·동일 경로")
