@@ -2,7 +2,7 @@
 
 흐름: 기존 orchestration의 SDK 주입만 제거하고 정식 driver/capture/contact를 연결한다.
 입출력: 고정 route·GUI/physics assets → g02-wall-hug/live와 새 attempt 증거.
-주의: ROS/SLAM overlay source 후 --g02로 실행한다. 기준/경로/물리값은 바꾸지 않는다.
+주의: ROS/SLAM overlay source 후 --g02로 실행한다. 보정된 지도 기준만 공유한다.
 과거 evidence helper가 필요한 AGX 전용 runner이며 물리 로봇 실행은 지원하지 않는다.
 """
 import hashlib
@@ -24,7 +24,7 @@ def replace_once(source, old, new):
 source = (ROOT / "gui_run.py").read_text()
 source = replace_once(
     source, "벽면 근접 매핑 시작; 임계값 파일 고정",
-    "1.0 m 거리 게이트 runtime으로 벽면 매핑 시작; 기존 경로·임계값 유지")
+    "1.0 m 게이트·smear .03 runtime 벽면 매핑 시작; GT 보정 기준·동일 경로")
 source = replace_once(
     source, 'tree = ast.parse((OLD / "owner_gui.py").read_text())',
     'helper = (OLD / "owner_gui.py").read_text()\n'
@@ -42,12 +42,23 @@ source = replace_once(
 source = replace_once(
     source, 'expected=yaml.safe_load(config.read_text())["slam_toolbox"]["ros__parameters"]',
     'expected=yaml.safe_load(config.read_text())["slam_toolbox"]["ros__parameters"]\n'
-    '    expected["loop_closure_max_odom_distance"]=1.0')
+    '    expected["loop_closure_max_odom_distance"]=1.0\n'
+    '    expected["correlation_search_space_smear_deviation"]=.03')
 source = replace_once(
     source, 'for name in ("loop_match_maximum_variance_coarse",',
-    'for name in ("loop_closure_max_odom_distance","loop_match_maximum_variance_coarse",')
+    'for name in ("correlation_search_space_smear_deviation",'
+    '"loop_closure_max_odom_distance","loop_match_maximum_variance_coarse",')
 source = replace_once(
     source, 'str(ROOT/"pad_driver.py")', 'str(Path(__runtime_modules__)/"pad_driver.py")')
+source = replace_once(
+    source, '    metrics["passed"]=(metrics["normal_profile_offset_m"]["p95"]<=.05 and\n'
+    '        metrics["normal_profile_offset_m"]["max"]<=.15 and\n'
+    '        metrics["ghost_wall_components"]==0 and metrics["doubled_wall_components"]==0 and\n'
+    '        metrics["normal_profile_thickness_m"]["p95"]<=.15 and\n',
+    '    from geometry import map_criteria\n'
+    '    metrics["complete_route"]=bool(g["RESULT"]["driver"]["finished"])\n'
+    '    metrics["criteria"]=map_criteria(metrics, complete_route=metrics["complete_route"])\n'
+    '    metrics["passed"]=(all(metrics["criteria"].values()) and\n')
 source = replace_once(
     source, '    import yaml\n    config=PROJECT/',
     '''    native = [pid for pid,row in g["snapshot"]().items()

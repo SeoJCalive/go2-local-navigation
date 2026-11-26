@@ -13,7 +13,45 @@ import json
 import tempfile
 import numpy as np
 from PIL import Image
-from geometry import evaluate, map_criteria
+from geometry import evaluate, map_criteria, THRESHOLDS
+
+
+def test_calibrated_thresholds_and_complete_route_gate():
+    assert THRESHOLDS["wall_offset_p95_m"] == .085
+    assert THRESHOLDS["normal_profile_offset_p95_m"] == .070
+    assert THRESHOLDS["normal_profile_thickness_p95_m"] == .25
+    assert THRESHOLDS["wall_thickness_p95_m"] == .25
+    assert THRESHOLDS["doubled_wall_components"] == 0
+    assert THRESHOLDS["ghost_wall_components"] == 0
+    assert THRESHOLDS["wall_offset_max_m"] == .15
+    assert THRESHOLDS["normal_profile_offset_max_m"] == .15
+    metrics = {
+        "wall_offset_m": {"p95": .085, "max": .15},
+        "normal_profile_offset_m": {"p95": .070, "max": .15},
+        "normal_profile_thickness_m": {"p95": .25},
+        "wall_thickness_m": {"p95": .25},
+        "doubled_wall_components": 0, "ghost_wall_components": 0,
+    }
+    assert all(map_criteria(metrics, complete_route=True).values())
+    for field, stat, criterion in (
+        ("wall_offset_m", "p95", "wall_offset_p95"),
+        ("wall_offset_m", "max", "wall_offset_max"),
+        ("normal_profile_offset_m", "p95", "normal_offset_p95"),
+        ("normal_profile_offset_m", "max", "normal_offset_max"),
+        ("normal_profile_thickness_m", "p95", "normal_thickness"),
+        ("wall_thickness_m", "p95", "wall_thickness"),
+    ):
+        original = metrics[field][stat]
+        metrics[field][stat] = np.nextafter(original, np.inf)
+        assert not map_criteria(metrics)[criterion]
+        metrics[field][stat] = original
+    metrics["doubled_wall_components"] = 6
+    assert not map_criteria(metrics, complete_route=True)["doubled_walls"]
+    assert "doubled_walls" not in map_criteria(metrics)
+    assert "doubled_walls" not in map_criteria(metrics, complete_route=False)
+    assert all(map_criteria(metrics, complete_route=False).values())
+    metrics["ghost_wall_components"] = 1
+    assert not map_criteria(metrics, complete_route=False)["ghost_walls"]
 
 def test_independent_maps_and_gates():
     with tempfile.TemporaryDirectory() as temp:
@@ -44,7 +82,7 @@ def test_independent_maps_and_gates():
         Image.fromarray(double).save(root/"map.pgm")
         extra=evaluate(world,root/"map.yaml",[0,0,0],root/"double.png")
         assert extra["doubled_wall_components"]>=1
-        assert not map_criteria(extra)["doubled_walls"]
+        assert not map_criteria(extra, complete_route=True)["doubled_walls"]
         ghost=image.copy(); ghost[10:15,10:15]=0
         Image.fromarray(ghost).save(root/"map.pgm")
         phantom=evaluate(world,root/"map.yaml",[0,0,0],root/"ghost.png")

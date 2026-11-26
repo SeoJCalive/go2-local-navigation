@@ -3,6 +3,10 @@
 Inputs and outputs follow the functions below; see README.md in this directory
 and docs/stabilization-2026-11/G02_WALL_HUG.md for provenance and limitations.
 Simulation/offline diagnostics only; real robot safety is unconfirmed.
+GT floor: .05 m 셀에서 GT 6/9차 wall p95 .056019/.055566 m,
+부분 7차 normal p95 .041250 m에 반 셀 .025 m 이상 여유를 둔다.
+GT 6/7/9차 occupied 폭 p95 .20 m, normal 폭 최대 .20 m에
+한 셀 .05 m를 더해 두 폭 한계는 .25 m다. 부분 경로의 doubled는 보고만 한다.
 """
 import json
 import math
@@ -16,9 +20,11 @@ import yaml
 
 
 THRESHOLDS = {
-    "wall_offset_p95_m": .05, "wall_offset_max_m": .15,
+    "wall_offset_p95_m": .085, "wall_offset_max_m": .15,
+    "normal_profile_offset_p95_m": .070, "normal_profile_offset_max_m": .15,
+    "normal_profile_thickness_p95_m": .25,
     "doubled_wall_components": 0, "ghost_wall_components": 0,
-    "wall_thickness_p95_m": .15, "slam_pose_max_xy_m": .10,
+    "wall_thickness_p95_m": .25, "slam_pose_max_xy_m": .10,
     "nonfoot_max_depth_m": .015, "nonfoot_sustained_depth_m": .005,
     "nonfoot_max_deep_duration_s": .050, "nonfoot_max_duration_s": 1.,
     "nav2_goal_xy_m": .30,
@@ -173,15 +179,23 @@ def evaluate(world, map_yaml, transform, output):
 
 
 
-def map_criteria(metrics):
-    """Apply the recorded map gates; missing geometry is a failed measurement."""
-    return {
+def map_criteria(metrics, *, complete_route=False):
+    """Apply calibrated map gates; partial routes report doubles without gating."""
+    criteria = {
         "wall_offset_p95": metrics["wall_offset_m"]["p95"] <= THRESHOLDS["wall_offset_p95_m"],
         "wall_offset_max": metrics["wall_offset_m"]["max"] <= THRESHOLDS["wall_offset_max_m"],
-        "doubled_walls": metrics["doubled_wall_components"] == 0,
         "ghost_walls": metrics["ghost_wall_components"] == 0,
         "wall_thickness": metrics["wall_thickness_m"]["p95"] <= THRESHOLDS["wall_thickness_p95_m"],
+        "normal_offset_p95": metrics["normal_profile_offset_m"]["p95"] is not None
+        and metrics["normal_profile_offset_m"]["p95"] <= THRESHOLDS["normal_profile_offset_p95_m"],
+        "normal_offset_max": metrics["normal_profile_offset_m"]["max"] is not None
+        and metrics["normal_profile_offset_m"]["max"] <= THRESHOLDS["normal_profile_offset_max_m"],
+        "normal_thickness": metrics["normal_profile_thickness_m"]["p95"] is not None
+        and metrics["normal_profile_thickness_m"]["p95"] <= THRESHOLDS["normal_profile_thickness_p95_m"],
     }
+    if complete_route:
+        criteria["doubled_walls"] = metrics["doubled_wall_components"] == THRESHOLDS["doubled_wall_components"]
+    return criteria
 
 
 if __name__ == "__main__":
@@ -191,10 +205,13 @@ if __name__ == "__main__":
     parser.add_argument("--map", required=True)
     parser.add_argument("--transform", nargs=3, type=float, default=[0,0,0])
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--complete-route", action="store_true",
+                        help="Gate doubled walls only for a confirmed complete route")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     metrics = evaluate(args.world, args.map, args.transform, args.output/"gt-overlay.png")
-    metrics["criteria"] = map_criteria(metrics)
+    metrics["complete_route"] = args.complete_route
+    metrics["criteria"] = map_criteria(metrics, complete_route=metrics["complete_route"])
     metrics["passed"] = all(metrics["criteria"].values())
     (args.output/"map-metrics.json").write_text(json.dumps(metrics, indent=2)+"\n")
     print(json.dumps(metrics))

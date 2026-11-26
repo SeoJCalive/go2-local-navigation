@@ -28,6 +28,7 @@ def test_simulation_gate_preserves_real_mapping_configuration():
         "adc6456037cc5448d7f4a8237026b57c7a9b7f895e7e8341de68f5d7143b1529")
     launch = (PROJECT / "src/go2_mujoco_lidar/launch/go2_sim_navigation.launch.py").read_text()
     assert '"loop_closure_max_odom_distance": 1.0' in launch
+    assert '"correlation_search_space_smear_deviation": .03' in launch
     assert 'get_package_prefix("slam_toolbox")' in launch
 
 
@@ -76,3 +77,22 @@ def test_gui_verifier_selects_native_argv0_and_owned_session():
     rows[14] = dict(session=10, argv=["/sdk/async_slam_toolbox_node"])
     with pytest.raises(RuntimeError, match="expected one runtime"):
         scope["select"]()
+
+
+def test_gui_template_uses_calibrated_gates_after_confirmed_route():
+    if not (PROJECT / ".omo/evidence/g02-wall-hug/gui_run.py").is_file():
+        pytest.skip("preserved AGX GUI helper absent; no simulator is started")
+    path = ROOT / "wall_hug/runtime_gui.py"
+    body = []
+    for statement in ast.parse(path.read_text()).body:
+        if (isinstance(statement, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == "route"
+                        for target in statement.targets)):
+            break
+        body.append(statement)
+    scope = {"__file__": str(path)}
+    exec(compile(ast.Module(body=body, type_ignores=[]), str(path), "exec"), scope)
+    compile(scope["source"], "preserved_gui_template", "exec")
+    assert 'metrics["complete_route"]=bool(g["RESULT"]["driver"]["finished"])' in scope["source"]
+    assert 'map_criteria(metrics, complete_route=metrics["complete_route"])' in scope["source"]
+    assert 'expected["correlation_search_space_smear_deviation"]=.03' in scope["source"]
