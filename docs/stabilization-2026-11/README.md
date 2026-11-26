@@ -23,6 +23,7 @@
 | [G02_COUNTERFACTUAL_REPLAY](G02_COUNTERFACTUAL_REPLAY.md) | 격리 Karto/Ceres·12개 raw dataset·motion/yaw gate·robust loss 비교와 잔여 이중벽 진단 |
 | [G02_RUNTIME_GATE](G02_RUNTIME_GATE.md) | built SDK 24회 동등성·거리 1 m GUI FAIL·정상 loop 거부 전체와 reader 판정 |
 | [G02_GT_FLOOR_THRESHOLDS](G02_GT_FLOOR_THRESHOLDS.md) | 독립 GT 하한·반 셀/한 셀 여유·완주별 doubled gate·simulation smear .03 |
+| [G02_DOUBLED_WALL_FACES](G02_DOUBLED_WALL_FACES.md) | 실제 두 면 배정·normal 예산 재사용·24개 연속 node 이동·known-bad·run 10 재판정 |
 | [W08_CLOSEOUT](W08_CLOSEOUT.md) | 문서·아카이브·전체 빌드/test 마감 |
 
 의존성 검증은 [simulator](../../third_party/unitree_mujoco/README.md)와

@@ -71,8 +71,11 @@ normal offset p95≤0.070 m, 두 offset max≤0.15 m,
 occupied/normal thickness p95≤0.25 m, ghost 0이다.
 완주한 경로만 `--complete-route`로 doubled 0을 요구한다. 기본값은 부분·중단 경로로
 count를 보고하고 doubled gate를 제외한다. GT 하한과 여유의 근거는
-[G02 보정 기준](../../../../docs/stabilization-2026-11/G02_GT_FLOOR_THRESHOLDS.md)이다. pose≤0.10 m·
-contact·Nav2 기준은 이 지도 판정에 섞지 않고 원래 G02의 별도 판정으로 남긴다.
+[G02 보정 기준](../../../../docs/stabilization-2026-11/G02_GT_FLOOR_THRESHOLDS.md)이다.
+이중 벽은 MJCF의 실제 두 면에 각 run을 한 번 배정하고 기존 normal 허용치
+.070 m 밖의 추가 run만 센다. [두 면 검증](../../../../docs/stabilization-2026-11/G02_DOUBLED_WALL_FACES.md)에
+허용치 분해와 모든 GT/합성 이동/불량 지도 대조를 보존한다.
+pose≤0.10 m·contact·Nav2 기준은 이 지도 판정에 섞지 않고 원래 G02의 별도 판정으로 남긴다.
 빈 지도는 측정 부재 오류이며 합격이 아니다. 수평 envelope의 음수는 보수적 모서리
 계산일 수 있어 실제 침투로 단정하지 않는다. world의 직접 worldbody box/cylinder만
 GT로 읽으며 다른 MJCF 구성에 대한 일반성은 미확인이다.

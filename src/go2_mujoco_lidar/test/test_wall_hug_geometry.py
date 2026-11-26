@@ -13,7 +13,32 @@ import json
 import tempfile
 import numpy as np
 from PIL import Image
-from geometry import evaluate, map_criteria, THRESHOLDS
+from geometry import evaluate, map_criteria, THRESHOLDS, face_assignment, doubled_profile
+
+
+def test_nearest_real_faces_and_calibrated_extra_runs():
+    # Run 10: the negative face interval crosses zero. It is assigned once.
+    faces, residuals = face_assignment([.00875, .10875], .06)
+    assert faces.tolist() == [1, 1]
+    assert np.allclose(residuals, [.05125, .04875])
+    assert not doubled_profile([.00875, .10875], .06)
+    faces, residuals = face_assignment([-.07, .07], .07)
+    assert faces.tolist() == [0, 1]
+    assert residuals.tolist() == [0., 0.]
+    assert not doubled_profile([], .06)
+    assert not doubled_profile([.26], .06)  # One displaced wall is offset, not double.
+    # Physical thickness, not a fixed centerline sign or separation threshold.
+    for minor in (.05, .06, .07):
+        for sign in (-1, 1):
+            for shift in (.02, .03, .04):
+                assert not doubled_profile(
+                    [-minor, minor, sign*(minor + .025 + shift)], minor)
+            for shift in (.10, .15, .20):
+                assert doubled_profile(
+                    [-minor, minor, sign*(minor + shift)], minor)
+    tolerance = THRESHOLDS["normal_profile_offset_p95_m"]
+    assert not doubled_profile([0., tolerance], 0.)
+    assert doubled_profile([0., np.nextafter(tolerance, np.inf)], 0.)
 
 
 def test_calibrated_thresholds_and_complete_route_gate():
