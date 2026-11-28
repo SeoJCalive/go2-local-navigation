@@ -160,3 +160,126 @@ cancel/terminal 불완전·process/instrument 실패는 즉시 세션 종료 FAI
 PASS이면 PR을 병합하고 정확한 main CI success와 merge hash를 확인한다.
 한국어 `G04/` progress에 run k/3 시작·끝, 모든 목표 시간/오차/min clearance,
 recovery·경보·teardown verdict를 추가한다.
+
+## v2 사전 등록 — 저속 응답·FREE 목표·정지 확인
+
+v1의 세 실행은 **FAIL/FAIL/FAIL**, 전체 **FAIL**로 보존한다. v2는 아래 변경만
+별도 등록하고, 이 문서의 독립 commit 뒤 구현 commit과 새 세션 3회를 실행한다.
+v1 원시 자료를 덮어쓰지 않고 `.omo/evidence/g04-narrow-passage-nav2/v2/`에
+v2 자료를 둔다. 소유자가 보는 기존 `live/progress.log`에는 `G04/v2`로 추가한다.
+
+### 변경 이유와 저속 근거
+
+같은 world·policy·bridge에서 각 명령마다 fresh headless simulator/RL을 시작해
+각 8.05~8.15 sim s, 두 번 측정했다. 마지막 4초 독립 GT의 회귀 속도다.
+단위는 전진 m/s, yaw rad/s이며 `low-speed/summary.json`과 24개 세션의
+`truth.csv`, command 조건, 종료 receipt를 보존한다.
+
+| 축 | 명령 | 실제 1 | 실제 2 |
+| --- | --- | --- | --- |
+| vx | .02 | .000420 | .000426 |
+| vx | .04 | .004734 | .004708 |
+| vx | .06 | .002470 | .002375 |
+| vx | .083 | .001758 | .001981 |
+| vx | .10 | .001513 | .001433 |
+| vx | .15 | .041633 | .040797 |
+| vx | .20 | .110424 | .113647 |
+| vx | .30 | .213140 | .233422 |
+| wz | .05 | .000822 | .000838 |
+| wz | .10 | .001698 | .001708 |
+| wz | .20 | .004471 | .005417 |
+| wz | .40 | .231896 | .234758 |
+
+`.10` 이하 전진은 초기 자세 이동 뒤 정상 속도가 progress 하한 `.05/10=.005`
+아래다. 최소 유효 **시험 명령**은 `.15`, 전환은 `(.10,.15]`이며 정확한
+물리 임계값은 이 표본으로 확정하지 않는다. `.15`는 정상 `.0408 m/s` 이상으로
+progress 하한을 8배 넘는다. Nav2는 vy를 사용하지 않으므로 vy 시험은 해당 없다.
+policy·RL 입력 구현·bridge 배율은 유지한다.
+
+사용 controller는 `RotationShimController` 안의 `DWBLocalPlanner`다.
+RPP cost scaling·min approach velocity는 사용하지 않는다. 기존 x 범위
+`[0,.25]`, `vx_samples=10`, `sim_time=1`, `acc_lim_x=.5`에서 `.0833333333`은
+`3*(.25/9)`인 이산 후보다. 기존 `min_speed_xy=.05`는 이 후보를 허용했다.
+N04에서 이 후보가 반복 선택됐지만 critic별 점수는 v1에 없으므로 정확한
+winning critic은 미확정이다. 낮은 명령에서 실제 진행이 사라지는 현상은
+벽 없는 원점 부근에서도 재현돼 N04의 progress abort를 설명한다.
+
+v2는 `FollowPath.min_vel_x: 0.0 -> 0.15` 한 값만 바꾼다. DWB의 전진 후보를
+실측 유효 구간으로 제한한다. shim의 회전·목표 최종 zero와 모든 기존
+progress/goal checker 값, 최대 속도, critics, radius/inflation은 유지한다.
+실제 controller parameter도 매회 덤프해 `.15` 적용을 확인한다.
+
+### 도달 목표의 FREE 배치
+
+도달을 요구하는 양성 34개와 경계 4개는 동결 global costmap에서 목표 중심이
+속한 cell의 cost가 **0**이어야 한다. 의도적으로 막힌 목으로 보내는 음성
+X01~X04는 v1의 blocked/no-path 거부 조건과 좌표를 유지한다.
+
+근거는 v1 `run-1/goal29_global_costmap.json`의 실제 OccupancyGrid다. FREE cell
+중 원래 map XY와 Euclidean 거리가 가장 가까운 cell 중심을 선택한다. yaw는
+유지하고 고정 역변환으로 world XY를 계산한다. inscribed(cost 99) cell 중심까지
+최소 거리에서 반 cell 대각선 `.05/sqrt(2)`를 뺀 보수적 영역 여유가 `.20 m`
+이상이어야 한다. 모든 38개 목표의 최소 보수적 여유는 `.214644664 m`다.
+매회 실제 global costmap으로 같은 FREE·여유 gate를 확인하고 전부 기록한다.
+
+아래는 변경하는 world XY 전부이며 다른 좌표·yaw는 v1과 같다. 실제 구현은
+아래 9자리 좌표를 사용하고 map 좌표는 기존 고정 변환으로 계산한다.
+
+| ID | old world XY | new world XY | old cost | 이동 m |
+| --- | --- | --- | --- | --- |
+| S05 | (-6.7,-5.25) | (-6.713933569,-5.184581478) | 49 | .066886 |
+| S06 | (-4,-5.25) | (-4.013933535,-5.184768268) | 49 | .066703 |
+| S07 | (-3.9,-4.1) | (-3.913819384,-3.534775166) | 57 | .565394 |
+| S08 | (-3.9,-2.98) | (-3.913791712,-3.134775161) | 66 | .155388 |
+| S09 | (-2.4,-2.98) | (-2.413791693,-3.134878933) | 66 | .155492 |
+| E01 | (.6,1.845) | (.536547333,1.764917043) | 64 | .102174 |
+| E02 | (2.445,1.845) | (2.436540439,1.664785597) | 77 | .180413 |
+| E05 | (5.2,-.38) | (5.186395192,-.435404679) | 57 | .057051 |
+| E07 | (7.1,-1.9) | (7.086312198,-1.635536139) | 89 | .264818 |
+| N04 | (-4,3.9) | (-3.813314358,3.765218007) | 99 | .230256 |
+| B01 | (5.3,-1.9) | (5.286315634,-1.585411611) | 99 | .314886 |
+| B02 | (7,-1.9) | (7.036312197,-1.635532680) | 89 | .266949 |
+| B03 | (3.85,2.93) | (3.786696114,3.914692230) | 99 | .986725 |
+
+S07는 P04의 북쪽 출구로 이동하지만 S06→S07 구간이 같은 목을 요구하며
+P02→P04→P06의 첫 횡단 순서는 유지한다. N04는 P15 서쪽, B01/B02는 P28
+양쪽, B03/B04는 P25 양쪽을 유지한다. 계획과 GT의 실제 단면 횡단 조건은
+그대로 적용하므로 도달이나 목표 배치만으로 통과를 면제하지 않는다.
+
+### 경보·abort·teardown 전 안전 정지
+
+경보 또는 세션 abort/정상 종료 시 먼저 Nav2 action 목표들에 cancel-all을
+요청하고 즉시 기존 bridge command topic에 zero Twist를 발행한다.
+zero를 50 Hz로 유지하면서 GT의 `.25 sim s` 차분 선속도 `<.03 m/s`와
+각속도 `<.10 rad/s`가 연속 `1 sim s` 성립하는지 최대 `15 wall s` 확인한다.
+확인 후에만 lifecycle teardown을 시작하며 zero는 teardown 중에도 유지한다.
+확인 timeout·취소 미완료·표본 누락은 instrument FAIL이다.
+
+새 정지 발행자는 실제 graph GID/node로 귀속하고, 정지 요청 뒤의 모든 6축
+zero만 허용한다. 그 전의 명령·nonzero·미식별 sender는 기존 기준대로 FAIL이다.
+서로 다른 Nav2 GID의 `.25 s` 중첩 기준도 그대로다. 정지 발행자 허용은
+주행 명령의 외부 sender를 면제하는 규칙이 아니다.
+
+경보 최초 native physics frame(일반 종료는 정지 요청 시각)부터 physics 종료까지
+최대 GT XY 이동과 최소 clearance를 매 frame으로 기록한다. 새 적용 gate는
+**최대 이동 ≤.10 m**, **최소 clearance ≥경보 시 clearance−.05 m**,
+**teardown 시작 전 연속 정지 확인**, **zero 명령 귀속 완전성**이다.
+경계에서도 이 정지 gate와 계측·종료 조건은 적용한다. 경계의 주행 성능
+제외와 본 구간의 기존 clearance≥.10 m는 유지한다.
+
+사전 강제 시험은 실제 Nav2 목표로 이동 중 경보를 발생시켰다.
+`safety-probe/forced-alert-2/result.json`: NavigateToPose/FollowPath 각각 취소 1,
+terminal CANCELED(5), zero 첫 발행 약 `3.23 ms`, sim `10.70~11.70` 정지 확인
+뒤 teardown이다. 최대 이동 `.028971744 m`, clearance
+`1.166786270 -> 1.146724020 m`로 두 상한을 만족했다. 여섯 FINALIZED·SIGINT만
+사용·잔류 0이다. 첫 진단의 physics 옵션 누락은 `forced-alert/result.json`의
+instrument FAIL로 보존하며 v2 세 실행 표본에 포함하지 않는다.
+
+### v2 판정
+
+위 FREE 배치·controller 값 확인·post-alert 정지 gate 외 모든 v1 수치와
+판정·경계 제외를 유지한다. 새 instrument gate도 누락 시 FAIL이다.
+CI가 녹색인 동일 implementation commit으로 fresh simulator/RL/AMCL 세션
+3회를 순차 실행한다. 재시도·표본 교체·실행 사이 변경은 없다.
+각 세션의 모든 적용 기준을 만족하고 **3/3**일 때만 PASS이며 그때만 PR #8을
+병합하고 main CI를 확인한다. 하나라도 FAIL이면 병합하지 않고 로그로 진단한다.
