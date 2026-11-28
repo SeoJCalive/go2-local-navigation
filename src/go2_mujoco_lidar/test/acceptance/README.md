@@ -162,6 +162,21 @@ build/go2_mujoco_lidar/planar_selection_broken_input \
 Humble rclpy가 버리는 sender 정보를 rclcpp/Cyclone builtin metadata로 연결하며
 `command_owners.csv`와 `result.json.command_ownership`에 실제 발신자와
 250 ms 창 중첩을 남긴다. endpoint 수는 `owner_samples`에 계속 보존한다.
+
+G03 v3는 builtin publication을 `dds_take` batch로 배출해 늦게 생성된
+publisher도 무제한 identity map에 보존한다. `ACTION_STATUS`는 실제 graph에서
+발견한 action status의 UUID·상태·steady 시각이며, 결과의 active 구간과
+메시지별 `active_actions`로 controller/behavior 역할을 독립 대조한다.
+미식별 primary sender에 대한 fallback은 허용하지 않는다.
+사전 기준은 [G03 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)의 v3 절이다.
+같은 ROS/Domain/DDS 환경에서 아래 계측 검사를 먼저 수행한다. simulator와
+RL은 시작하지 않으며, fresh output에 실제 raw bytes·graph GUID·네 verdict를 남긴다.
+
+```bash
+timeout 300 python3 "$A/command_instrument.py" \
+  --observer "$PWD/install/go2_mujoco_lidar/lib/go2_mujoco_lidar/tf_owner_observer" \
+  --output "$PWD/runs/g03-instrument-01"
+```
 이 관측기는 발행하지 않으며 bridge 수신 scheduling과 동일하다고 보장하지 않는다.
 
 실행당 새 output이 필요하며 `.omo/evidence/g03-saved-map-nav2/run-v2-1`은

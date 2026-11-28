@@ -101,8 +101,8 @@ def main():
         result["saved_map"] = str(args.saved_map.resolve())
         result["world_map_transform"] = WORLD_MAP
         result["mode"] = "saved-map-headless"
-        result["criteria_version"] = 2
-        progress("시작 v2 headless 저장 지도 Nav2 단일 실행")
+        result["criteria_version"] = 3
+        progress("시작 v3 headless 저장 지도 Nav2 단일 실행")
     result["paths"] = {
         name: str(getattr(args, name).resolve()) for name in (
             "simulator", "controller", "controller_cwd", "world", "tf_observer",
@@ -493,7 +493,8 @@ def main():
             with (output / "command_owners.csv").open("w") as file:
                 writer_csv = csv.DictWriter(file, fieldnames=[
                     "received_steady_ns", "sim_stamp_ns", "topic", "rmw_gid", "publisher_gid",
-                    "node", "vx", "wz", "vy", "vz", "wx", "wy"])
+                    "node", "active_actions", "action_role_matches",
+                    "vx", "wz", "vy", "vz", "wx", "wy"])
                 writer_csv.writeheader()
                 writer_csv.writerows(command_rows)
             errors = amcl_errors(amcl_poses, load_csv(output / "truth.csv")) if (

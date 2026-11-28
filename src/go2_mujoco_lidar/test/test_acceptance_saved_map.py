@@ -102,3 +102,43 @@ def test_v2_also_checks_bypass_command_topic():
     result = command_ownership(log, samples, 10, 11)
     assert not result["passed"]
     assert result["external_endpoints"][0]["topic"] == "/cmd_vel"
+
+
+def test_v3_action_channel_correlates_intervals_without_overriding_unknown_gid():
+    log, samples = command_fixture(1250000000)
+    log += ("ACTION_STATUS\t900000000\t/follow_path/_action/status\tgoal1:1\n"
+            "ACTION_STATUS\t950000000\t/follow_path/_action/status\tgoal1:2\n"
+            "ACTION_STATUS\t1100000000\t/follow_path/_action/status\tgoal1:4\n"
+            "ACTION_STATUS\t1200000000\t/spin/_action/status\tgoal2:2\n"
+            "ACTION_STATUS\t1300000000\t/spin/_action/status\tgoal2:3\n"
+            "ACTION_STATUS\t1400000000\t/spin/_action/status\tgoal2:5\n")
+    result = command_ownership(log, samples, 10, 11)
+    assert result["passed"]
+    assert [row["active_actions"] for row in result["messages"]] == [
+        ["/follow_path/_action/status"], ["/spin/_action/status"]]
+    assert result["action_status"]["intervals"] == [
+        {"topic": "/follow_path/_action/status", "goal_id": "goal1",
+         "start_ns": 900000000, "end_ns": 1100000000},
+        {"topic": "/spin/_action/status", "goal_id": "goal2",
+         "start_ns": 1200000000, "end_ns": 1400000000}]
+    unknown = command_ownership(log.replace("\th1\t", "\tunmapped\t", 1), samples, 10, 11)
+    assert not unknown["passed"]
+    assert unknown["fallback_messages"] == 0
+    assert unknown["attribution_counts"]["UNIDENTIFIED"] == 1
+
+
+def test_v3_no_mapping_cap_and_empty_status_closes_interval():
+    topic = COMMAND_TOPICS[0]
+    endpoints, lines = [], []
+    for i in range(300):
+        endpoints.append({"topic": topic, "gid": f"g{i}", "node": "/controller_server"})
+        lines.extend([f"GID_MAP\th{i}\tg{i}",
+                      f"COMMAND_OWNER\t{1000000000+i*250000000}\t10\t{topic}"
+                      f"\th{i}\t0\t0\t0\t0\t0\t0"])
+    lines += ["ACTION_STATUS\t900000000\t/follow_path/_action/status\tgoal:2",
+              "ACTION_STATUS\t1000000000\t/follow_path/_action/status\t"]
+    result = command_ownership("\n".join(lines), [{"cmd_vel": endpoints}], 10, 10)
+    assert result["passed"]
+    assert result["attribution_counts"] == {"/controller_server": 300}
+    assert len(result["gid_attribution_counts"]) == 300
+    assert result["action_status"]["messages_with_active_action"] == 0
