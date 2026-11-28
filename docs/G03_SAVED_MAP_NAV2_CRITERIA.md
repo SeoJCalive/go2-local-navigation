@@ -145,3 +145,59 @@ native·colcon·관련 tests·PR CI green 이후 fresh session에서 정확히 �
 실행 시작 뒤에는 조건 변경·재시도가 없다. 실패 진단은 저장 로그만 사용한다.
 소유자의 이번 승인에 따라 v2 PASS일 때만 PR #7을 저장소 관례대로 main에
 병합하고 main CI green을 확인한다. FAIL이면 병합하지 않는다.
+
+## v3 사전 등록 (2026-11-28, v2 관찰 뒤)
+
+v1 `run-1`과 v2 `run-v2-1`은 모두 **FAIL**이며 기존 기준·로그·판정은
+그대로 보존한다. v3는 **발신자 귀속 방법과 아래 fallback 규칙만** 바꾼다.
+v2의 모든 threshold와 다른 criteria는 동일하다. 지도·변환·세 목표·stack·
+설정·기립·전체 physics 관측·실행 횟수도 동일하다. 이 절은 구현보다 먼저
+별도 commit하며 새 G03 실행 결과를 보기 전에 고정한다.
+
+### 귀속 방법과 독립 관측
+
+Primary는 기존 `rclcpp MessageInfo.publisher_gid`의 RMW publication handle을
+Cyclone builtin publication instance handle → endpoint GUID → ROS graph
+node로 연결한다. 24-byte 출력에서 RMW는 8-byte handle과 16-byte zero
+padding이고 endpoint는 16-byte GUID와 8-byte zero padding이다.
+이 두 표현을 byte 직접 비교하거나 임의로 16 byte로 자르지 않는다.
+metadata는 `dds_take`로 소비하고 각 batch 뒤 loan을 반환하며, 남은 batch도
+모두 배출한다. 256은 한 batch 크기일 뿐 전체 mapping 보존 상한이 아니다.
+메시지 뒤에 도착한 metadata와 graph도 전체 기록에서 결합한다.
+
+독립 채널은 `/follow_path/_action/status`와 behavior의
+`/spin/_action/status`, `/backup/_action/status`,
+`/drive_on_heading/_action/status`, `/wait/_action/status`,
+`/assisted_teleop/_action/status`다. 실제 graph에서 추가 발견한 action status도
+관측한다. steady 수신 시각·goal UUID·상태를 보존하고 ACCEPTED(1)·
+EXECUTING(2)·CANCELING(3) 상태의 active 구간을 command 수신 시각과 대조한다.
+이 채널은 controller/behavior의 역할과 active 구간을 독립적으로 설명한다.
+상태 전달 순서와 terminal 직후 stop Twist 때문에 active 구간 밖 메시지도
+별도 보고한다. 이 진단에 새 시간 threshold나 다른 goal 기준을 추가하지 않는다.
+
+**Fallback 규칙: 미식별 primary sender를 면제하는 fallback은 허용하지 않는다.**
+active action 하나만으로 sender GUID를 증명할 수 없으며 behavior 하나에도
+여러 publisher가 있다. 따라서 단 하나라도 primary 귀속 불가 메시지가 있으면
+FAIL이다. 상태 채널은 미식별 메시지를 합격으로 바꾸지 않는다.
+외부 endpoint와 외부 sender는 계속 FAIL이다. 서로 다른 Nav2 publisher GID의
+`[수신 시각, 수신 시각+.25 wall s)` 창 중첩은 계속 FAIL이다.
+zero Twist를 포함하며 정확히 `.25 s`인 간격은 중첩이 아니다.
+
+### 계측기 사전 증명과 단일 실행
+
+AGX의 G03와 동일한 `rmw_cyclonedds_cpp`, Domain 41, acceptance loopback/tag에서
+simulator 없이 알려진 command publisher와 graph GID로 먼저 계측기를 검증한다.
+
+- (a) controller/behavior 두 publisher가 겹치지 않게 순차 발행: 올바른 귀속과 PASS.
+- (b) 두 publisher가 `.25 s` 안에 고의로 발행: overlap을 검출하고 FAIL.
+- (c) 추가 external publisher: endpoint·sender를 검출하고 FAIL.
+- (d) 256개 초과의 publication이 있는 상태에서 늦게 생긴 command publisher와
+  256개 초과 command publisher의 실제 메시지를 모두 귀속: 포화·오귀속 0.
+
+실제 raw GID 양쪽 bytes·기대/관측 node·메시지 수·overlap·기대 verdict를 기록하고,
+관련 unit test와 이 instrument 결과를 실행 전 branch에 commit한다.
+native/colcon build·관련 tests·instrument test·정확한 HEAD의 PR CI가 모두 green인
+뒤 fresh session `run-v3-1`에서 G03를 정확히 한 번 실행한다.
+실행 중 한국어 `G03/` progress를 남긴다. 재시도·사후 기준 변경은 없다.
+v3 PASS일 때만 PR #7을 병합하고 main CI green과 main hash를 확인한다.
+FAIL이면 병합하지 않고 저장 로그로 진단한다.
