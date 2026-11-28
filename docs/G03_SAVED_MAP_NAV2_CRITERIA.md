@@ -111,7 +111,7 @@ command topic은 remap된 `/go2_nav2/shadow_cmd_vel`과 우회 경로 `/cmd_vel`
 PASS는 아래 조건을 모두 만족해야 한다.
 
 - 관측 endpoint와 실제 메시지 발신자는 `/controller_server`, `/behavior_server`,
-  `/twist_to_joystick`만 허용한다. bridge는 현재 Twist publisher가 없지만
+  `/go2_nav2_mujoco_bridge`만 허용한다. bridge는 현재 Twist publisher가 없지만
   계약상 허용한 구성원이다. 그 밖의 endpoint 또는 미식별 발신자는 FAIL이다.
 - 서로 다른 **Nav2 publisher GID**의 수신 시각 간격이 `.25 wall s` 미만인
   메시지 쌍이 없어야 한다. 각 메시지의 `[수신 시각, 수신 시각+.25)` 창이
