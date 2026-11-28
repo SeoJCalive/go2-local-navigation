@@ -34,7 +34,7 @@ from tf2_ros import Buffer, TransformListener
 from owned_processes import OwnedProcesses, existing_stack, snapshot
 from ament_index_python.packages import get_package_prefix
 from saved_map import (COMMAND_TOPICS, GOALS, WORLD_MAP, amcl_errors,
-                       command_ownership, load_csv, map_pose, physics_summary)
+                       command_ownership, load_csv, map_pose, physics_summary, truth_tail)
 from narrow_passage import (GOAL_SPECS, SafetyReader, negative_outcome,
                             goal_placement, passage_coverage, recoveries, verdict_physics)
 from safety_stop import SafetyStop, post_stop_summary
@@ -258,18 +258,7 @@ def main():
         return (output / f"{name}.log").read_text()
 
     def truth(recent=False):
-        with (output / "truth.csv").open("rb") as file:
-            header = file.readline().decode().strip().split(",")
-            file.seek(0, os.SEEK_END)
-            file.seek(max(0, file.tell()-4096))
-            tail = file.read().decode()
-            lines = tail.splitlines()
-            if not tail.endswith("\n"):
-                lines = lines[:-1]
-        # Native flushes complete rows. Ignore a partially observed final row.
-        rows = [line.split(",") for line in lines
-                if len(line.split(",")) == len(header) and line.split(",") != header]
-        values = [{key: float(value) for key, value in zip(header, row)} for row in rows]
+        values = truth_tail(output / "truth.csv")
         return values if recent else values[-1]
 
     def halt():

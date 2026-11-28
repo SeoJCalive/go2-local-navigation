@@ -9,6 +9,7 @@ import bisect
 from collections import Counter
 import csv
 import math
+import os
 
 
 COMMAND_TOPICS = ("/go2_nav2/shadow_cmd_vel", "/cmd_vel")
@@ -54,6 +55,36 @@ def physics_summary(rows, start=-math.inf, end=math.inf):
 def load_csv(path):
     with path.open() as file:
         return list(csv.DictReader(file))
+
+
+def truth_tail(path, size=4096):
+    """Read numeric GT rows while native appends; discard both cut boundaries.
+
+    A nonzero seek can begin inside a field even when its comma count is valid.
+    Only newline-terminated, complete numeric rows may reach driving or stopping.
+    """
+    with path.open("rb") as file:
+        header = file.readline().decode().strip().split(",")
+        file.seek(0, os.SEEK_END)
+        offset = max(0, file.tell()-size)
+        file.seek(offset)
+        if offset:
+            file.readline()
+        tail = file.read().decode()
+    rows = []
+    for line in tail.splitlines(keepends=True):
+        if not line.endswith("\n"):
+            continue
+        fields = line.strip().split(",")
+        if len(fields) != len(header) or fields == header:
+            continue
+        try:
+            row = dict(zip(header, map(float, fields)))
+        except ValueError:
+            continue
+        if all(math.isfinite(value) for value in row.values()):
+            rows.append(row)
+    return rows
 
 
 def command_ownership(log, samples, start_ns, end_ns, safety_stop=None):

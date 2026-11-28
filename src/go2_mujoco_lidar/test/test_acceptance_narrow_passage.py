@@ -8,6 +8,63 @@ from narrow_passage import (GOAL_SPECS, THROATS, SafetyReader, crossings, entere
                             goal_placement, negative_outcome, passage_coverage, recoveries, verdict_physics)
 from saved_map import map_pose
 from safety_stop import stationary, post_stop_summary
+from saved_map import truth_tail
+
+
+def test_truth_tail_cut_first_and_incomplete_last_row(tmp_path):
+    path = tmp_path / "truth.csv"
+    header = b"epoch,sim_time,x,y,z,qw,qx,qy,qz\n"
+    row = b"1234567890,0.4,0,0,0.3,1,0,0,0\n"
+    data = header + row * 200
+    path.write_bytes(data)
+    # Starts at the comma after epoch: old reader attempted float('').
+    size = len(data) - (len(header) + 10)
+    assert truth_tail(path, size) == [dict(zip(header.decode().strip().split(","),
+                                             map(float, row.decode().strip().split(","))))] * 199
+    with path.open("ab") as stream:
+        stream.write(b"1,2,3,4,5,6,7,8,")
+    assert len(truth_tail(path, len(data)+100)) == 200
+    with path.open("ab") as stream:
+        stream.write(b"\n1,2,3,4,5,6,7,8,nope\n")
+    assert len(truth_tail(path, len(data)+100)) == 200
+
+
+def test_truth_tail_concurrent_split_appends(tmp_path):
+    import threading
+    path = tmp_path / "truth.csv"
+    path.write_bytes(b"epoch,sim_time,x,y,z,qw,qx,qy,qz\n")
+    partial, observed = threading.Event(), threading.Event()
+
+    def append():
+        with path.open("ab", buffering=0) as stream:
+            for i in range(150):
+                stream.write(f"1234567890,{i},0,0,0.3,1,0,0,".encode())
+                partial.set()
+                assert observed.wait(5)
+                observed.clear()
+                stream.write(b"0\n")
+                partial.clear()
+                assert observed.wait(5)
+                observed.clear()
+
+    worker = threading.Thread(target=append)
+    worker.start()
+    try:
+        for i in range(150):
+            assert partial.wait(5)
+            rows = truth_tail(path)
+            assert not rows or rows[-1]["sim_time"] == i-1
+            observed.set()
+            # The writer clears partial only after completing this row.
+            while partial.is_set() and worker.is_alive():
+                threading.Event().wait(.001)
+            rows = truth_tail(path)
+            assert rows[-1]["sim_time"] == i
+            observed.set()
+    finally:
+        observed.set()
+        worker.join(5)
+    assert not worker.is_alive()
 
 
 def test_route_counts_transform_and_boundary_last():
