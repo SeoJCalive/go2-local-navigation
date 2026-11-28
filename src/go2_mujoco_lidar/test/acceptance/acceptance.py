@@ -32,7 +32,8 @@ from tf2_ros import Buffer, TransformListener
 
 from owned_processes import OwnedProcesses, existing_stack, snapshot
 from ament_index_python.packages import get_package_prefix
-from saved_map import GOALS, WORLD_MAP, amcl_errors, load_csv, map_pose, physics_summary
+from saved_map import (COMMAND_TOPICS, GOALS, WORLD_MAP, amcl_errors,
+                       command_ownership, load_csv, map_pose, physics_summary)
 
 PROJECT = Path(__file__).resolve().parents[4]
 HERE = Path(__file__).resolve().parent
@@ -100,7 +101,8 @@ def main():
         result["saved_map"] = str(args.saved_map.resolve())
         result["world_map_transform"] = WORLD_MAP
         result["mode"] = "saved-map-headless"
-        progress("시작 headless 저장 지도 Nav2 단일 실행")
+        result["criteria_version"] = 2
+        progress("시작 v2 headless 저장 지도 Nav2 단일 실행")
     result["paths"] = {
         name: str(getattr(args, name).resolve()) for name in (
             "simulator", "controller", "controller_cwd", "world", "tf_observer",
@@ -183,8 +185,8 @@ def main():
             return
         last_owner_sample = time.monotonic()
         owners = [{"node": e.node_namespace.rstrip("/") + "/" + e.node_name,
-                   "gid": bytes(e.endpoint_gid).hex()}
-                  for e in node.get_publishers_info_by_topic("/go2_nav2/shadow_cmd_vel")]
+                   "gid": bytes(e.endpoint_gid).hex(), "topic": topic}
+                  for topic in COMMAND_TOPICS for e in node.get_publishers_info_by_topic(topic)]
         owner_samples.append({
             "sim_time": node.get_clock().now().nanoseconds/1e9,
             "cmd_vel": owners, "map_odom_amcl": edge_owner(output / "localization_tf.log", "amcl")})
@@ -282,6 +284,11 @@ def main():
         until(lambda: "to Velocity_Down" in text("controller"), 10, [sim, ctrl])
         result["walking_mode"] = True
         print("WALKING_MODE_READY", flush=True)
+        if args.saved_map:
+            until(lambda: (output / "standup.json").exists(), 15, [sim, ctrl])
+            result["standup"] = json.loads((output / "standup.json").read_text())
+            if not result["standup"]["completed"] or result["standup"]["timed_out"]:
+                raise RuntimeError("G03 v2 stand-up did not complete within 10 sim seconds")
         base = ["ros2", "launch", "go2_mujoco_lidar", "go2_sim_navigation.launch.py",
                 f"simulator_pid:={sim.pid}"]
         if args.tf2_prefix.resolve() != PROJECT / "third_party/tf2/install":
@@ -308,7 +315,10 @@ def main():
                 output, start, stop, until, advance, text, truth, buffer, node,
                 samples, base, sim, ctrl, bridge, mapping, tap, result, checkpoint,
                 route_points, executable)
-        tap = start("localization_tf", [str(args.tf_observer.resolve())])
+        tap_command = [str(args.tf_observer.resolve())]
+        if args.saved_map:
+            tap_command += ["--ros-args", "-p", "observe_commands:=true", "-p", "use_sim_time:=true"]
+        tap = start("localization_tf", tap_command)
         localization = start("localization", base + [
             "mode:=localization", f"map:={selected_map}",
             "initial_pose:="+",".join(map(str, map_base))])
@@ -320,6 +330,7 @@ def main():
         result["tf2_loaded"] = [line for line in text("localization").splitlines()
                                 if "TF2_LOADED" in line]
         print("LOCALIZATION_READY", flush=True)
+        result["navigation_start_ns"] = node.get_clock().now().nanoseconds
         observe_navigation = bool(args.saved_map)
         observe_owners()
         action = ActionClient(node, NavigateToPose, "/navigate_to_pose")
@@ -376,6 +387,7 @@ def main():
             print("GOAL_RESULT "+json.dumps(row), flush=True)
             progress(f"목표 {index} {'도달' if row['status'] == 4 else '실패'} "
                      f"시간={row['wall_sec']:.3f}s 오차={row['position_error_m']:.6f}m")
+        result["navigation_end_ns"] = node.get_clock().now().nanoseconds
         if not args.saved_map:
             before = {key:len(samples[key]) for key in ("cloud","odom")}
             before_pids = {p.pid: sorted(pid for pid, row in snapshot().items()
@@ -472,6 +484,18 @@ def main():
         if args.saved_map:
             physics = load_csv(output / "physics.csv") if (output / "physics.csv").exists() else []
             result["physics"] = physics_summary(physics)
+            result["command_ownership"] = command_ownership(
+                (output / "localization_tf.log").read_text() if (
+                    output / "localization_tf.log").exists() else "",
+                owner_samples, result.get("navigation_start_ns", 0),
+                result.get("navigation_end_ns", node.get_clock().now().nanoseconds))
+            command_rows = result["command_ownership"]["messages"]
+            with (output / "command_owners.csv").open("w") as file:
+                writer_csv = csv.DictWriter(file, fieldnames=[
+                    "received_steady_ns", "sim_stamp_ns", "topic", "rmw_gid", "publisher_gid",
+                    "node", "vx", "wz", "vy", "vz", "wx", "wy"])
+                writer_csv.writeheader()
+                writer_csv.writerows(command_rows)
             errors = amcl_errors(amcl_poses, load_csv(output / "truth.csv")) if (
                 output / "truth.csv").exists() else []
             with (output / "amcl_gt.csv").open("w") as file:
@@ -491,11 +515,12 @@ def main():
             result["criteria"].update({
                 "goal_time": len(result["goals"]) == 3 and all(
                     row["wall_sec"] <= 150 for row in result["goals"]),
-                "zero_falls": result["physics"]["falls"] == 0,
+                "zero_falls": bool(result.get("standup", {}).get("completed"))
+                              and not result["standup"]["timed_out"]
+                              and result["physics"]["falls"] == 0,
                 "clearance": result["physics"]["min_clearance_m"] is not None
                              and result["physics"]["min_clearance_m"] >= .10,
-                "single_cmd_vel_owner": bool(owner_samples) and all(
-                    len(s["cmd_vel"]) == 1 for s in owner_samples),
+                "single_cmd_vel_owner": result["command_ownership"]["passed"],
                 "single_map_odom_owner": bool(owner_samples) and all(
                     s["map_odom_amcl"] for s in owner_samples),
                 "telemetry": bool(errors) and any(

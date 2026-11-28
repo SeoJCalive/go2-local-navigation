@@ -3,8 +3,11 @@
 // handle, while graph endpoints use GUIDs. Public DDS built-in publication
 // metadata maps those identities; TSV is consumed by verify_bringup.py.
 // This read-only observer owns no TF/clock edge and accepts use_sim_time=true.
+// Optional G03 command tap preserves the same RMW handle mapping for each Twist.
+// Steady receipt time measures the bridge watchdog window; it is not send time.
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <dds/dds.h>
 
 #include <array>
@@ -13,6 +16,7 @@
 #include <iostream>
 #include <set>
 #include <sstream>
+#include <vector>
 
 int main(int argc, char ** argv)
 {
@@ -71,6 +75,28 @@ int main(int argc, char ** argv)
     "/tf", rclcpp::QoS(100), receive);
   auto fixed = node->create_subscription<tf2_msgs::msg::TFMessage>(
     "/tf_static", rclcpp::QoS(100).transient_local(), receive);
+  std::vector<rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr> commands;
+  if (node->declare_parameter("observe_commands", false)) {
+    for (const std::string topic : {"/go2_nav2/shadow_cmd_vel", "/cmd_vel"}) {
+      commands.push_back(node->create_subscription<geometry_msgs::msg::Twist>(
+        topic, rclcpp::QoS(1000),
+        [node, topic](geometry_msgs::msg::Twist::ConstSharedPtr message,
+                      const rclcpp::MessageInfo & info) {
+          const auto received = std::chrono::steady_clock::now().time_since_epoch();
+          std::ostringstream gid;
+          gid << std::hex << std::setfill('0');
+          for (const auto byte : info.get_rmw_message_info().publisher_gid.data)
+            gid << std::setw(2) << static_cast<unsigned int>(byte);
+          std::cout << std::setprecision(17) << "COMMAND_OWNER\t"
+                    << std::chrono::duration_cast<std::chrono::nanoseconds>(received).count()
+                    << '\t' << node->get_clock()->now().nanoseconds() << '\t'
+                    << topic << '\t' << gid.str() << '\t'
+                    << message->linear.x << '\t' << message->angular.z << '\t'
+                    << message->linear.y << '\t' << message->linear.z << '\t'
+                    << message->angular.x << '\t' << message->angular.y << std::endl;
+        }));
+    }
+  }
   rclcpp::spin(node);
   dds_delete(participant);
   rclcpp::shutdown();

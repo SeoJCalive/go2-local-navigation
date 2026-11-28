@@ -4,8 +4,10 @@
 // A dedicated reset request file triggers mj_resetData without node restarts.
 // contacts.csv records every robot/world non-plane contact at each
 // physics step, including contacts between the 20 Hz truth samples.
+// G03 v2 latches stand-up/timeout and records roll/pitch at every physics step.
 #include "unitree_sdk2_bridge.h"
 #include "simulation_step.hpp"
+#include "posture.hpp"
 #include "../wall_hug/clearance_2d.h"
 
 #include <boost/program_options.hpp>
@@ -75,10 +77,12 @@ int main(int argc, char **argv)
   std::ofstream physics, progress;
   std::vector<int> obstacles, robot_geoms;
   bool contact_alert = false, fall_alert = false;
+  G03Posture posture;
+  bool standup_recorded = false;
   if (args.count("progress-log")) {
     progress.open(args["progress-log"].as<std::string>(), std::ios::app);
     physics.open(output / "physics.csv");
-    physics << "sim_time,x,y,z,min_clearance_m,robot_geom,world_geom,fall\n"
+    physics << "sim_time,x,y,z,min_clearance_m,robot_geom,world_geom,fall,roll,pitch\n"
             << std::setprecision(17);
     for (int g = 0; g < model->ngeom; ++g) {
       if (!model->geom_contype[g] && !model->geom_conaffinity[g]) continue;
@@ -137,10 +141,23 @@ int main(int argc, char **argv)
         const double roll = std::atan2(2*(q[0]*q[1]+q[2]*q[3]),
                                       1-2*(q[1]*q[1]+q[2]*q[2]));
         const double pitch = std::asin(std::clamp(2*(q[0]*q[2]-q[3]*q[1]), -1., 1.));
-        const bool fall = data->qpos[2] < .18 || std::max(std::abs(roll), std::abs(pitch)) > M_PI/3;
+        const bool fall = posture.observe(data->time, data->qpos[2], roll, pitch);
+        if (!standup_recorded && (posture.completed_at >= 0. || posture.timed_out)) {
+          {
+            std::ofstream receipt(output / "standup.tmp");
+            receipt << std::setprecision(17) << std::boolalpha
+                    << "{\"completed\":" << (posture.completed_at >= 0.)
+                    << ",\"sim_time\":" << posture.completed_at
+                    << ",\"timed_out\":" << posture.timed_out << "}\n";
+          }
+          std::filesystem::rename(output / "standup.tmp", output / "standup.json");
+          progress << "G03/기립 " << (posture.timed_out ? "시간초과 FAIL" : "완료")
+                   << " sim=" << data->time << std::endl;
+          standup_recorded = true;
+        }
         physics << data->time << ',' << data->qpos[0] << ',' << data->qpos[1] << ','
                 << data->qpos[2] << ',' << minimum << ',' << nearest_robot << ','
-                << nearest_world << ',' << fall << '\n';
+                << nearest_world << ',' << fall << ',' << roll << ',' << pitch << '\n';
         if (fall && !fall_alert) {
           progress << "G03/경보 낙상 sim=" << data->time << std::endl;
           fall_alert = true;

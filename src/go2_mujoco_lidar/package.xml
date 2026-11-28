@@ -46,6 +46,7 @@
   <test_depend>rmw_cyclonedds_cpp</test_depend>
   <test_depend>rcl_interfaces</test_depend>
   <test_depend>tf2_msgs</test_depend>
+  <test_depend>geometry_msgs</test_depend>
   <test_depend>tf2_ros</test_depend>
   <test_depend>tf2_tools</test_depend>
   <test_depend>cyclonedds</test_depend>

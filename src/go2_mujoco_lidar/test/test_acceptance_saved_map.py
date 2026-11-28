@@ -7,7 +7,8 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent / "acceptance"))
-from saved_map import GOALS, WORLD_MAP, amcl_errors, map_pose, physics_summary
+from saved_map import (COMMAND_TOPICS, GOALS, WORLD_MAP, amcl_errors,
+                       command_ownership, map_pose, physics_summary)
 
 
 def test_h3_transform_and_goal_order():
@@ -45,3 +46,59 @@ def test_physics_minimum_keeps_location_and_inclusive_goal_interval():
     assert physics_summary(rows)["falls"] == 1
     assert physics_summary(rows, 4, 5) == {
         "frames": 0, "min_clearance_m": None, "falls": None, "minimum": None}
+
+
+def command_fixture(second_ns, second_handle="h2", second_node="/behavior_server"):
+    topic = COMMAND_TOPICS[0]
+    samples = [{"cmd_vel": [
+        {"topic": topic, "gid": "g1", "node": "/controller_server"},
+        {"topic": topic, "gid": "g2", "node": second_node},
+        {"topic": topic, "gid": "g3", "node": "/behavior_server"},
+        {"topic": topic, "gid": "g4", "node": "/behavior_server"},
+    ]}]
+    log = ("COMMAND_OWNER\t1000000000\t10\t" + topic + "\th1\t0\t0\t0\t0\t0\t0\n"
+           f"COMMAND_OWNER\t{second_ns}\t11\t{topic}\t{second_handle}\t0\t0\t0\t0\t0\t0\n"
+           "GID_MAP\th1\tg1\nGID_MAP\th2\tg2\n")
+    return log, samples
+
+
+def test_v2_accepts_idle_endpoints_and_exact_watchdog_boundary():
+    log, samples = command_fixture(1250000000)
+    result = command_ownership(log, samples, 10, 11)
+    assert result["passed"]
+    assert result["endpoint_counts"] == [4]
+    assert [m["node"] for m in result["messages"]] == ["/controller_server", "/behavior_server"]
+    assert not result["overlaps"]
+
+
+def test_v2_rejects_overlap_even_for_zero_commands_or_same_behavior_node():
+    log, samples = command_fixture(1249999999)
+    assert not command_ownership(log, samples, 10, 11)["passed"]
+    samples[0]["cmd_vel"][0]["node"] = "/behavior_server"
+    assert len(command_ownership(log, samples, 10, 11)["overlaps"]) == 1
+    log, samples = command_fixture(1000000001, "h1")
+    assert command_ownership(log, samples, 10, 11)["passed"]  # same GID can stream
+
+
+@pytest.mark.parametrize("handle,node", [
+    ("unmapped", "/behavior_server"), ("h2", "/teleop")])
+def test_v2_fails_unknown_sender_or_external_endpoint(handle, node):
+    log, samples = command_fixture(2000000000, handle, node)
+    assert not command_ownership(log, samples, 10, 11)["passed"]
+
+
+def test_v2_needs_observations_and_uses_sim_time_only_for_phase_selection():
+    log, samples = command_fixture(1250000000)
+    assert not command_ownership(log, samples, 20, 30)["passed"]
+    assert not command_ownership(log, [], 10, 11)["passed"]
+    assert not command_ownership("", samples, 10, 11)["passed"]
+
+
+def test_v2_also_checks_bypass_command_topic():
+    log, samples = command_fixture(1250000000, "h2", "/teleop")
+    log = log.replace(COMMAND_TOPICS[0], COMMAND_TOPICS[1])
+    for endpoint in samples[0]["cmd_vel"]:
+        endpoint["topic"] = COMMAND_TOPICS[1]
+    result = command_ownership(log, samples, 10, 11)
+    assert not result["passed"]
+    assert result["external_endpoints"][0]["topic"] == "/cmd_vel"

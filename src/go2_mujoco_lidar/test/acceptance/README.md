@@ -147,6 +147,26 @@ build/go2_mujoco_lidar/planar_selection_broken_input \
   --gtest_filter=PlanarSelection.ChoosesClosestElevationAndFirstTie
 ```
 
+## G03 저장 지도 v2
+
+`--saved-map <H3 wall-19.yaml>`은 mapping·reset을 생략하고 고정 H3 변환과
+세 world 목표를 사용한다. 판정과 출처는
+[G03 사전 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)의 v2를 따른다.
+기립 gate는 native `posture.hpp`가 매 physics frame에서 관측하고
+`standup.json`의 완료 시각·timeout을 목표 1 전에 확인한다.
+`physics.csv`는 기립 뒤 fall flag와 전체 구간 roll/pitch·clearance를 보존한다.
+`acceptance_posture_test`는 simulator를 실행하지 않고 같은 gate의 경계를 검사한다.
+
+기존 `tf_owner_observer`에 `observe_commands:=true`·`use_sim_time:=true`를
+넘겨 command topic 둘의 RMW GID와 steady 수신 시각을 기록한다.
+Humble rclpy가 버리는 sender 정보를 rclcpp/Cyclone builtin metadata로 연결하며
+`command_owners.csv`와 `result.json.command_ownership`에 실제 발신자와
+250 ms 창 중첩을 남긴다. endpoint 수는 `owner_samples`에 계속 보존한다.
+이 관측기는 발행하지 않으며 bridge 수신 scheduling과 동일하다고 보장하지 않는다.
+
+실행당 새 output이 필요하며 `.omo/evidence/g03-saved-map-nav2/run-v2-1`은
+사전 승인된 v2 단일 실행 전용이다. 실행 뒤 조건 변경·재시도는 하지 않는다.
+
 ## GUI binary 장시간 clock 검증
 
 F04의 `gui_clock.py`는 shared GUI binary를 Xvfb·software GL에서 실행한다.
