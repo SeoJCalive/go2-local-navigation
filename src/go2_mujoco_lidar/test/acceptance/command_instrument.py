@@ -91,7 +91,7 @@ def main():
         status.publish(message)
         until(lambda: f"{'01'*16}:{state}" in log_path.read_text())
 
-    def judge(name, markers, expected_pass):
+    def judge(name, markers, expected_pass, safety_stop=None):
         # Wait for delayed discovery metadata as the production offline judge
         # does. No publisher or message is selected by an assumed node identity.
         def mapped():
@@ -105,13 +105,13 @@ def main():
         selected = "\n".join(line for line in lines if not line.startswith("COMMAND_OWNER\t")
                              or float(line.split("\t")[5]) in markers)
         endpoints = [known[m] for m in markers]
-        result = command_ownership(selected, [{"cmd_vel": endpoints}], 0, 2**63-1)
+        result = command_ownership(selected, [{"cmd_vel": endpoints}], 0, 2**63-1, safety_stop)
         correct = all(row["publisher_gid"] == known[int(row["vx"])]["gid"]
                       and row["node"] == known[int(row["vx"])]["node"]
                       for row in result["messages"])
         assert len(result["messages"]) == len(markers), name
         assert correct and result["unidentified_or_external_messages"] == (
-            1 if name == "c_external" else 0), name
+            1 if name in ("c_external", "f_safety_nonzero") else 0), name
         assert result["passed"] == expected_pass, (name, result)
         if name == "b_overlap":
             assert len(result["overlaps"]) == 1
@@ -161,6 +161,14 @@ def main():
                 gap()
             report["cases"]["d"] = judge(
                 "d_270_late_publishers", set(range(1000, 1270)), True)
+            safety = publisher(external, 0)
+            stop = {"request_steady_ns": time.monotonic_ns(),
+                    "zero_endpoints": [known[0]]}
+            publish(safety, 0)
+            report["cases"]["e"] = judge("e_safety_zero", {0}, True, stop)
+            known[6] = known[0]
+            publish(safety, 6)
+            report["cases"]["f"] = judge("f_safety_nonzero", {6}, False, stop)
             mappings = [l.split("\t")[1:] for l in log_path.read_text().splitlines()
                         if l.startswith("GID_MAP\t")]
             report["metadata_count"] = len(mappings)

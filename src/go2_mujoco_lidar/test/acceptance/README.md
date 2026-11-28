@@ -2,6 +2,30 @@
 판정으로 연결한다. 실제 로봇 동작·전체 지도 정확도는 이 절차의 검증 범위 밖이다. -->
 # MuJoCo 수용 시험
 
+## G04 좁은 통로 진입점
+
+v2는 [사전 기준의 v2](../../../../docs/G04_NARROW_PASSAGE_NAV2_CRITERIA.md)를
+따른다. 저속 실측으로 DWB 전진 하한 `.15`를 선택했고, 양성/경계 목표는
+실제 global costmap의 FREE·inscribed 영역 여유 `.20 m`를 검사한다.
+`safety_stop.py`는 모든 abort와 종료에서 Nav2 cancel-all·bridge zero 유지 후
+GT 선속도 `<.03`/각속도 `<.10`을 연속 1초 확인하고 lifecycle 종료를 시작한다.
+경보부터 physics 종료까지 이동 `.10 m`·clearance 감소 `.05 m` 상한을
+`post_alert`에 판정한다. 정지 zero도 native DDS GID로 별도 귀속하며 주행 중
+외부 명령과 nonzero 정지 명령은 허용하지 않는다. v2 output은 새 하위
+디렉터리로 분리하고 `--progress-log`에 기존 `live/progress.log`를 지정한다.
+
+`--saved-map <H3 wall-19.yaml> --narrow-passage --run-index <1|2|3>`은
+[사전 기준](../../../../docs/G04_NARROW_PASSAGE_NAV2_CRITERIA.md)의 고정 42개
+목표를 실행한다. 양성 34·음성 4·마지막 경계 4개이며 새 output으로 세 번
+순차 실행한다. `narrow_passage.py`가 world/map 좌표·유한 목 단면 횡단·닫힌
+틈 진입·음성 ABORTED/no-path·실제 recovery status와 sender를 판정한다.
+기존 physics와 G03 v3 DDS 계측을 그대로 쓰며 `parameters.json`에 실제
+global/local/planner parameter 전수를 기록한다. 경계 시작 시각 이후
+성능/physics는 별도 기록하고 명령 계측·TF·종료는 전체 세션에 적용한다.
+안전 표본은 새 CSV line만 읽어 관측 즉시 중지하며, 일반 goal 실패는 다음
+목표로 진행한다. G04 progress는 run 번호·목표·시간·오차·최소 여유·회복·
+경보·teardown을 `../live/progress.log`에 한국어로 남긴다.
+
 ## G03 저장 지도 진입점
 
 `--saved-map`은 mapping과 reset을 생략하고 G03에 사전 등록한 H3 변환과 세
