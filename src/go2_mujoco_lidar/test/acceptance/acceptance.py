@@ -26,12 +26,13 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from go2_inputs.simulation_epoch import watch_simulation_epoch
 from lifecycle_msgs.msg import State
 from nav2_msgs.action import NavigateToPose
-from nav_msgs.msg import OccupancyGrid, Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry, Path as PlannedPath
 from sensor_msgs.msg import PointCloud2
 from tf2_ros import Buffer, TransformListener
 
 from owned_processes import OwnedProcesses, existing_stack, snapshot
 from ament_index_python.packages import get_package_prefix
+from saved_map import GOALS, WORLD_MAP, amcl_errors, load_csv, map_pose, physics_summary
 
 PROJECT = Path(__file__).resolve().parents[4]
 HERE = Path(__file__).resolve().parent
@@ -50,6 +51,8 @@ def main():
     parser.add_argument("--domain", type=int, required=True)
     parser.add_argument("--goals", type=Path, default=HERE / "goals.json")
     parser.add_argument("--route", type=Path, default=HERE / "route.json")
+    parser.add_argument("--saved-map", type=Path,
+                        help="G03: skip mapping/reset; fixed H3 transform and three world goals")
     parser.add_argument("--simulator", type=Path,
                         default=SIM_DEPS / "acceptance-build/acceptance_simulator")
     parser.add_argument("--controller", type=Path, default=CONTROLLER_DIR / "go2_ctrl")
@@ -77,7 +80,7 @@ def main():
             or os.environ.get("ROS_LOCALHOST_ONLY") != "1"
             or os.environ.get("CYCLONEDDS_URI") != config.as_uri()):
         raise ValueError("domain/localhost/DDS environment does not match arguments")
-    goals = json.loads(args.goals.read_text())
+    goals = GOALS if args.saved_map else json.loads(args.goals.read_text())
     route_points = json.loads(args.route.read_text())
     for points in (goals, route_points):
         if not points or any(len(p) != 2 or not all(math.isfinite(v) for v in p) for p in points):
@@ -85,6 +88,19 @@ def main():
     baseline = existing_stack(PROJECT)
     (output / "preexisting.json").write_text(json.dumps(baseline, indent=2))
     result = {"domain": args.domain, "goals": [], "preexisting": baseline, "criteria": {}}
+    progress_path = output.parent / "live/progress.log"
+
+    def progress(message):
+        if args.saved_map:
+            with progress_path.open("a") as file:
+                file.write("G03/" + message + "\n")
+
+    if args.saved_map:
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        result["saved_map"] = str(args.saved_map.resolve())
+        result["world_map_transform"] = WORLD_MAP
+        result["mode"] = "saved-map-headless"
+        progress("시작 headless 저장 지도 Nav2 단일 실행")
     result["paths"] = {
         name: str(getattr(args, name).resolve()) for name in (
             "simulator", "controller", "controller_cwd", "world", "tf_observer",
@@ -107,6 +123,26 @@ def main():
     samples = {"cloud": [], "odom": [], "amcl": [], "maps": []}
     commands = []
     costmaps = {}
+    planned_paths = (output / "planned_paths.jsonl").open("w")
+    amcl_poses = []
+    owner_samples = []
+    observe_navigation = False
+    last_owner_sample = 0.
+
+    def record_path(message):
+        planned_paths.write(json.dumps({
+            "stamp": [message.header.stamp.sec, message.header.stamp.nanosec],
+            "frame": message.header.frame_id,
+            "poses": [[p.pose.position.x, p.pose.position.y, yaw(p.pose.orientation)]
+                      for p in message.poses]}) + "\n")
+        planned_paths.flush()
+
+    def record_amcl(message):
+        samples["amcl"].append(message)
+        p = message.pose.pose
+        amcl_poses.append([message.header.stamp.sec + message.header.stamp.nanosec/1e9,
+                           p.position.x, p.position.y, yaw(p.orientation)])
+
     subscriptions = [
         node.create_subscription(PointCloud2, "/utlidar/cloud", lambda m: samples["cloud"].append(
             [m.header.stamp.sec, m.header.stamp.nanosec]), qos_profile_sensor_data),
@@ -114,12 +150,14 @@ def main():
             [m.header.stamp.sec, m.header.stamp.nanosec, m.pose.pose.position.x,
              m.pose.pose.position.y]), 20),
         node.create_subscription(PoseWithCovarianceStamped, "/amcl_pose",
-                                 lambda m: samples["amcl"].append(m), 10),
+                                 record_amcl, 10),
         node.create_subscription(OccupancyGrid, "/map",
                                  lambda m: samples["maps"].append(m),
                                  QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)),
         node.create_subscription(Twist, "/go2_nav2/shadow_cmd_vel", lambda m: commands.append(
-            [node.get_clock().now().nanoseconds, m.linear.x, m.angular.z]), 100),
+            [node.get_clock().now().nanoseconds, m.linear.x, m.angular.z,
+             m.linear.y, m.linear.z, m.angular.x, m.angular.y]), 100),
+        node.create_subscription(PlannedPath, "/plan", record_path, 20),
     ]
     for name in ("global_costmap", "local_costmap"):
         subscriptions.append(node.create_subscription(
@@ -137,6 +175,19 @@ def main():
         rclpy.spin_once(node, timeout_sec=0.02)
         while time.monotonic() < end:
             rclpy.spin_once(node, timeout_sec=0)
+        observe_owners()
+
+    def observe_owners():
+        nonlocal last_owner_sample
+        if not observe_navigation or time.monotonic() - last_owner_sample < .5:
+            return
+        last_owner_sample = time.monotonic()
+        owners = [{"node": e.node_namespace.rstrip("/") + "/" + e.node_name,
+                   "gid": bytes(e.endpoint_gid).hex()}
+                  for e in node.get_publishers_info_by_topic("/go2_nav2/shadow_cmd_vel")]
+        owner_samples.append({
+            "sim_time": node.get_clock().now().nanoseconds/1e9,
+            "cmd_vel": owners, "map_odom_amcl": edge_owner(output / "localization_tf.log", "amcl")})
 
     manager = OwnedProcesses(pump)
     processes = manager.processes
@@ -159,6 +210,7 @@ def main():
                 if p.poll() is not None:
                     raise RuntimeError(f"owned process {p.pid} exited {p.returncode}")
             rclpy.spin_once(node, timeout_sec=0.05)
+            observe_owners()
             if predicate():
                 return
         raise TimeoutError("condition timed out; inspect phase logs")
@@ -202,9 +254,12 @@ def main():
         native = os.environ.copy()
         native.pop("LD_LIBRARY_PATH", None)
         world = args.world.resolve()
-        sim = start("simulator", [str(args.simulator.resolve()), "-s", str(world),
+        sim_command = [str(args.simulator.resolve()), "-s", str(world),
                                   "-i", str(args.domain), "-n", "lo", "--dds-config", str(config),
-                                  "--fifo", str(fifo), "--output", str(output)], native)
+                                  "--fifo", str(fifo), "--output", str(output)]
+        if args.saved_map:
+            sim_command += ["--progress-log", str(progress_path)]
+        sim = start("simulator", sim_command, native)
         ctrl_dir = args.controller_cwd.resolve()
         ctrl = start("controller", ["stdbuf", "-oL", "-eL", str(args.controller.resolve()), "-n", "lo", "-d", str(args.domain)],
                      native, ctrl_dir)
@@ -231,17 +286,28 @@ def main():
                 f"simulator_pid:={sim.pid}"]
         if args.tf2_prefix.resolve() != PROJECT / "third_party/tf2/install":
             base.append(f"tf2_prefix:={args.tf2_prefix.resolve()}")
-        tap = start("mapping_tf", [str(args.tf_observer.resolve())])
-        mapping = start("mapping", base + ["mode:=mapping"])
-        until(lambda: samples["maps"] and edge_owner(output / "mapping_tf.log", "slam_toolbox"),
-              45, [sim, ctrl, mapping, tap])
+        if not args.saved_map:
+            tap = start("mapping_tf", [str(args.tf_observer.resolve())])
+            mapping = start("mapping", base + ["mode:=mapping"])
+            until(lambda: samples["maps"] and edge_owner(output / "mapping_tf.log", "slam_toolbox"),
+                  45, [sim, ctrl, mapping, tap])
         bridge = start("bridge", [executable("go2_nav2_mujoco_bridge", "twist_to_joystick"),
                                   "--ros-args", "-p", f"fifo_path:={fifo}"])
         until(lambda: "simulation bridge ready" in text("bridge"), 10, [bridge])
-        selected_map, map_base, map_odom = map_route(
-            output, start, stop, until, advance, text, truth, buffer, node,
-            samples, base, sim, ctrl, bridge, mapping, tap, result, checkpoint,
-            route_points, executable)
+        if args.saved_map:
+            selected_map = str(args.saved_map.resolve())
+            p = truth()
+            angle = math.atan2(2*(p["qw"]*p["qz"]+p["qx"]*p["qy"]),
+                               1-2*(p["qy"]**2+p["qz"]**2))
+            map_base = map_pose(p["x"], p["y"], angle)
+            a, tx, ty = WORLD_MAP
+            map_odom = [tx, ty, a]
+            result["initial_truth"] = p
+        else:
+            selected_map, map_base, map_odom = map_route(
+                output, start, stop, until, advance, text, truth, buffer, node,
+                samples, base, sim, ctrl, bridge, mapping, tap, result, checkpoint,
+                route_points, executable)
         tap = start("localization_tf", [str(args.tf_observer.resolve())])
         localization = start("localization", base + [
             "mode:=localization", f"map:={selected_map}",
@@ -254,6 +320,8 @@ def main():
         result["tf2_loaded"] = [line for line in text("localization").splitlines()
                                 if "TF2_LOADED" in line]
         print("LOCALIZATION_READY", flush=True)
+        observe_navigation = bool(args.saved_map)
+        observe_owners()
         action = ActionClient(node, NavigateToPose, "/navigate_to_pose")
         if not action.wait_for_server(timeout_sec=10):
             raise TimeoutError("NavigateToPose server missing")
@@ -268,6 +336,7 @@ def main():
             goal.pose.pose.orientation.z = math.sin(angle/2)
             goal.pose.pose.orientation.w = math.cos(angle/2)
             started = time.monotonic()
+            start_sim_time = truth()["sim_time"]
             future = action.send_goal_async(goal)
             until(future.done, 10, [sim, ctrl, bridge, localization])
             handle = future.result()
@@ -286,6 +355,7 @@ def main():
             row["wall_sec"] = time.monotonic()-started
             row["status_name"] = "SUCCEEDED" if row["status"] == 4 else str(row["status"])
             row["truth"] = truth()
+            row["start_sim_time"] = start_sim_time
             row["position_error_m"] = math.hypot(row["truth"]["x"]-x, row["truth"]["y"]-y)
             if samples["amcl"]:
                 pose = samples["amcl"][-1]
@@ -304,34 +374,38 @@ def main():
             result["goals"].append(row)
             checkpoint()
             print("GOAL_RESULT "+json.dumps(row), flush=True)
-        before = {key:len(samples[key]) for key in ("cloud","odom")}
-        before_pids = {p.pid: sorted(pid for pid, row in snapshot().items()
-                                   if row["session"] == p.pid)
-                       for p in (localization, bridge)}
-        before_time = samples["odom"][-1][0]
-        before_cloud_stamp = samples["cloud"][-1]
-        (output / "reset.request").touch()
-        until(lambda: truth()["epoch"] == 1, 5, [sim, ctrl, bridge, localization])
-        until(lambda: all(len(samples[key]) > before[key]+3 for key in ("cloud","odom"))
-              and samples["odom"][-1][0] < before_time
-              and samples["cloud"][-1] < before_cloud_stamp,
-              15, [sim, ctrl, bridge, localization])
-        result["reset"] = {
-            "cloud_before": before["cloud"], "cloud_after": len(samples["cloud"]),
-            "odom_before": before["odom"], "odom_after": len(samples["odom"]),
-            "odom_stamp_before_sec": before_time, "odom_stamp_after": samples["odom"][-1][:2],
-            "cloud_stamp_before": before_cloud_stamp,
-            "cloud_stamp_after": samples["cloud"][-1],
-            "same_pids": before_pids == {
-                p.pid: sorted(pid for pid, row in snapshot().items()
-                              if row["session"] == p.pid)
-                for p in (localization, bridge)},
-        }
-        print("RESET_RECOVERED", flush=True)
+            progress(f"목표 {index} {'도달' if row['status'] == 4 else '실패'} "
+                     f"시간={row['wall_sec']:.3f}s 오차={row['position_error_m']:.6f}m")
+        if not args.saved_map:
+            before = {key:len(samples[key]) for key in ("cloud","odom")}
+            before_pids = {p.pid: sorted(pid for pid, row in snapshot().items()
+                                       if row["session"] == p.pid)
+                           for p in (localization, bridge)}
+            before_time = samples["odom"][-1][0]
+            before_cloud_stamp = samples["cloud"][-1]
+            (output / "reset.request").touch()
+            until(lambda: truth()["epoch"] == 1, 5, [sim, ctrl, bridge, localization])
+            until(lambda: all(len(samples[key]) > before[key]+3 for key in ("cloud","odom"))
+                  and samples["odom"][-1][0] < before_time
+                  and samples["cloud"][-1] < before_cloud_stamp,
+                  15, [sim, ctrl, bridge, localization])
+            result["reset"] = {
+                "cloud_before": before["cloud"], "cloud_after": len(samples["cloud"]),
+                "odom_before": before["odom"], "odom_after": len(samples["odom"]),
+                "odom_stamp_before_sec": before_time, "odom_stamp_after": samples["odom"][-1][:2],
+                "cloud_stamp_before": before_cloud_stamp,
+                "cloud_stamp_after": samples["cloud"][-1],
+                "same_pids": before_pids == {
+                    p.pid: sorted(pid for pid, row in snapshot().items()
+                                  if row["session"] == p.pid)
+                    for p in (localization, bridge)},
+            }
+            print("RESET_RECOVERED", flush=True)
     except Exception:
         result["failure"] = traceback.format_exc()
         print(result["failure"], flush=True)
     finally:
+        observe_navigation = False
         cleanup_errors = []
         for p in reversed(processes):
             try:
@@ -351,7 +425,7 @@ def main():
         result["owned_remaining"] = manager.remaining()
         with (output / "commands.csv").open("w") as file:
             writer_csv = csv.writer(file)
-            writer_csv.writerow(["stamp_ns", "vx", "wz"])
+            writer_csv.writerow(["stamp_ns", "vx", "wz", "vy", "vz", "wx", "wy"])
             writer_csv.writerows(commands)
         contact_file = output / "contacts.csv"
         result["nonfloor_contacts"] = (
@@ -372,6 +446,7 @@ def main():
         result["shutdown_errors"] = [
             line for line in shutdown_log.splitlines() if "MANAGED_SHUTDOWN_FAILED" in line]
         result["samples"] = {key:len(value) for key,value in samples.items()}
+        planned_paths.close()
         result["criteria"] = {
             "mapping": bool(result.get("route_completed")),
             "mapping_no_stalls": result.get("mapping_stalls") == 0,
@@ -394,8 +469,43 @@ def main():
                       for value in result["shutdown_states"].values()),
             "preexisting_unchanged": result["preexisting_unchanged"],
         }
+        if args.saved_map:
+            physics = load_csv(output / "physics.csv") if (output / "physics.csv").exists() else []
+            result["physics"] = physics_summary(physics)
+            errors = amcl_errors(amcl_poses, load_csv(output / "truth.csv")) if (
+                output / "truth.csv").exists() else []
+            with (output / "amcl_gt.csv").open("w") as file:
+                writer_csv = csv.DictWriter(file, fieldnames=[
+                    "sim_time", "x", "y", "yaw", "xy_error_m"])
+                writer_csv.writeheader()
+                writer_csv.writerows(errors)
+            result["owner_samples"] = owner_samples
+            for row in result["goals"]:
+                end = row["truth"]["sim_time"]
+                row["physics"] = physics_summary(physics, row["start_sim_time"], end)
+                matches = [p for p in errors if row["start_sim_time"] <= p["sim_time"] <= end
+                           and p["xy_error_m"] is not None]
+                row["amcl_error_m"] = matches[-1]["xy_error_m"] if matches else None
+            for key in ("mapping", "mapping_no_stalls", "save", "reset_recovery"):
+                del result["criteria"][key]
+            result["criteria"].update({
+                "goal_time": len(result["goals"]) == 3 and all(
+                    row["wall_sec"] <= 150 for row in result["goals"]),
+                "zero_falls": result["physics"]["falls"] == 0,
+                "clearance": result["physics"]["min_clearance_m"] is not None
+                             and result["physics"]["min_clearance_m"] >= .10,
+                "single_cmd_vel_owner": bool(owner_samples) and all(
+                    len(s["cmd_vel"]) == 1 for s in owner_samples),
+                "single_map_odom_owner": bool(owner_samples) and all(
+                    s["map_odom_amcl"] for s in owner_samples),
+                "telemetry": bool(errors) and any(
+                    e["xy_error_m"] is not None for e in errors)
+                    and bool(commands) and (output / "planned_paths.jsonl").stat().st_size > 0,
+            })
         result["passed"] = not result.get("failure") and all(result["criteria"].values())
         checkpoint()
+        progress("종료 정리 판정=" + ("PASS" if result["passed"] else "FAIL")
+                 + f" 잔류={len(result['owned_remaining'])}")
         node.destroy_node()
         rclpy.shutdown()
         print("ACCEPTANCE_FINISHED "+str(output / "result.json"), flush=True)

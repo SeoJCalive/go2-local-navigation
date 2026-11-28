@@ -2,6 +2,34 @@
 판정으로 연결한다. 실제 로봇 동작·전체 지도 정확도는 이 절차의 검증 범위 밖이다. -->
 # MuJoCo 수용 시험
 
+## G03 저장 지도 진입점
+
+`--saved-map`은 mapping과 reset을 생략하고 G03에 사전 등록한 H3 변환과 세
+world goal을 사용한다. 같은 headless physics·RL·공개 localization launch와
+Nav2 설정·FIFO bridge를 사용한다. 실행 전
+[G03 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)을 먼저 읽는다.
+기준 문서 commit 뒤 구현·build/test·PR CI green 순서이며 실행은 한 번뿐이다.
+
+기존 아래 ROS 환경에서 다음 진입점을 사용한다.
+
+```bash
+python3 -u "$A/acceptance.py" --domain 41 \
+  --saved-map "$PWD/.omo/evidence/g02-headless-repeatability/run-3/frozen/wall-19.yaml" \
+  --output "$PWD/.omo/evidence/g03-saved-map-nav2/run-1"
+```
+
+이 mode에서 native driver는 `physics.csv`에 모든 physics step의 수평 collision
+envelope 최솟값·base 위치·geom pair·fall을 기록한다. 기존 G02 analytic
+clearance 함수를 재사용하며 기존 `contacts.csv`도 매 step 관측한다.
+`truth.csv`는 독립 freejoint qpos다. `amcl_gt.csv`는 같은 stamp의 qpos 보간값을
+고정 map frame으로 변환한 AMCL 오차다. bracket이 없으면 빈 오차로 남긴다.
+`planned_paths.jsonl`은 `/plan`, `commands.csv`는 shadow command,
+`result.json`은 goal별 실제 시간·오차·clearance 위치·AMCL 오차와 owner sample,
+종료 여섯 상태와 residue를 담는다. `../live/progress.log`는 한국어 `G03/`
+시작·goal 결과·contact/fall 최초 경보·종료 판정이다.
+
+## 기본 mapping과 reset 수용
+
 자신의 simulator·RL controller·FIFO bridge를 시작해 mapping → 지도 저장 →
 localization → JSON에 지정한 N개 world goal → 입력 epoch reset을 재현한다.
 수용 판정은 action `SUCCEEDED`, simulator freejoint qpos 기준 goal별 XY 오차
