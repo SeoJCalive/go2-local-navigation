@@ -4,6 +4,16 @@
 
 ## G04 좁은 통로 진입점
 
+v2는 [사전 기준의 v2](../../../../docs/G04_NARROW_PASSAGE_NAV2_CRITERIA.md)를
+따른다. 저속 실측으로 DWB 전진 하한 `.15`를 선택했고, 양성/경계 목표는
+실제 global costmap의 FREE·inscribed 영역 여유 `.20 m`를 검사한다.
+`safety_stop.py`는 모든 abort와 종료에서 Nav2 cancel-all·bridge zero 유지 후
+GT 선속도 `<.03`/각속도 `<.10`을 연속 1초 확인하고 lifecycle 종료를 시작한다.
+경보부터 physics 종료까지 이동 `.10 m`·clearance 감소 `.05 m` 상한을
+`post_alert`에 판정한다. 정지 zero도 native DDS GID로 별도 귀속하며 주행 중
+외부 명령과 nonzero 정지 명령은 허용하지 않는다. v2 output은 새 하위
+디렉터리로 분리하고 `--progress-log`에 기존 `live/progress.log`를 지정한다.
+
 `--saved-map <H3 wall-19.yaml> --narrow-passage --run-index <1|2|3>`은
 [사전 기준](../../../../docs/G04_NARROW_PASSAGE_NAV2_CRITERIA.md)의 고정 42개
 목표를 실행한다. 양성 34·음성 4·마지막 경계 4개이며 새 output으로 세 번

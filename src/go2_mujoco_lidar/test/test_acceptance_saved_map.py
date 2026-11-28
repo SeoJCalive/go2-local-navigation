@@ -142,3 +142,19 @@ def test_v3_no_mapping_cap_and_empty_status_closes_interval():
     assert result["attribution_counts"] == {"/controller_server": 300}
     assert len(result["gid_attribution_counts"]) == 300
     assert result["action_status"]["messages_with_active_action"] == 0
+
+
+def test_v2_safety_gid_allows_only_zero_after_stop_request():
+    log, samples = command_fixture(1250000000, "h2", "/go2_sim_acceptance")
+    stop = {"request_steady_ns": 1200000000,
+            "zero_endpoints": [{"gid": "g2", "node": "/go2_sim_acceptance"}]}
+    assert not command_ownership(log, samples, 10, 11)["passed"]
+    result = command_ownership(log, samples, 10, 11, stop)
+    assert result["passed"] and result["messages"][1]["safety_zero"]
+    assert command_ownership(log, samples, 10, 11, [stop])["passed"]
+    assert not command_ownership(log, samples, 10, 11, {
+        **stop, "request_steady_ns": 1250000001})["passed"]
+    assert not command_ownership(log.replace("h2\t0\t0", "h2\t.1\t0"),
+                                 samples, 10, 11, stop)["passed"]
+    assert not command_ownership(log, samples, 10, 11, {
+        **stop, "zero_endpoints": [{"gid": "g2", "node": "/other"}]})["passed"]

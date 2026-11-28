@@ -15,24 +15,28 @@ ROUTE = [
     ("C01", .8, 0, 0, ""), ("C02", 1.5, -1, 0, ""), ("C03", 0, 0, 0, ""),
     ("S01", -4.2, 0, -PI/2, "P14"), ("S02", -4.75, -1.6, -PI/2, ""),
     ("S03", -4.75, -3.1, PI, "P01"), ("S04", -6.7, -3.15, -PI/2, "P03"),
-    ("S05", -6.7, -5.25, 0, "P05"), ("S06", -4, -5.25, PI/2, "P02"),
-    ("S07", -3.9, -4.1, PI/2, ""), ("S08", -3.9, -2.98, 0, "P04"),
-    ("S09", -2.4, -2.98, 0, "P06"), ("S10", 1.5, -3.1, PI/2, ""),
+    ("S05", -6.713933569, -5.184581478, 0, "P05"),
+    ("S06", -4.013933535, -5.184768268, PI/2, "P02"),
+    ("S07", -3.913819384, -3.534775166, PI/2, ""),
+    ("S08", -3.913791712, -3.134775161, 0, "P04"),
+    ("S09", -2.413791693, -3.134878933, 0, "P06"), ("S10", 1.5, -3.1, PI/2, ""),
     ("S11", 1.5, -1.7, PI, "P13"), ("S12", 0, 0, 0, ""),
-    ("E01", .6, 1.845, 0, ""), ("E02", 2.445, 1.845, -PI/2, "P26"),
+    ("E01", .536547333, 1.764917043, 0, ""),
+    ("E02", 2.436540439, 1.664785597, -PI/2, "P26"),
     ("E03", 2.445, .25, 0, "P27"), ("E04", 4.2, 0, 0, "P17"),
-    ("E05", 5.2, -.38, 0, ""), ("E06", 7.1, -.38, -PI/2, "P38"),
-    ("E07", 7.1, -1.9, PI/2, "P29"), ("E08", 7.04, 1.6, PI/2, "P30"),
+    ("E05", 5.186395192, -.435404679, 0, ""), ("E06", 7.1, -.38, -PI/2, "P38"),
+    ("E07", 7.086312198, -1.635536139, PI/2, "P29"), ("E08", 7.04, 1.6, PI/2, "P30"),
     ("E09", 4.2, 0, PI, ""), ("E10", 0, 0, 0, ""),
     ("N01", -.2, 1.7, PI/2, ""), ("N02", -.2, 3.2, PI, "P11"),
-    ("N03", -2.5, 3.9, PI, ""), ("N04", -4, 3.9, 0, "P15"),
+    ("N03", -2.5, 3.9, PI, ""), ("N04", -3.813314358, 3.765218007, 0, "P15"),
     ("N05", 0, 0, 0, ""),
     ("X01", -3.2, -2.27, 0, "P07"), ("R01", 0, 0, 0, ""),
     ("X02", -6.2, 2.65, 0, "P08"), ("R02", 0, 0, 0, ""),
     ("X03", -6.2, 3.85, 0, "P09"), ("R03", 0, 0, 0, ""),
     ("X04", 5.9, 2.08, 0, "P10"), ("R04", 0, 0, 0, ""),
-    ("B01", 5.3, -1.9, 0, ""), ("B02", 7, -1.9, 0, "P28"),
-    ("B03", 3.85, 2.93, 0, ""), ("B04", 5.1, 2.93, 0, "P25"),
+    ("B01", 5.286315634, -1.585411611, 0, ""),
+    ("B02", 7.036312197, -1.635532680, 0, "P28"),
+    ("B03", 3.786696114, 3.914692230, 0, ""), ("B04", 5.1, 2.93, 0, "P25"),
 ]
 GOAL_SPECS = [
     {"id": name, "kind": "negative" if name.startswith("X") else
@@ -68,6 +72,30 @@ THROATS = {
 SW_ORDER = list(THROATS)[:8]
 POSITIVE_PASSAGES = list(THROATS)[:16]
 RECOVERY_TOPICS = {f"/{name}/_action/status" for name in ("spin", "backup", "wait")}
+
+
+def goal_placement(grid):
+    """Check actual frozen FREE cells and conservative distance to inscribed squares.
+
+    Negative rejection targets intentionally retain their blocked v1 positions.
+    The half-cell diagonal makes centre distance a lower bound for cell regions.
+    """
+    res, (ox, oy), width = grid["resolution"], grid["origin"], grid["width"]
+    inscribed = [(ox+(k % width+.5)*res, oy+(k // width+.5)*res)
+                 for k, value in enumerate(grid["data"]) if value == 99]
+    checks = []
+    for spec in GOAL_SPECS:
+        if spec["kind"] == "negative":
+            continue
+        x, y = spec["map_goal"][:2]
+        i, j = math.floor((x-ox)/res), math.floor((y-oy)/res)
+        cost = grid["data"][j*width+i] if 0 <= i < width and 0 <= j < grid["height"] else None
+        distance = min((math.hypot(x-u, y-v) for u, v in inscribed), default=-math.inf)
+        margin = distance-res/math.sqrt(2)
+        checks.append({"id": spec["id"], "map_goal": spec["map_goal"],
+                       "cell": [i, j], "cost": cost, "inscribed_margin_m": margin,
+                       "passed": cost == 0 and margin >= .20})
+    return {"goals": checks, "passed": len(checks) == 38 and all(r["passed"] for r in checks)}
 
 
 def world_xy(point):
@@ -179,6 +207,7 @@ class SafetyReader:
         self.output = output
         self.offsets = {}
         self.minimum = math.inf
+        self.alert_row = None
 
     def poll(self):
         alert = None
@@ -201,12 +230,16 @@ class SafetyReader:
                         file.seek(position)
                         break
                     row = next(csv.DictReader([line], fieldnames=header))
+                    candidate = None
                     if name == "contacts":
-                        alert = f"비바닥 접촉 sim={row['sim_time']}"
+                        candidate = f"비바닥 접촉 sim={row['sim_time']}"
                     else:
                         gap = float(row["min_clearance_m"])
                         self.minimum = min(self.minimum, gap)
                         if int(row["fall"]) or gap < .10:
-                            alert = f"안전 경계 sim={row['sim_time']} fall={row['fall']} clearance={gap}"
+                            candidate = f"안전 경계 sim={row['sim_time']} fall={row['fall']} clearance={gap}"
+                    if candidate and (alert is None or
+                                      float(row["sim_time"]) < float(self.alert_row["sim_time"])):
+                        alert, self.alert_row = candidate, row
                 self.offsets[name] = (file.tell(), header)
         return alert

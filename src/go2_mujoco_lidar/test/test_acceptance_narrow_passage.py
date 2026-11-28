@@ -5,8 +5,9 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent / "acceptance"))
 from narrow_passage import (GOAL_SPECS, THROATS, SafetyReader, crossings, entered,
-                            negative_outcome, passage_coverage, recoveries, verdict_physics)
+                            goal_placement, negative_outcome, passage_coverage, recoveries, verdict_physics)
 from saved_map import map_pose
+from safety_stop import stationary, post_stop_summary
 
 
 def test_route_counts_transform_and_boundary_last():
@@ -99,3 +100,60 @@ def test_safety_reader_consumes_only_new_complete_frames(tmp_path):
     with (tmp_path / "contacts.csv").open("a") as file:
         file.write("3,17\n")
     assert "접촉" in reader.poll()
+
+
+def test_safety_reader_retains_first_alert_frame(tmp_path):
+    (tmp_path / "physics.csv").write_text(
+        "sim_time,min_clearance_m,fall\n1,.2,0\n2,.09,0\n3,.02,0\n")
+    reader = SafetyReader(tmp_path)
+    assert "sim=2" in reader.poll()
+    assert reader.alert_row["sim_time"] == "2"
+    assert reader.minimum == .02
+
+
+def test_free_goal_placement_checks_actual_cost_and_inscribed_region_margin():
+    grid = {"width": 400, "height": 400, "origin": [-10, -10], "resolution": .05,
+            "data": [0]*160000}
+    grid["data"][0] = 99
+    assert goal_placement(grid)["passed"]
+    spec = next(s for s in GOAL_SPECS if s["id"] == "N04")
+    x, y = spec["map_goal"][:2]
+    i, j = int((x+10)/.05), int((y+10)/.05)
+    grid["data"][j*400+i] = 1
+    assert not goal_placement(grid)["passed"]
+    grid["data"][j*400+i] = 0
+    grid["data"][j*400+i+1] = 99
+    assert not goal_placement(grid)["passed"]
+    negatives = [s for s in GOAL_SPECS if s["kind"] == "negative"]
+    assert [s["world_goal"][:2] for s in negatives] == [
+        [-3.2, -2.27], [-6.2, 2.65], [-6.2, 3.85], [5.9, 2.08]]
+
+
+def test_gt_stationary_requires_linear_and_angular_speed():
+    rows = [dict(sim_time=i*.05, x=0., y=0., qw=1., qx=0., qy=0., qz=0.)
+            for i in range(30)]
+    assert stationary(rows)
+    assert not stationary([])
+    assert not stationary([{**r, "x": r["sim_time"]*.031} for r in rows])
+    import math
+    assert not stationary([{**r, "qw": math.cos(r["sim_time"]*.11/2),
+                            "qz": math.sin(r["sim_time"]*.11/2)} for r in rows])
+
+
+def test_post_alert_uses_all_physics_frames_and_both_bounds():
+    start = {"sim_time": 2., "x": 0., "y": 0.}
+    physics = [{"sim_time": 1, "x": 0, "y": 0, "min_clearance_m": .001},
+               {"sim_time": 2, "x": 0, "y": 0, "min_clearance_m": .10},
+               {"sim_time": 3, "x": .09, "y": 0, "min_clearance_m": .06}]
+    result = post_stop_summary(physics, start, True)
+    assert result["passed"] and result["frames"] == 2
+    assert result["max_displacement_m"] == .09
+    assert result["min_clearance_m"] == .06
+    assert not post_stop_summary(physics, start, False)["passed"]
+    assert not post_stop_summary([], start, True)["passed"]
+    physics[-1]["x"] = .101
+    assert not post_stop_summary(physics, start, True)["passed"]
+    physics[-1]["x"], physics[-1]["min_clearance_m"] = .09, .049
+    assert not post_stop_summary(physics, start, True)["passed"]
+    # Motion after the next goal resumes is outside the completed stop episode.
+    assert post_stop_summary(physics, start, True, 2)["passed"]

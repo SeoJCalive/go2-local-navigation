@@ -36,7 +36,8 @@ from ament_index_python.packages import get_package_prefix
 from saved_map import (COMMAND_TOPICS, GOALS, WORLD_MAP, amcl_errors,
                        command_ownership, load_csv, map_pose, physics_summary)
 from narrow_passage import (GOAL_SPECS, SafetyReader, negative_outcome,
-                            passage_coverage, recoveries, verdict_physics)
+                            goal_placement, passage_coverage, recoveries, verdict_physics)
+from safety_stop import SafetyStop, post_stop_summary
 
 PROJECT = Path(__file__).resolve().parents[4]
 HERE = Path(__file__).resolve().parent
@@ -60,6 +61,8 @@ def main():
     parser.add_argument("--narrow-passage", action="store_true",
                         help="G04 preregistered positive/negative/boundary sequence")
     parser.add_argument("--run-index", type=int, choices=(1, 2, 3), default=1)
+    parser.add_argument("--progress-log", type=Path,
+                        help="Append progress here when v2 evidence is in a separate directory")
     parser.add_argument("--simulator", type=Path,
                         default=SIM_DEPS / "acceptance-build/acceptance_simulator")
     parser.add_argument("--controller", type=Path, default=CONTROLLER_DIR / "go2_ctrl")
@@ -98,19 +101,19 @@ def main():
     baseline = existing_stack(PROJECT)
     (output / "preexisting.json").write_text(json.dumps(baseline, indent=2))
     result = {"domain": args.domain, "goals": [], "preexisting": baseline, "criteria": {}}
-    progress_path = output.parent / "live/progress.log"
+    progress_path = args.progress_log or output.parent / "live/progress.log"
 
     def progress(message):
         if args.saved_map:
             with progress_path.open("a") as file:
-                file.write(("G04/" if args.narrow_passage else "G03/") + message + "\n")
+                file.write(("G04/v2 " if args.narrow_passage else "G03/") + message + "\n")
 
     if args.saved_map:
         progress_path.parent.mkdir(parents=True, exist_ok=True)
         result["saved_map"] = str(args.saved_map.resolve())
         result["world_map_transform"] = WORLD_MAP
         result["mode"] = "saved-map-headless"
-        result["criteria_version"] = 4 if args.narrow_passage else 3
+        result["criteria_version"] = "G04-v2" if args.narrow_passage else 3
         result["run_index"] = args.run_index
         progress(f"run {args.run_index}/3 시작" if args.narrow_passage else
                  "시작 v3 headless 저장 지도 Nav2 단일 실행")
@@ -129,6 +132,7 @@ def main():
     signal.signal(signal.SIGINT, interrupted)
     node = rclpy.create_node("go2_sim_acceptance", parameter_overrides=[
         Parameter("use_sim_time", value=True)])
+    stopper = SafetyStop(node) if args.narrow_passage else None
     buffer = Buffer()
     # Humble's Python Buffer does not attach a clock jump callback itself.
     node._epoch_reset = watch_simulation_epoch(node, buffer.clear)
@@ -226,7 +230,8 @@ def main():
             alert = safety.poll()
             if alert:
                 result["safety_alert"] = {"message": alert,
-                                          "boundary": current_spec.get("kind") == "boundary"}
+                                          "boundary": current_spec.get("kind") == "boundary",
+                                          "first_native_row": safety.alert_row}
                 progress("경보 " + alert)
                 raise RuntimeError("G04 safety stop: " + alert)
 
@@ -252,7 +257,7 @@ def main():
     def text(name):
         return (output / f"{name}.log").read_text()
 
-    def truth():
+    def truth(recent=False):
         with (output / "truth.csv").open("rb") as file:
             header = file.readline().decode().strip().split(",")
             file.seek(0, os.SEEK_END)
@@ -262,8 +267,21 @@ def main():
             if not tail.endswith("\n"):
                 lines = lines[:-1]
         # Native flushes complete rows. Ignore a partially observed final row.
-        rows = [line.split(",") for line in lines if len(line.split(",")) == len(header)]
-        return {key: float(value) for key, value in zip(header, rows[-1])}
+        rows = [line.split(",") for line in lines
+                if len(line.split(",")) == len(header) and line.split(",") != header]
+        values = [{key: float(value) for key, value in zip(header, row)} for row in rows]
+        return values if recent else values[-1]
+
+    def halt():
+        # Each ordinary goal abort also stops before the next frozen goal.
+        if stopper.publisher is None:
+            receipt = stopper.run(lambda: truth(True), pump)
+            result.setdefault("safety_stops", []).append(receipt)
+        else:
+            receipt = stopper.result
+        if not receipt["stationary_verified"]:
+            raise RuntimeError("GT did not become stationary before teardown/resume")
+        return receipt
 
     def edge_owner(logfile, expected):
         identities, guids = set(), {}
@@ -371,7 +389,7 @@ def main():
             # Query all actual parameters, not only source YAML/default guesses.
             dumps = {}
             for target in ("/global_costmap/global_costmap", "/local_costmap/local_costmap",
-                           "/planner_server"):
+                           "/planner_server", "/controller_server"):
                 list_client = node.create_client(ListParameters, target + "/list_parameters")
                 get_client = node.create_client(GetParameters, target + "/get_parameters")
                 until(lambda: list_client.service_is_ready() and get_client.service_is_ready(), 10)
@@ -404,8 +422,24 @@ def main():
                 dumps["/planner_server"].get(key) == value for key, value in (
                     ("GridBased.use_astar", False), ("GridBased.allow_unknown", False),
                     ("GridBased.tolerance", .1)))
+            result["parameters_match"] = result["parameters_match"] and all(
+                dumps["/controller_server"].get(key) == value for key, value in (
+                    ("FollowPath.min_vel_x", .15),
+                    ("progress_checker.required_movement_radius", .05),
+                    ("progress_checker.required_movement_angle", .20),
+                    ("progress_checker.movement_time_allowance", 10.)))
             if not result["parameters_match"]:
                 raise RuntimeError("G04 actual parameter/model mismatch")
+            until(lambda: "global_costmap" in costmaps, 10)
+            grid = costmaps["global_costmap"]
+            frozen = {"width": grid.info.width, "height": grid.info.height,
+                      "resolution": grid.info.resolution,
+                      "origin": [grid.info.origin.position.x, grid.info.origin.position.y],
+                      "data": list(grid.data)}
+            (output / "frozen_global_costmap.json").write_text(json.dumps(frozen)+"\n")
+            result["goal_placement"] = goal_placement(frozen)
+            if not result["goal_placement"]["passed"]:
+                raise RuntimeError("G04 FREE goal placement mismatch")
         action = ActionClient(node, NavigateToPose, "/navigate_to_pose")
         if not action.wait_for_server(timeout_sec=10):
             raise TimeoutError("NavigateToPose server missing")
@@ -492,6 +526,10 @@ def main():
                      f"{row.get('id', '')} {row['status_name']} "
                      f"시간={row['wall_sec']:.3f}s 오차={row['position_error_m']:.6f}m "
                      f"최소여유={row.get('live_min_clearance_m')}")
+            if args.narrow_passage and row["status"] != 4:
+                receipt = halt()
+                receipt["resume_sim_time"] = truth()["sim_time"]
+                stopper.release()
         result["navigation_end_ns"] = node.get_clock().now().nanoseconds
         if not args.saved_map:
             before = {key:len(samples[key]) for key in ("cloud","odom")}
@@ -532,8 +570,17 @@ def main():
         print(traceback.format_exc(), flush=True)
     finally:
         check_safety = False
-        observe_navigation = False
         cleanup_errors = []
+        if stopper is not None and (output / "truth.csv").exists():
+            try:
+                result["safety_stop"] = halt()
+                result["safety_stop"]["teardown_begin_sim_time"] = truth()["sim_time"]
+                if not result["safety_stop"]["stationary_verified"]:
+                    cleanup_errors.append("GT did not become stationary before teardown")
+                progress("정지 확인 " + json.dumps(result["safety_stop"], ensure_ascii=False))
+            except Exception as error:
+                cleanup_errors.append("safety stop: " + str(error))
+        observe_navigation = False
         for p in reversed(processes):
             try:
                 stop(p)
@@ -541,6 +588,8 @@ def main():
                 cleanup_errors.append(str(error))
         result["cleanup_errors"] = cleanup_errors
         result["shutdowns"] = manager.stops
+        if args.narrow_passage:
+            result["navigation_end_ns"] = node.get_clock().now().nanoseconds
         for log in logs:
             log.close()
         os.close(writer)
@@ -603,12 +652,13 @@ def main():
                 (output / "localization_tf.log").read_text() if (
                     output / "localization_tf.log").exists() else "",
                 owner_samples, result.get("navigation_start_ns", 0),
-                result.get("navigation_end_ns", node.get_clock().now().nanoseconds))
+                result.get("navigation_end_ns", node.get_clock().now().nanoseconds),
+                result.get("safety_stops"))
             command_rows = result["command_ownership"]["messages"]
             with (output / "command_owners.csv").open("w") as file:
                 writer_csv = csv.DictWriter(file, fieldnames=[
                     "received_steady_ns", "sim_stamp_ns", "topic", "rmw_gid", "publisher_gid",
-                    "node", "active_actions", "action_role_matches",
+                    "node", "active_actions", "action_role_matches", "safety_zero",
                     "vx", "wz", "vy", "vz", "wx", "wy"])
                 writer_csv.writeheader()
                 writer_csv.writerows(command_rows)
@@ -644,6 +694,25 @@ def main():
                     and bool(commands) and (output / "planned_paths.jsonl").stat().st_size > 0,
             })
             if args.narrow_passage:
+                stop_result = result.get("safety_stop", {})
+                anchor = stop_result.get("start")
+                alert = result.get("safety_alert", {}).get("first_native_row")
+                if alert:
+                    anchor = next(({k: float(r[k]) for k in ("sim_time", "x", "y")}
+                                   for r in physics if float(r["sim_time"]) >= float(alert["sim_time"])), None)
+                cancellation_complete = bool(result.get("safety_stops"))
+                for receipt in result.get("safety_stops", []):
+                    start = anchor if receipt is stop_result else receipt["start"]
+                    receipt["post_stop"] = post_stop_summary(
+                        physics, start, receipt.get("stationary_verified", False),
+                        receipt.get("resume_sim_time", math.inf)) if start else {"passed": False}
+                    cancel = receipt.get("cancellations", {})
+                    cancellation_complete = cancellation_complete and bool(cancel) and all(
+                        "incomplete" not in r for r in cancel.values())
+                    if result.get("localization_owner"):
+                        cancellation_complete = cancellation_complete and all(
+                            name in cancel for name in ("navigate_to_pose", "follow_path"))
+                result["post_alert"] = stop_result.get("post_stop", {"passed": False})
                 boundary = result.get("boundary_start_sim_time", math.inf)
                 result["all_physics"] = result["physics"]
                 result["physics"] = verdict_physics(physics, boundary)
@@ -689,6 +758,11 @@ def main():
                     "clearance": result["physics"]["min_clearance_m"] is not None
                                  and result["physics"]["min_clearance_m"] >= .10,
                     "parameters": result.get("parameters_match", False),
+                    "goal_placement": result.get("goal_placement", {}).get("passed", False),
+                    "safety_stop": all(r["post_stop"]["passed"] for r in result.get("safety_stops", []))
+                                   and cancellation_complete
+                                   and stop_result.get("verified_sim_time", math.inf)
+                                   <= stop_result.get("teardown_begin_sim_time", -math.inf),
                 })
         result["passed"] = not result.get("failure") and all(result["criteria"].values())
         checkpoint()

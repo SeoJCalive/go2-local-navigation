@@ -56,7 +56,7 @@ def load_csv(path):
         return list(csv.DictReader(file))
 
 
-def command_ownership(log, samples, start_ns, end_ns):
+def command_ownership(log, samples, start_ns, end_ns, safety_stop=None):
     """Resolve each native RMW handle, then compare half-open 250 ms windows.
 
     Graph endpoint counts remain evidence, not a single-endpoint requirement.
@@ -96,10 +96,22 @@ def command_ownership(log, samples, start_ns, end_ns):
         intervals.extend({"topic": topic, "goal_id": uuid,
                           "start_ns": received, "end_ns": None}
                          for uuid, received in active.items())
+    stops = [safety_stop] if isinstance(safety_stop, dict) else safety_stop or []
+    safety_endpoints = {
+        (COMMAND_TOPICS[0], e["gid"]): e["node"]
+        for stop in stops for e in stop.get("zero_endpoints", [])}
     latest, overlaps = {}, []
     for row in sorted(messages, key=lambda r: r["received_steady_ns"]):
         row["publisher_gid"] = gids.get(row["rmw_gid"])
         row["node"] = endpoints.get((row["topic"], row["publisher_gid"]))
+        row["safety_zero"] = any(
+            row["received_steady_ns"] >= stop["request_steady_ns"]
+            and any(e["gid"] == row["publisher_gid"] and e["node"] == row["node"]
+                    for e in stop.get("zero_endpoints", []))
+            and row["topic"] == COMMAND_TOPICS[0]
+            and row["node"] is not None
+            and all(row[k] == 0 for k in ("vx", "wz", "vy", "vz", "wx", "wy"))
+            for stop in stops)
         row["active_actions"] = sorted({
             interval["topic"] for interval in intervals
             if interval["start_ns"] <= row["received_steady_ns"] and (
@@ -119,8 +131,9 @@ def command_ownership(log, samples, start_ns, end_ns):
                     overlaps.append({"earlier": previous, "later": row})
             latest[row["publisher_gid"]] = row
     external = [{"topic": topic, "gid": gid, "node": node}
-                for (topic, gid), node in endpoints.items() if node not in COMMAND_NODES]
-    unknown = sum(row["node"] not in COMMAND_NODES for row in messages)
+                for (topic, gid), node in endpoints.items()
+                if node not in COMMAND_NODES and safety_endpoints.get((topic, gid)) != node]
+    unknown = sum(row["node"] not in COMMAND_NODES and not row["safety_zero"] for row in messages)
     return {"method": "rclcpp/RMW publisher_gid + Cyclone GID_MAP",
             "window_wall_sec": .25, "messages": messages, "overlaps": overlaps,
             "external_endpoints": external, "unidentified_or_external_messages": unknown,

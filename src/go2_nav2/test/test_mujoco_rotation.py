@@ -34,6 +34,8 @@ def test_shim_reaches_responsive_band_in_one_control_cycle():
     # XYThetaIterator's minimum-speed rejection combines XY and theta with AND.
     assert 0 < controller["min_speed_xy"] < controller["max_vel_x"]
     assert controller["min_speed_theta"] >= floor
+    # G04 fresh open-floor probes: .10 settles below .005; .15 exceeds .0408.
+    assert controller["min_vel_x"] == .15
     # Measured worst-sign response, rather than candidate command, clears progress.
     progress = params["progress_checker"]
     assert 0.362 * progress["movement_time_allowance"] > progress["required_movement_angle"]
