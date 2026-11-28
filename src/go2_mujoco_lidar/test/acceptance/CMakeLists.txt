@@ -22,6 +22,8 @@ target_link_libraries(acceptance_simulator PRIVATE
 set_target_properties(acceptance_simulator PROPERTIES
   BUILD_RPATH "${MJ}/lib;/opt/unitree_robotics/lib")
 enable_testing()
+add_executable(acceptance_posture_test posture_test.cpp)
+add_test(NAME acceptance_posture_test COMMAND acceptance_posture_test)
 add_executable(acceptance_clock_test clock_test.cpp)
 target_include_directories(acceptance_clock_test PRIVATE "${SIM}/simulate/src" "${MJ}/include")
 target_link_directories(acceptance_clock_test PRIVATE "${MJ}/lib")

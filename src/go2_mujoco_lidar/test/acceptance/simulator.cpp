@@ -4,8 +4,11 @@
 // A dedicated reset request file triggers mj_resetData without node restarts.
 // contacts.csv records every robot/world non-plane contact at each
 // physics step, including contacts between the 20 Hz truth samples.
+// G03 v2 latches stand-up/timeout and records roll/pitch at every physics step.
 #include "unitree_sdk2_bridge.h"
 #include "simulation_step.hpp"
+#include "posture.hpp"
+#include "../wall_hug/clearance_2d.h"
 
 #include <boost/program_options.hpp>
 #include <chrono>
@@ -13,8 +16,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 namespace {
 volatile std::sig_atomic_t stopped = 0;
@@ -31,7 +36,8 @@ int main(int argc, char **argv)
     ("interface,n", po::value<std::string>()->required())
     ("dds-config", po::value<std::string>()->required())
     ("fifo", po::value<std::string>()->required())
-    ("output", po::value<std::string>()->required());
+    ("output", po::value<std::string>()->required())
+    ("progress-log", po::value<std::string>());
   po::variables_map args;
   po::store(po::parse_command_line(argc, argv, options), args);
   po::notify(args);
@@ -66,6 +72,30 @@ int main(int argc, char **argv)
   truth << "epoch,sim_time,x,y,z,qw,qx,qy,qz\n" << std::setprecision(17);
   std::ofstream contacts(output / "contacts.csv");
   contacts << "epoch,sim_time,robot_geom,world_geom,distance\n" << std::setprecision(17);
+  // G03 observes every step without changing physics, collision masks or policy.
+  // Reuse G02's conservative horizontal support envelopes, including moving legs.
+  std::ofstream physics, progress;
+  std::vector<int> obstacles, robot_geoms;
+  bool contact_alert = false, fall_alert = false;
+  G03Posture posture;
+  bool standup_recorded = false;
+  if (args.count("progress-log")) {
+    progress.open(args["progress-log"].as<std::string>(), std::ios::app);
+    physics.open(output / "physics.csv");
+    physics << "sim_time,x,y,z,min_clearance_m,robot_geom,world_geom,fall,roll,pitch\n"
+            << std::setprecision(17);
+    for (int g = 0; g < model->ngeom; ++g) {
+      if (!model->geom_contype[g] && !model->geom_conaffinity[g]) continue;
+      if (model->geom_bodyid[g] != 0) robot_geoms.push_back(g);
+      else if (model->geom_type[g] != mjGEOM_PLANE) {
+        if (model->geom_type[g] != mjGEOM_BOX && model->geom_type[g] != mjGEOM_CYLINDER)
+          throw std::runtime_error("G03 world envelope supports only box/cylinder");
+        obstacles.push_back(g);
+      }
+    }
+    if (obstacles.empty() || robot_geoms.empty())
+      throw std::runtime_error("G03 collision envelope geometry missing");
+  }
   {
     Go2Bridge bridge(model, data);
     auto started = std::chrono::steady_clock::now();
@@ -95,6 +125,44 @@ int main(int argc, char **argv)
         contacts << epoch << ',' << data->time << ',' << robot << ','
                  << mj_id2name(model, mjOBJ_GEOM, obstacle) << ','
                  << contact.dist << std::endl;
+        if (progress.is_open() && !contact_alert) {
+          progress << "G03/경보 비바닥 접촉 sim=" << data->time << std::endl;
+          contact_alert = true;
+        }
+      }
+      if (physics.is_open()) {
+        double minimum = std::numeric_limits<double>::infinity();
+        int nearest_robot = -1, nearest_world = -1;
+        for (int w : obstacles) for (int r : robot_geoms) {
+          const double gap = clearance2d(model, data, w, r);
+          if (gap < minimum) {minimum = gap; nearest_robot = r; nearest_world = w;}
+        }
+        const auto* q = data->qpos + 3;
+        const double roll = std::atan2(2*(q[0]*q[1]+q[2]*q[3]),
+                                      1-2*(q[1]*q[1]+q[2]*q[2]));
+        const double pitch = std::asin(std::clamp(2*(q[0]*q[2]-q[3]*q[1]), -1., 1.));
+        const bool fall = posture.observe(data->time, data->qpos[2], roll, pitch);
+        if (!standup_recorded && (posture.completed_at >= 0. || posture.timed_out)) {
+          {
+            std::ofstream receipt(output / "standup.tmp");
+            receipt << std::setprecision(17) << std::boolalpha
+                    << "{\"completed\":" << (posture.completed_at >= 0.)
+                    << ",\"sim_time\":" << posture.completed_at
+                    << ",\"timed_out\":" << posture.timed_out << "}\n";
+          }
+          std::filesystem::rename(output / "standup.tmp", output / "standup.json");
+          progress << "G03/기립 " << (posture.timed_out ? "시간초과 FAIL" : "완료")
+                   << " sim=" << data->time << std::endl;
+          standup_recorded = true;
+        }
+        physics << data->time << ',' << data->qpos[0] << ',' << data->qpos[1] << ','
+                << data->qpos[2] << ',' << minimum << ',' << nearest_robot << ','
+                << nearest_world << ',' << fall << ',' << roll << ',' << pitch << '\n';
+        if (fall && !fall_alert) {
+          progress << "G03/경보 낙상 sim=" << data->time << std::endl;
+          fall_alert = true;
+        }
+        if (steps % 25 == 0) physics.flush();
       }
       if (++steps % 25 == 0) {
         truth << epoch << ',' << data->time;

@@ -2,6 +2,34 @@
 판정으로 연결한다. 실제 로봇 동작·전체 지도 정확도는 이 절차의 검증 범위 밖이다. -->
 # MuJoCo 수용 시험
 
+## G03 저장 지도 진입점
+
+`--saved-map`은 mapping과 reset을 생략하고 G03에 사전 등록한 H3 변환과 세
+world goal을 사용한다. 같은 headless physics·RL·공개 localization launch와
+Nav2 설정·FIFO bridge를 사용한다. 실행 전
+[G03 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)을 먼저 읽는다.
+기준 문서 commit 뒤 구현·build/test·PR CI green 순서이며 실행은 한 번뿐이다.
+
+기존 아래 ROS 환경에서 다음 진입점을 사용한다.
+
+```bash
+python3 -u "$A/acceptance.py" --domain 41 \
+  --saved-map "$PWD/.omo/evidence/g02-headless-repeatability/run-3/frozen/wall-19.yaml" \
+  --output "$PWD/.omo/evidence/g03-saved-map-nav2/run-1"
+```
+
+이 mode에서 native driver는 `physics.csv`에 모든 physics step의 수평 collision
+envelope 최솟값·base 위치·geom pair·fall을 기록한다. 기존 G02 analytic
+clearance 함수를 재사용하며 기존 `contacts.csv`도 매 step 관측한다.
+`truth.csv`는 독립 freejoint qpos다. `amcl_gt.csv`는 같은 stamp의 qpos 보간값을
+고정 map frame으로 변환한 AMCL 오차다. bracket이 없으면 빈 오차로 남긴다.
+`planned_paths.jsonl`은 `/plan`, `commands.csv`는 shadow command,
+`result.json`은 goal별 실제 시간·오차·clearance 위치·AMCL 오차와 owner sample,
+종료 여섯 상태와 residue를 담는다. `../live/progress.log`는 한국어 `G03/`
+시작·goal 결과·contact/fall 최초 경보·종료 판정이다.
+
+## 기본 mapping과 reset 수용
+
 자신의 simulator·RL controller·FIFO bridge를 시작해 mapping → 지도 저장 →
 localization → JSON에 지정한 N개 world goal → 입력 epoch reset을 재현한다.
 수용 판정은 action `SUCCEEDED`, simulator freejoint qpos 기준 goal별 XY 오차
@@ -118,6 +146,41 @@ cmake --build build/go2_mujoco_lidar \
 build/go2_mujoco_lidar/planar_selection_broken_input \
   --gtest_filter=PlanarSelection.ChoosesClosestElevationAndFirstTie
 ```
+
+## G03 저장 지도 v2
+
+`--saved-map <H3 wall-19.yaml>`은 mapping·reset을 생략하고 고정 H3 변환과
+세 world 목표를 사용한다. 판정과 출처는
+[G03 사전 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)의 v2를 따른다.
+기립 gate는 native `posture.hpp`가 매 physics frame에서 관측하고
+`standup.json`의 완료 시각·timeout을 목표 1 전에 확인한다.
+`physics.csv`는 기립 뒤 fall flag와 전체 구간 roll/pitch·clearance를 보존한다.
+`acceptance_posture_test`는 simulator를 실행하지 않고 같은 gate의 경계를 검사한다.
+
+기존 `tf_owner_observer`에 `observe_commands:=true`·`use_sim_time:=true`를
+넘겨 command topic 둘의 RMW GID와 steady 수신 시각을 기록한다.
+Humble rclpy가 버리는 sender 정보를 rclcpp/Cyclone builtin metadata로 연결하며
+`command_owners.csv`와 `result.json.command_ownership`에 실제 발신자와
+250 ms 창 중첩을 남긴다. endpoint 수는 `owner_samples`에 계속 보존한다.
+
+G03 v3는 builtin publication을 `dds_take` batch로 배출해 늦게 생성된
+publisher도 무제한 identity map에 보존한다. `ACTION_STATUS`는 실제 graph에서
+발견한 action status의 UUID·상태·steady 시각이며, 결과의 active 구간과
+메시지별 `active_actions`로 controller/behavior 역할을 독립 대조한다.
+미식별 primary sender에 대한 fallback은 허용하지 않는다.
+사전 기준은 [G03 기준](../../../../docs/G03_SAVED_MAP_NAV2_CRITERIA.md)의 v3 절이다.
+같은 ROS/Domain/DDS 환경에서 아래 계측 검사를 먼저 수행한다. simulator와
+RL은 시작하지 않으며, fresh output에 실제 raw bytes·graph GUID·네 verdict를 남긴다.
+
+```bash
+timeout 300 python3 "$A/command_instrument.py" \
+  --observer "$PWD/install/go2_mujoco_lidar/lib/go2_mujoco_lidar/tf_owner_observer" \
+  --output "$PWD/runs/g03-instrument-01"
+```
+이 관측기는 발행하지 않으며 bridge 수신 scheduling과 동일하다고 보장하지 않는다.
+
+실행당 새 output이 필요하며 `.omo/evidence/g03-saved-map-nav2/run-v2-1`은
+사전 승인된 v2 단일 실행 전용이다. 실행 뒤 조건 변경·재시도는 하지 않는다.
 
 ## GUI binary 장시간 clock 검증
 
