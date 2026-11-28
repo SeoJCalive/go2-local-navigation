@@ -27,6 +27,7 @@ from go2_inputs.simulation_epoch import watch_simulation_epoch
 from lifecycle_msgs.msg import State
 from nav2_msgs.action import NavigateToPose
 from nav_msgs.msg import OccupancyGrid, Odometry, Path as PlannedPath
+from rcl_interfaces.srv import GetParameters, ListParameters
 from sensor_msgs.msg import PointCloud2
 from tf2_ros import Buffer, TransformListener
 
@@ -34,6 +35,8 @@ from owned_processes import OwnedProcesses, existing_stack, snapshot
 from ament_index_python.packages import get_package_prefix
 from saved_map import (COMMAND_TOPICS, GOALS, WORLD_MAP, amcl_errors,
                        command_ownership, load_csv, map_pose, physics_summary)
+from narrow_passage import (GOAL_SPECS, SafetyReader, negative_outcome,
+                            passage_coverage, recoveries, verdict_physics)
 
 PROJECT = Path(__file__).resolve().parents[4]
 HERE = Path(__file__).resolve().parent
@@ -54,6 +57,9 @@ def main():
     parser.add_argument("--route", type=Path, default=HERE / "route.json")
     parser.add_argument("--saved-map", type=Path,
                         help="G03: skip mapping/reset; fixed H3 transform and three world goals")
+    parser.add_argument("--narrow-passage", action="store_true",
+                        help="G04 preregistered positive/negative/boundary sequence")
+    parser.add_argument("--run-index", type=int, choices=(1, 2, 3), default=1)
     parser.add_argument("--simulator", type=Path,
                         default=SIM_DEPS / "acceptance-build/acceptance_simulator")
     parser.add_argument("--controller", type=Path, default=CONTROLLER_DIR / "go2_ctrl")
@@ -67,6 +73,8 @@ def main():
                         default=PROJECT / "third_party/tf2/install")
     parser.add_argument("--dds-config", type=Path, default=HERE / "cyclonedds.xml")
     args = parser.parse_args()
+    if args.narrow_passage and not args.saved_map:
+        parser.error("--narrow-passage requires --saved-map")
     for executable_path in (args.simulator, args.controller, args.tf_observer):
         if not executable_path.is_file():
             parser.error(f"missing executable: {executable_path}; "
@@ -81,7 +89,8 @@ def main():
             or os.environ.get("ROS_LOCALHOST_ONLY") != "1"
             or os.environ.get("CYCLONEDDS_URI") != config.as_uri()):
         raise ValueError("domain/localhost/DDS environment does not match arguments")
-    goals = GOALS if args.saved_map else json.loads(args.goals.read_text())
+    goals = ([s["world_goal"][:2] for s in GOAL_SPECS] if args.narrow_passage else
+             GOALS if args.saved_map else json.loads(args.goals.read_text()))
     route_points = json.loads(args.route.read_text())
     for points in (goals, route_points):
         if not points or any(len(p) != 2 or not all(math.isfinite(v) for v in p) for p in points):
@@ -94,15 +103,17 @@ def main():
     def progress(message):
         if args.saved_map:
             with progress_path.open("a") as file:
-                file.write("G03/" + message + "\n")
+                file.write(("G04/" if args.narrow_passage else "G03/") + message + "\n")
 
     if args.saved_map:
         progress_path.parent.mkdir(parents=True, exist_ok=True)
         result["saved_map"] = str(args.saved_map.resolve())
         result["world_map_transform"] = WORLD_MAP
         result["mode"] = "saved-map-headless"
-        result["criteria_version"] = 3
-        progress("시작 v3 headless 저장 지도 Nav2 단일 실행")
+        result["criteria_version"] = 4 if args.narrow_passage else 3
+        result["run_index"] = args.run_index
+        progress(f"run {args.run_index}/3 시작" if args.narrow_passage else
+                 "시작 v3 headless 저장 지도 Nav2 단일 실행")
     result["paths"] = {
         name: str(getattr(args, name).resolve()) for name in (
             "simulator", "controller", "controller_cwd", "world", "tf_observer",
@@ -130,10 +141,15 @@ def main():
     owner_samples = []
     observe_navigation = False
     last_owner_sample = 0.
+    current_spec = {}
+    safety = SafetyReader(output)
+    check_safety = args.narrow_passage
 
     def record_path(message):
         planned_paths.write(json.dumps({
             "stamp": [message.header.stamp.sec, message.header.stamp.nanosec],
+            "received_steady_ns": time.monotonic_ns(),
+            "goal_id": current_spec.get("id"), "kind": current_spec.get("kind"),
             "frame": message.header.frame_id,
             "poses": [[p.pose.position.x, p.pose.position.y, yaw(p.pose.orientation)]
                       for p in message.poses]}) + "\n")
@@ -205,6 +221,15 @@ def main():
     def stop(process):
         return manager.stop(process)
 
+    def safety_check():
+        if check_safety:
+            alert = safety.poll()
+            if alert:
+                result["safety_alert"] = {"message": alert,
+                                          "boundary": current_spec.get("kind") == "boundary"}
+                progress("경보 " + alert)
+                raise RuntimeError("G04 safety stop: " + alert)
+
     def until(predicate, timeout, running=()):
         end = time.monotonic() + timeout
         while time.monotonic() < end:
@@ -213,6 +238,7 @@ def main():
                     raise RuntimeError(f"owned process {p.pid} exited {p.returncode}")
             rclpy.spin_once(node, timeout_sec=0.05)
             observe_owners()
+            safety_check()
             if predicate():
                 return
         raise TimeoutError("condition timed out; inspect phase logs")
@@ -227,9 +253,17 @@ def main():
         return (output / f"{name}.log").read_text()
 
     def truth():
-        rows = list(csv.DictReader((output / "truth.csv").read_text().splitlines()))
-        row = rows[-1]
-        return {key: float(value) for key, value in row.items()}
+        with (output / "truth.csv").open("rb") as file:
+            header = file.readline().decode().strip().split(",")
+            file.seek(0, os.SEEK_END)
+            file.seek(max(0, file.tell()-4096))
+            tail = file.read().decode()
+            lines = tail.splitlines()
+            if not tail.endswith("\n"):
+                lines = lines[:-1]
+        # Native flushes complete rows. Ignore a partially observed final row.
+        rows = [line.split(",") for line in lines if len(line.split(",")) == len(header)]
+        return {key: float(value) for key, value in zip(header, rows[-1])}
 
     def edge_owner(logfile, expected):
         identities, guids = set(), {}
@@ -333,38 +367,93 @@ def main():
         result["navigation_start_ns"] = node.get_clock().now().nanoseconds
         observe_navigation = bool(args.saved_map)
         observe_owners()
+        if args.narrow_passage:
+            # Query all actual parameters, not only source YAML/default guesses.
+            dumps = {}
+            for target in ("/global_costmap/global_costmap", "/local_costmap/local_costmap",
+                           "/planner_server"):
+                list_client = node.create_client(ListParameters, target + "/list_parameters")
+                get_client = node.create_client(GetParameters, target + "/get_parameters")
+                until(lambda: list_client.service_is_ready() and get_client.service_is_ready(), 10)
+                request = ListParameters.Request()
+                listed = list_client.call_async(request)
+                until(listed.done, 10)
+                names = listed.result().result.names
+                request = GetParameters.Request()
+                request.names = names
+                queried = get_client.call_async(request)
+                until(queried.done, 10)
+                fields = {1: "bool_value", 2: "integer_value", 3: "double_value",
+                          4: "string_value", 5: "byte_array_value", 6: "bool_array_value",
+                          7: "integer_array_value", 8: "double_array_value", 9: "string_array_value"}
+                dumps[target] = {name: getattr(value, fields[value.type]) if value.type in fields else None
+                                 for name, value in zip(names, queried.result().values)}
+                dumps[target] = {k: list(v) if not isinstance(v, (str, bool, int, float, type(None)))
+                                 else v for k, v in dumps[target].items()}
+                node.destroy_client(list_client)
+                node.destroy_client(get_client)
+            (output / "parameters.json").write_text(json.dumps(dumps, indent=2) + "\n")
+            result["parameters_match"] = all(
+                isinstance(dumps[target].get(key), (float, int)) and
+                math.isclose(dumps[target][key], value, rel_tol=0, abs_tol=1e-8)
+                for target in ("/global_costmap/global_costmap", "/local_costmap/local_costmap")
+                for key, value in (("robot_radius", .42), ("resolution", .05),
+                                   ("footprint_padding", .01),
+                                   ("inflation_layer.inflation_radius", .65)))
+            result["parameters_match"] = result["parameters_match"] and all(
+                dumps["/planner_server"].get(key) == value for key, value in (
+                    ("GridBased.use_astar", False), ("GridBased.allow_unknown", False),
+                    ("GridBased.tolerance", .1)))
+            if not result["parameters_match"]:
+                raise RuntimeError("G04 actual parameter/model mismatch")
         action = ActionClient(node, NavigateToPose, "/navigate_to_pose")
         if not action.wait_for_server(timeout_sec=10):
             raise TimeoutError("NavigateToPose server missing")
         dx, dy, angle = map_odom
         ca, sa = math.cos(angle), math.sin(angle)
         for index, (x,y) in enumerate(goals, 1):
+            current_spec = GOAL_SPECS[index-1] if args.narrow_passage else {}
+            if current_spec.get("kind") == "boundary" and "boundary_start_sim_time" not in result:
+                result["boundary_start_sim_time"] = truth()["sim_time"]
+                result["boundary_start_steady_ns"] = time.monotonic_ns()
+            safety.minimum = math.inf
             gx, gy = dx+ca*x-sa*y, dy+sa*x+ca*y
             goal = NavigateToPose.Goal()
             goal.pose.header.frame_id = "map"
             goal.pose.header.stamp = node.get_clock().now().to_msg()
             goal.pose.pose.position.x, goal.pose.pose.position.y = gx, gy
-            goal.pose.pose.orientation.z = math.sin(angle/2)
-            goal.pose.pose.orientation.w = math.cos(angle/2)
+            goal_angle = angle + (current_spec["world_goal"][2] if current_spec else 0)
+            goal.pose.pose.orientation.z = math.sin(goal_angle/2)
+            goal.pose.pose.orientation.w = math.cos(goal_angle/2)
             started = time.monotonic()
             start_sim_time = truth()["sim_time"]
+            start_steady_ns = time.monotonic_ns()
             future = action.send_goal_async(goal)
             until(future.done, 10, [sim, ctrl, bridge, localization])
             handle = future.result()
             row = {"index":index, "world_goal":[x,y], "map_goal":[gx,gy], "accepted":handle.accepted}
+            row.update(current_spec)
+            row["start_steady_ns"] = start_steady_ns
+            row["goal_uuid"] = bytes(handle.goal_id.uuid).hex()
             if handle.accepted:
                 response = handle.get_result_async()
                 try:
                     until(response.done, 150, [sim, ctrl, bridge, localization])
                     row["status"] = response.result().status
+                    row["action_result"] = str(response.result().result)
                 except TimeoutError:
                     cancellation = handle.cancel_goal_async()
                     until(cancellation.done, 10)
+                    if args.narrow_passage:
+                        until(response.done, 10, [sim, ctrl, bridge, localization])
+                        row["cancel_terminal_status"] = response.result().status
                     row["status"] = "timeout"
             else:
                 row["status"] = "rejected"
             row["wall_sec"] = time.monotonic()-started
-            row["status_name"] = "SUCCEEDED" if row["status"] == 4 else str(row["status"])
+            row["end_steady_ns"] = time.monotonic_ns()
+            row["status_name"] = {4: "SUCCEEDED", 5: "CANCELED", 6: "ABORTED"}.get(
+                row["status"], str(row["status"]))
             row["truth"] = truth()
             row["start_sim_time"] = start_sim_time
             row["position_error_m"] = math.hypot(row["truth"]["x"]-x, row["truth"]["y"]-y)
@@ -375,6 +464,20 @@ def main():
                                       yaw(pose.pose.pose.orientation)]
             row["costmaps"] = {key: [value.info.width, value.info.height,
                                      value.info.resolution] for key,value in costmaps.items()}
+            if args.narrow_passage:
+                safety_check()
+                row["live_min_clearance_m"] = safety.minimum if math.isfinite(safety.minimum) else None
+                if row["kind"] == "negative":
+                    grid = costmaps.get("global_costmap")
+                    if grid is None:
+                        row["tolerance_allowed_cells"] = None
+                    else:
+                        res = grid.info.resolution
+                        ox, oy = grid.info.origin.position.x, grid.info.origin.position.y
+                        row["tolerance_allowed_cells"] = sum(
+                            1 for j in range(grid.info.height) for i in range(grid.info.width)
+                            if abs(ox+(i+.5)*res-gx) <= .1 and abs(oy+(j+.5)*res-gy) <= .1
+                            and 0 <= grid.data[j*grid.info.width+i] <= 98)
             if row["status"] != 4 or row["position_error_m"] > .3:
                 for key,value in costmaps.items():
                     (output / f"goal{index}_{key}.json").write_text(json.dumps({
@@ -386,7 +489,9 @@ def main():
             checkpoint()
             print("GOAL_RESULT "+json.dumps(row), flush=True)
             progress(f"목표 {index} {'도달' if row['status'] == 4 else '실패'} "
-                     f"시간={row['wall_sec']:.3f}s 오차={row['position_error_m']:.6f}m")
+                     f"{row.get('id', '')} {row['status_name']} "
+                     f"시간={row['wall_sec']:.3f}s 오차={row['position_error_m']:.6f}m "
+                     f"최소여유={row.get('live_min_clearance_m')}")
         result["navigation_end_ns"] = node.get_clock().now().nanoseconds
         if not args.saved_map:
             before = {key:len(samples[key]) for key in ("cloud","odom")}
@@ -414,9 +519,19 @@ def main():
             }
             print("RESET_RECOVERED", flush=True)
     except Exception:
-        result["failure"] = traceback.format_exc()
-        print(result["failure"], flush=True)
+        if args.narrow_passage and current_spec:
+            result["interrupted_goal"] = {
+                **current_spec, "wall_sec": time.monotonic()-started,
+                "truth": truth(), "live_min_clearance_m": safety.minimum}
+            progress(f"목표 {current_spec['id']} 중단 시간={time.monotonic()-started:.3f}s "
+                     f"최소여유={safety.minimum}")
+        if args.narrow_passage and result.get("safety_alert", {}).get("boundary"):
+            result["boundary_failure"] = traceback.format_exc()
+        else:
+            result["failure"] = traceback.format_exc()
+        print(traceback.format_exc(), flush=True)
     finally:
+        check_safety = False
         observe_navigation = False
         cleanup_errors = []
         for p in reversed(processes):
@@ -528,10 +643,59 @@ def main():
                     e["xy_error_m"] is not None for e in errors)
                     and bool(commands) and (output / "planned_paths.jsonl").stat().st_size > 0,
             })
+            if args.narrow_passage:
+                boundary = result.get("boundary_start_sim_time", math.inf)
+                result["all_physics"] = result["physics"]
+                result["physics"] = verdict_physics(physics, boundary)
+                truth_rows = load_csv(output / "truth.csv") if (output / "truth.csv").exists() else []
+                paths = [json.loads(line) for line in (
+                    output / "planned_paths.jsonl").read_text().splitlines()]
+                for row in result["goals"]:
+                    row["planned_path_count"] = sum(
+                        bool(p["poses"]) for p in paths if p["goal_id"] == row["id"])
+                    if row["kind"] == "negative":
+                        points = [[float(r["x"]), float(r["y"])] for r in truth_rows
+                                  if row["start_sim_time"] <= float(r["sim_time"])
+                                  <= row["truth"]["sim_time"]]
+                        row["negative_checks"] = negative_outcome(row, points)
+                positives = [r for r in result["goals"] if r["kind"] == "positive"]
+                negatives = [r for r in result["goals"] if r["kind"] == "negative"]
+                main_truth = [r for r in truth_rows if
+                              result.get("navigation_start_ns", 0)/1e9 <= float(r["sim_time"]) < boundary]
+                result["passage_coverage"] = passage_coverage(main_truth, paths)
+                native_log = (output / "localization_tf.log").read_text() if (
+                    output / "localization_tf.log").exists() else ""
+                result["recoveries"] = recoveries(native_log, result["command_ownership"])
+                for recovery in result["recoveries"]:
+                    progress("회복 " + json.dumps(recovery, ensure_ascii=False))
+                main_recoveries = [r for r in result["recoveries"] if
+                                   r["start_ns"] < result.get("boundary_start_steady_ns", math.inf)]
+                result["main_nonfloor_contacts"] = sum(
+                    float(r["sim_time"]) < boundary for r in load_csv(output / "contacts.csv")) if (
+                        output / "contacts.csv").exists() else None
+                result["criteria"].update({
+                    "goals_succeeded": len(positives) == 34 and all(r["status"] == 4 for r in positives),
+                    "position_error": len(positives) == 34 and all(
+                        r["position_error_m"] <= .3 for r in positives),
+                    "goal_time": len(positives) == 34 and all(r["wall_sec"] <= 150 for r in positives),
+                    "negative_goals": len(negatives) == 4 and all(
+                        all(r["negative_checks"].values()) for r in negatives),
+                    "passage_coverage": result["passage_coverage"]["passed"],
+                    "recoveries_terminated": all(r["terminal"] in (4, 5, 6) for r in main_recoveries),
+                    "zero_nonfloor_contacts": result["main_nonfloor_contacts"] == 0,
+                    "zero_falls": bool(result.get("standup", {}).get("completed"))
+                                  and not result["standup"]["timed_out"]
+                                  and result["physics"]["falls"] == 0,
+                    "clearance": result["physics"]["min_clearance_m"] is not None
+                                 and result["physics"]["min_clearance_m"] >= .10,
+                    "parameters": result.get("parameters_match", False),
+                })
         result["passed"] = not result.get("failure") and all(result["criteria"].values())
         checkpoint()
         progress("종료 정리 판정=" + ("PASS" if result["passed"] else "FAIL")
                  + f" 잔류={len(result['owned_remaining'])}")
+        if args.narrow_passage:
+            progress(f"run {args.run_index}/3 끝 " + ("PASS" if result["passed"] else "FAIL"))
         node.destroy_node()
         rclpy.shutdown()
         print("ACCEPTANCE_FINISHED "+str(output / "result.json"), flush=True)
